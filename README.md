@@ -101,6 +101,14 @@ om import -content olymmath -comp putnam -promote
 
 An import never changes the canonical text of an existing problem, unless you give `-promote`. With `-promote`, a candidate of class H1 or H2 becomes the canonical statement when it ranks above the canonical statement, its text agrees with the canonical text (the signal T is 0.5 or more) and the answers do not disagree. The old text stays in the file as another statement. Each other better candidate goes to the review queue.
 
+### Record the USA TST papers
+
+```sh
+om papers -content olymmath usa-tst-archive
+```
+
+The USA TST Archive on GitHub has the problems, solutions and statistics of the IMO TST, the TSTST and the EGMO TST. The archive states no licence, so its texts are in zone Z2. The `om papers` command lists the files of the archive with the GitHub API and records each problems file as the official English paper of its edition. When the corpus does not have the edition, the command writes the edition file.
+
 ### Link the human solutions
 
 ```sh
