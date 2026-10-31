@@ -1,0 +1,8 @@
+- code: imo
+  name: International Mathematical Olympiad
+  short: IMO
+  level: international
+  organizer: IMO Board
+  url: https://www.imo-official.org/
+  first_year: 1959
+  description: The world championship of mathematics for secondary school students.
