@@ -10,6 +10,8 @@ import (
 type Doc struct {
 	Year int
 	URL  string
+	// Label is the competition label of the rows of the file when it is not the label of the lane.
+	Label string
 }
 
 // Problem is one problem of a file.
@@ -32,6 +34,7 @@ type Lane struct {
 // Lanes maps a source id of the source register to its lane.
 var Lanes = map[string]Lane{
 	"kedlaya-putnam": {Label: "Putnam", Docs: Putnam, Parse: ParsePutnam},
+	"kalva":          {Docs: Kalva, Parse: ParseKalva},
 }
 
 // PutnamFirst is the first year of the Putnam archive.

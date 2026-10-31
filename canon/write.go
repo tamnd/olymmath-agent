@@ -50,8 +50,11 @@ type outProblem struct {
 
 func statementOf(id string, c *Candidate) outStatement {
 	kind := "transcription"
-	if c.Origin == "H1" {
+	switch {
+	case c.Origin == "H1":
 		kind = "official"
+	case c.Reworded:
+		kind = "rewording"
 	}
 	lang := c.Lang
 	if lang == "" {
@@ -139,7 +142,8 @@ func Add(p *content.Problem, r *Record, original string) Additions {
 		have[c.Source] = true
 		n++
 		a.Statements = append(a.Statements, statementOf(fmt.Sprintf("S%d", n), c))
-		if rk, _ := Rank(c, original); rk >= 0 && rk < cur && a.Better == nil {
+		// A reworded text never replaces a canonical statement (spec 06.3).
+		if rk, _ := Rank(c, original); rk >= 0 && rk < cur && a.Better == nil && !c.Reworded {
 			a.Better = c
 		}
 	}

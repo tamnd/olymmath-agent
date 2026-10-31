@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/match"
 )
 
@@ -29,6 +30,25 @@ func TestChooseHumanFirst(t *testing.T) {
 	}
 	if len(ch.Kept) != 2 {
 		t.Fatalf("kept %d, want 2", len(ch.Kept))
+	}
+}
+
+func TestChooseReworded(t *testing.T) {
+	kalva := cand("apmo/1989/p1", "kalva", "H3", "$a_i$ are positive reals. s = $a_1$ + ... + $a_n$. Prove that (1 + $a_1$) ... (1 + $a_n$) < 1 + s + $s^2$/2! + ... + $s^n$/n!.", "")
+	kalva.Reworded = true
+	kalva.Key = match.WeakKey
+	d := cand("apmo/1989/p1", "hf-d", "D", "Let $x_1, x_2, \\dots, x_n$ be positive real numbers and let $S = x_1 + \\dots + x_n$. Prove that $(1+x_1)\\cdots(1+x_n) \\le 1 + S + S^2/2! + \\dots + S^n/n!$.", "")
+	d.Key = match.WeakKey
+	ch, ok := Choose("apmo/1989/p1", []*Candidate{kalva, d}, "en")
+	if !ok {
+		t.Fatal("no choice")
+	}
+	if ch.Best.Source != "hf-d" || len(ch.Doubts) != 0 || len(ch.Kept) != 1 || ch.Kept[0].Source != "kalva" {
+		t.Fatalf("best %s, %d doubts, kept %v", ch.Best.Source, len(ch.Doubts), ch.Kept)
+	}
+	only, _ := Choose("apmo/1989/p1", []*Candidate{kalva}, "en")
+	if only.Best.Source != "kalva" {
+		t.Fatalf("best %s, want kalva when it is the only text", only.Best.Source)
 	}
 }
 
@@ -149,5 +169,19 @@ func TestConfirm(t *testing.T) {
 	}
 	if len(ch.Doubts) != 1 || ch.Doubts[0].C != wrong {
 		t.Errorf("doubts %v, want the text of p2", ch.Doubts)
+	}
+}
+
+func TestAddReworded(t *testing.T) {
+	p := &content.Problem{Statements: []content.Statement{{ID: "S1", Lang: "en", Source: "hf-d", Origin: "D"}}}
+	p.Canonical.Statement = "S1"
+	kalva := cand("apmo/1989/p1", "kalva", "H3", geo, "")
+	kalva.Reworded = true
+	wiki := cand("apmo/1989/p1", "aops-wiki", "H3", geo, "")
+	if a := Add(p, &Record{Primary: Choice{Best: kalva}}, "en"); a.Better != nil || len(a.Statements) != 1 {
+		t.Fatalf("reworded: better %v, %d statements", a.Better, len(a.Statements))
+	}
+	if a := Add(p, &Record{Primary: Choice{Best: wiki}}, "en"); a.Better != wiki {
+		t.Fatalf("not reworded: better %v", a.Better)
 	}
 }

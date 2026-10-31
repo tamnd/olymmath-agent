@@ -113,7 +113,11 @@ func seedArchive(ctx context.Context, fc *fetch.Client, dir, source string, lane
 					skipped++
 					continue
 				}
-				row := seed.Row{Source: source, File: path.Base(d.URL), Row: i, Labels: []string{lane.Label}, Year: d.Year, Number: p.Number, Lang: "en", Statement: p.Text, Ref: d.URL}
+				label := lane.Label
+				if d.Label != "" {
+					label = d.Label
+				}
+				row := seed.Row{Source: source, File: path.Base(d.URL), Row: i, Labels: []string{label}, Year: d.Year, Number: p.Number, Lang: "en", Statement: p.Text, Ref: d.URL}
 				if err := enc.Encode(row); err != nil {
 					return err
 				}
