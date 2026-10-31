@@ -162,6 +162,16 @@ func runImport(env Env, args []string) int {
 			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
 			return ExitFailure
 		}
+		// A merge that the register has already does not get a second row.
+		known := map[string]bool{}
+		olds, err := review.Merges(*root)
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
+			return ExitFailure
+		}
+		for _, m := range olds {
+			known[m.At+"\x00"+m.Into] = true
+		}
 		for i, r := range newRecs {
 			comp := strings.SplitN(r.Primary.At, "/", 2)[0]
 			b, err := canon.Render(r, tags[i], canon.TypeOf(comp, r.Primary.Answer))
@@ -175,6 +185,9 @@ func runImport(env Env, args []string) int {
 			}
 			for _, m := range r.Merged {
 				merged++
+				if known[m.At+"\x00"+m.Into] {
+					continue
+				}
 				mergeRows = append(mergeRows, fmt.Sprintf("%s\t%s\t%s\t%.3f\t%s\t%s\t-", m.At, m.Into, keyName(m), m.Signals.T, answerName(m), cmpOr(m.Rule, "text")))
 			}
 		}
