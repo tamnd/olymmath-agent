@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -69,6 +70,11 @@ func Open(name string, r io.ReaderAt, size int64) (Table, error) {
 
 // IsData tells if Open can read the file.
 func IsData(name string) bool {
+	switch path.Base(strings.ToLower(name)) {
+	case "config.json", "dataset_info.json", "dataset_infos.json", "dataset_dict.json", "state.json", "metadata.json":
+		// The files of the datasets library that describe a dataset. They are not rows.
+		return false
+	}
 	switch ext(name) {
 	case "parquet", "jsonl", "ndjson", "json", "csv":
 		return true

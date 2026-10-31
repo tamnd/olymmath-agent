@@ -155,6 +155,15 @@ var Profiles = map[string]Profile{
 			}, r.Get("problem") != ""
 		},
 	},
+	// The TÜBİTAK set has each problem as an image only. The seed row records the year and the subject, and milestone M6 reads the image.
+	"hf-tubitak": {
+		Columns: []string{"id", "subject", "year", "stage", "question_number"},
+		Files:   func(p string) bool { return strings.Contains(p, "matematik") },
+		Map: func(r Record) (Row, bool) {
+			y, _ := strconv.Atoi(r.Get("year"))
+			return Row{ID: r.Get("id"), Labels: labels("TÜBİTAK " + r.Get("subject")), Year: y, Country: "TR", Lang: "tr"}, r.Get("id") != ""
+		},
+	},
 	"hf-olympiadbench": {
 		Columns: []string{"id", "question", "final_answer", "solution", "language", "subfield"},
 		Files:   func(p string) bool { return strings.Contains(p, "maths") && !strings.Contains(p, "CEE") },
@@ -191,9 +200,9 @@ var (
 	genStatement = []string{"problem", "question", "Problem", "Question", "problem_markdown", "statement", "informal_statement", "informal_problem", "problem_statement", "prompt"}
 	genAnswer    = []string{"answer", "final_answer", "Answer", "ground_truth", "expected_answer"}
 	genSolution  = []string{"solution", "solutions", "Solution", "proof", "reference_solution", "reasoning"}
-	genLabel     = []string{"competition", "contest", "exam", "source", "Source", "origin", "category", "subject"}
+	genLabel     = []string{"competition", "contest", "exam", "source", "Source", "origin", "category", "subject", "part"}
 	genYear      = []string{"year", "Year"}
-	genNumber    = []string{"problem_label", "problem_number", "number", "problem_idx", "No"}
+	genNumber    = []string{"problem_label", "problem_number", "number", "problem_idx", "No", "index"}
 	genID        = []string{"id", "ID", "uid", "problem_id", "unique_id", "idx"}
 	genLang      = []string{"language", "lang"}
 )
@@ -219,6 +228,11 @@ func Generic(cols []string) Profile {
 		Columns: pick,
 		Map: func(r Record) (Row, bool) {
 			st := r.First(genStatement...)
+			id, num := r.First(genID...), r.First(genNumber...)
+			if num == "" && Position(id) != "" {
+				// Some sets give the position as the id, as in "A-1".
+				num = id
+			}
 			var ls []string
 			for _, c := range genLabel {
 				ls = append(ls, r.Get(c))
@@ -232,7 +246,7 @@ func Generic(cols []string) Profile {
 				}
 			}
 			return Row{
-				ID: r.First(genID...), Labels: labels(ls...), Year: y, Number: r.First(genNumber...), Lang: r.First(genLang...),
+				ID: id, Labels: labels(ls...), Year: y, Number: num, Lang: r.First(genLang...),
 				Statement: st, Answer: r.First(genAnswer...), Solutions: count(r, genSolution...),
 			}, st != ""
 		},
