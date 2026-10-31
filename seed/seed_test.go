@@ -19,11 +19,16 @@ import (
 func TestNorm(t *testing.T) {
 	cases := map[string]string{
 		"51st Ukrainian National Mathematical Olympiad, 2015": "ukrainian national mathematical olympiad",
-		"NewZealand_MO":            "new zealand mathematical olympiad",
-		"BalticWay":                "baltic way",
-		"2023 Germany TST":         "germany team selection test",
-		"The Balkan Math Olympiad": "balkan mathematical olympiad",
-		"IMO":                      "imo",
+		"NewZealand_MO":                        "new zealand mathematical olympiad",
+		"BalticWay":                            "baltic way",
+		"2023 Germany TST":                     "germany team selection test",
+		"The Balkan Math Olympiad":             "balkan mathematical olympiad",
+		"IMO":                                  "imo",
+		"South-Afrika 2011-2013":               "south afrika",
+		"Belarus2022":                          "belarus",
+		"IV Soros Olympiad 1997 - 98 (Russia)": "soros olympiad russia",
+		"53. Bulgarian Mathematical Olympiad":  "bulgarian mathematical olympiad",
+		"AMC 10 A":                             "amc 10 a",
 	}
 	for in, want := range cases {
 		if got := Norm(in); got != want {
@@ -33,7 +38,7 @@ func TestNorm(t *testing.T) {
 }
 
 func TestPosition(t *testing.T) {
-	cases := map[string]string{"3": "p3", "P3": "p3", "Problem 12": "p12", "A1": "a1", "c7": "c7", "": "", "3a": "", "0": ""}
+	cases := map[string]string{"3": "p3", "P3": "p3", "Problem 12": "p12", "A1": "a1", "A-1": "a1", "B_6": "b6", "c7": "c7", "": "", "3a": "", "0": ""}
 	for in, want := range cases {
 		if got := Position(in); got != want {
 			t.Errorf("Position(%q) = %q, want %q", in, got, want)
