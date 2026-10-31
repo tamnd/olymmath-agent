@@ -38,23 +38,48 @@ var expand = map[string]string{
 	"&":           "and",
 }
 
-// Norm gives the key of a label: lower case, words of a CamelCase name apart, no years, no ordinals, no punctuation, the long form of short words and single spaces. "51st Ukrainian National Mathematical Olympiad, 2015" gives "ukrainian national mathematical olympiad", and "NewZealand_MO" gives "new zealand mathematical olympiad".
+var (
+	letterDigitRE = regexp.MustCompile(`([a-z])([0-9])`)
+	digitLetterRE = regexp.MustCompile(`([0-9])([a-z])`)
+	yearWordRE    = regexp.MustCompile(`^(19|20)[0-9]{2}$`)
+	shortNumRE    = regexp.MustCompile(`^[0-9]{1,2}$`)
+	romanRE       = regexp.MustCompile(`^[ivxl]+$`)
+)
+
+// Norm gives the key of a label: lower case, words of a CamelCase name apart, no years, no year ranges, no ordinals, no edition number at the start, no punctuation, the long form of short words and single spaces. "51st Ukrainian National Mathematical Olympiad, 2015" gives "ukrainian national mathematical olympiad", and "NewZealand_MO" gives "new zealand mathematical olympiad".
 func Norm(s string) string {
 	s = camelRE.ReplaceAllString(s, "$1 $2")
 	s = strings.ToLower(s)
-	s = yearRE.ReplaceAllString(s, " ")
 	s = ordinalRE.ReplaceAllString(s, " ")
+	s = letterDigitRE.ReplaceAllString(s, "$1 $2")
+	s = digitLetterRE.ReplaceAllString(s, "$1 $2")
 	s = strings.Map(func(r rune) rune {
 		if unicode.IsLetter(r) || unicode.IsDigit(r) {
 			return r
 		}
 		return ' '
 	}, s)
-	words := strings.Fields(s)
-	for i, w := range words {
-		if x, ok := expand[w]; ok {
-			words[i] = x
+	var words []string
+	afterYear := false
+	for _, w := range strings.Fields(s) {
+		switch {
+		case yearWordRE.MatchString(w):
+			afterYear = true
+			continue
+		case afterYear && shortNumRE.MatchString(w):
+			// The end of a range such as "1997-98".
+			afterYear = false
+			continue
 		}
+		afterYear = false
+		if x, ok := expand[w]; ok {
+			w = x
+		}
+		words = append(words, w)
+	}
+	// An edition number or a roman numeral at the start, as in "53. Bulgarian Mathematical Olympiad" or "IV Soros Olympiad".
+	if len(words) > 1 && (romanRE.MatchString(words[0]) || shortNumRE.MatchString(words[0]) || strings.Trim(words[0], "0123456789") == "") {
+		words = words[1:]
 	}
 	if len(words) > 0 && words[0] == "the" {
 		words = words[1:]
@@ -123,9 +148,9 @@ func (a *Aliases) Len() int { return len(a.m) }
 
 var posRE = regexp.MustCompile(`^(?:problem|prob|p|q|#)?\s*([a-z]?)\s*([0-9]{1,2})$`)
 
-// Position makes a position from a problem label of a dataset: "3", "P3" and "Problem 3" give "p3", and "A1" gives "a1". It returns "" for a label it cannot read.
+// Position makes a position from a problem label of a dataset: "3", "P3" and "Problem 3" give "p3", and "A1" and "A-1" give "a1". It returns "" for a label it cannot read.
 func Position(label string) string {
-	m := posRE.FindStringSubmatch(strings.ToLower(strings.TrimSpace(label)))
+	m := posRE.FindStringSubmatch(strings.NewReplacer("-", "", "_", "", ".", "").Replace(strings.ToLower(strings.TrimSpace(label))))
 	if m == nil {
 		return ""
 	}

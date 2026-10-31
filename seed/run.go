@@ -78,6 +78,10 @@ func (r *Runner) Run(ctx context.Context, source string, w io.Writer) (Stats, er
 				return nil
 			}
 			row.Source, row.File, row.Row = source, f.Path, i
+			if len(row.Labels) == 0 {
+				// A dataset of one competition often has no label column. The alias table can map the source label to that competition.
+				row.Labels = []string{SourceLabel(source)}
+			}
 			row.Statement = strings.TrimSpace(row.Statement)
 			st.Kept++
 			return enc.Encode(row)
@@ -115,6 +119,9 @@ func (r *Runner) open(ctx context.Context, f hf.ManifestFile) (io.ReaderAt, func
 	rg.Agent, rg.Token = r.Agent, r.Token
 	return rg, func() {}, rg, nil
 }
+
+// SourceLabel is the label of a seed row that has no label of its own: "source:" and the source id.
+func SourceLabel(source string) string { return "source:" + source }
 
 // DefaultDir is the work directory of the seed rows: OLYMMATH_WORK/seed, or ~/.cache/olymmath/work/seed.
 func DefaultDir() string {
