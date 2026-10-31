@@ -1,14 +1,23 @@
-{{define "competitions.html"}}{{template "top" .}}
+{{define "competitions.html"}}{{template "top" .}}{{with .Data}}
 <nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Competitions</span></nav>
 <h1>Competitions</h1>
-<p class="lede">The olympiads on olymmath. More competitions come with each release.</p>
-<div class="grid">
-{{range .Data}}
-  <a class="card tile" href="{{link (printf "c/%s/" .Code)}}">
-    <span class="tile-kicker">{{.Level}}</span>
-    <span class="tile-title">{{.Name}}</span>
-    <span class="tile-meta">Since {{.FirstYear}} · {{len .Editions}} papers on olymmath</span>
-  </a>
+<p class="lede">The register has {{.Total}} competitions. {{if eq .WithProblems 1}}1 of them has problems{{else}}{{.WithProblems}} of them have problems{{end}} on olymmath now. Each competition with no problems yet shows what is missing, so a gap is easy to see.</p>
+<div class="filter"><label for="filter" class="sr-only">Filter the competitions</label><input id="filter" type="search" placeholder="Filter by name, code or country" autocomplete="off" data-filter></div>
+<nav class="jump" aria-label="Groups">{{range .Groups}}<a href="#{{.ID}}">{{.Title}} <span class="muted">{{.Count}}</span></a>{{end}}</nav>
+{{range .Groups}}
+<section class="group" id="{{.ID}}" data-group>
+  <h2>{{.Title}} <span class="muted">{{.Count}}</span></h2>
+  {{range .Countries}}
+  <div class="country" data-group>
+    {{if .Name}}<h3>{{.Name}}</h3>{{end}}
+    <ul class="directory">
+    {{range .Rows}}
+      <li data-row data-text="{{.Name}} {{.Short}} {{.Code}} {{country .Country}}"><a href="{{link (printf "c/%s/" .Code)}}"><span class="dir-name">{{.Name}}</span> <span class="dir-code">{{.Code}}</span></a><span class="dir-meta">{{if .FirstYear}}since {{.FirstYear}}{{end}}{{$n := problems .}}{{if $n}}<span class="dir-count">{{$n}} problems</span>{{end}}</span></li>
+    {{end}}
+    </ul>
+  </div>
+  {{end}}
+</section>
 {{end}}
-</div>
-{{template "bottom" .}}{{end}}
+<p class="empty-filter" hidden data-empty>No competition matches the filter.</p>
+{{end}}{{template "bottom" .}}{{end}}

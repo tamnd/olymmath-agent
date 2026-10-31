@@ -94,4 +94,21 @@
     input.addEventListener("input", run);
     document.querySelector("[data-search]").addEventListener("submit", function (e) { e.preventDefault(); run(); });
   }).catch(function () { status.textContent = "The search index did not load. Try again later."; });
+  // The filter of the competition list hides each row that does not contain the text, and each group that has no row left.
+  var filter = document.querySelector("[data-filter]");
+  if (filter) {
+    filter.addEventListener("input", function () {
+      var q = filter.value.trim().toLowerCase();
+      var shown = 0;
+      document.querySelectorAll("[data-row]").forEach(function (row) {
+        var hit = row.getAttribute("data-text").toLowerCase().indexOf(q) >= 0;
+        row.hidden = !hit;
+        if (hit) shown++;
+      });
+      document.querySelectorAll("[data-group]").forEach(function (g) {
+        g.hidden = !g.querySelector("[data-row]:not([hidden])");
+      });
+      document.querySelector("[data-empty]").hidden = shown > 0;
+    });
+  }
 })();

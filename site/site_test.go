@@ -97,6 +97,22 @@ func TestBuildTagsAndRedirects(t *testing.T) {
 	}
 }
 
+func TestCompetitionsPage(t *testing.T) {
+	out := build(t, "/")
+	c := read(t, out, "c/index.html")
+	for _, want := range []string{`id="international"`, "1 of them has problems", "data-filter", `href="/c/imo/"`} {
+		if !strings.Contains(c, want) {
+			t.Errorf("c/index.html has no %q", want)
+		}
+	}
+}
+
+func TestCountryName(t *testing.T) {
+	if countryName("VN") != "Vietnam" || countryName("ZZ") != "ZZ" {
+		t.Error("countryName is wrong")
+	}
+}
+
 func TestBuildBase(t *testing.T) {
 	out := build(t, "/olymmath/")
 	p1 := read(t, out, "imo/2024/p1.html")
