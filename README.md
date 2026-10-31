@@ -40,6 +40,8 @@ om site build -content olymmath -out build/site
 
 Open `build/site/index.html` in a browser, or serve the directory with any static file server.
 
+Each competition page has a year grid. A row is a year and a cell is a position. The colour of a cell gives the class of its text, a dot marks a human solution, and an empty cell is a position with no problem yet. The years come from `first_year`, `last_year` and `gaps` in the register. The page `/coverage/` gives the measures C0 to C8 of spec 14 for each competition.
+
 Use `om help` to see all the commands.
 
 ## Edit the content

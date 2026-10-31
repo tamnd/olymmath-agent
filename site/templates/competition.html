@@ -7,17 +7,29 @@
   {{if .FirstYear}}<div><dt>First held</dt><dd>{{.FirstYear}}</dd></div>{{end}}
   {{if .URL}}<div><dt>Official site</dt><dd><a href="{{.URL}}" rel="noopener">{{.URL}}</a></dd></div>{{end}}
 </dl>
-<h2>Papers</h2>
+<h2>Years</h2>
+<dl class="measures">
+  {{range .Measures}}<div><dt><abbr title="{{.Name}}">{{.Code}}</abbr> {{.Name}}</dt><dd>{{.Value}}</dd></div>{{end}}
+</dl>
+<ul class="legend">
+  <li><span class="cell cell-h1"></span>Official text</li>
+  <li><span class="cell cell-h2"></span>Curated human text</li>
+  <li><span class="cell cell-h3"></span>Community text</li>
+  <li><span class="cell cell-d"></span>Derived text</li>
+  <li><span class="cell cell-missing"></span>No problem yet</li>
+  <li><span class="cell cell-h1 cell-sol"></span>Has a human solution</li>
+</ul>
 <div class="table-wrap">
 <table class="years">
-  <thead><tr><th scope="col">Year</th><th scope="col">Place</th><th scope="col">Problems</th></tr></thead>
+  <thead><tr><th scope="col">Year</th><th scope="col">Place</th><th scope="col">Positions</th></tr></thead>
   <tbody>
   {{$c := .}}
-  {{range .Editions}}
+  {{range .Rows}}
     <tr>
-      <th scope="row"><a href="{{link (printf "%s/" .Locator)}}">{{.Year}}</a></th>
-      <td>{{.Place}}{{if .Country}}, {{.Country}}{{end}}</td>
-      <td><ol class="cells">{{range .Problems}}<li><a href="{{link .Locator}}" title="{{$c.Short}} {{.Year}} {{poslabel .Position}}">{{poscell .Position}}</a></li>{{end}}</ol></td>
+      {{$e := .Edition}}{{$y := .Year}}
+      <th scope="row">{{if $e}}<a href="{{link (printf "%s/" $e.Locator)}}">{{.Year}}</a>{{else}}{{.Year}}{{end}}</th>
+      <td>{{with $e}}{{.Place}}{{if .Country}}, {{.Country}}{{end}}{{end}}</td>
+      <td><ol class="cells">{{range .Cells}}<li>{{if .Problem}}<a class="cell cell-{{lower .Class}}{{if .Human}} cell-sol{{end}}{{if not .Counted}} cell-extra{{end}}" href="{{link (printf "%s/%s" $e.Locator .Position)}}" title="{{$c.Short}} {{$y}} {{poslabel .Position}}">{{poscell .Position}}</a>{{else}}<span class="cell cell-missing" title="{{$c.Short}} {{$y}} {{poslabel .Position}}: no problem yet">{{poscell .Position}}</span>{{end}}</li>{{end}}</ol></td>
     </tr>
   {{end}}
   </tbody>

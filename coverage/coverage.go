@@ -187,7 +187,9 @@ func measure(c *content.Competition, cand map[int]map[string]bool, seen map[int]
 			last = c.LastYear
 		}
 		for y := c.FirstYear; y <= last; y++ {
-			years[y] = true
+			if !slices.Contains(c.Gaps, y) {
+				years[y] = true
+			}
 		}
 	}
 	for y := range editions {
