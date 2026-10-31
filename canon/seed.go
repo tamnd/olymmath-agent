@@ -23,8 +23,15 @@ var (
 	letterRE   = regexp.MustCompile(`(?i)(?:^|[\s\d])(ii|i|a|b)\s*$`)
 	positionRE = regexp.MustCompile(`^[a-z][0-9]{1,2}$`)
 	// titleRE matches a text that names a problem instead of stating it.
+	// refRE matches a short text with no formula that names the source of a problem, for example "Tuymaada 2002 day 1 problem 1. Author : A. Golovanov." or "Kvant M1467 (Sol: 3/1995) IMO 1994 P1 IMO Shortlist 1994 A2".
+	refRE   = regexp.MustCompile(`(?i)\b(19|20)[0-9]{2}\b.*\b(problem|shortlist|olympiad|tst|authors?|grade|round|day|kvant)\b|\b(problem|shortlist|olympiad|tst|authors?|grade|round|day|kvant)\b.*\b(19|20)[0-9]{2}\b`)
 	titleRE = regexp.MustCompile(`(?i)^[\w .'-]*\b(19|20)[0-9]{2}\b[\w .'-]*(/|#|problem\s*)[a-z]?[0-9]{1,2}\b[\w ./#-]*$`)
 )
+
+// isRef tells if a text names the source of a problem instead of stating it: a text with no formula, a year, a word such as "problem" or "shortlist", fewer than 20 words and no question mark at the end.
+func isRef(text string) bool {
+	return !strings.Contains(text, "$") && len(strings.Fields(text)) < 20 && !strings.HasSuffix(text, "?") && refRE.MatchString(text)
+}
 
 // Letter gives the letter of the edition of a competition with two papers each year, from the labels of a row: "AIME I" gives a, "AIME II" gives b and "AMC 10B" gives b. It returns "" when no label has a letter.
 func Letter(labels []string) string {
@@ -117,7 +124,7 @@ func (s *Seeds) Add(r seed.Row) {
 		return
 	}
 	text := normalize.Statement(r.Statement, pos)
-	if utf8.RuneCountInString(text) < MinText || titleRE.MatchString(text) || (len(strings.Fields(text)) < MinWords && !strings.Contains(text, "$")) || !strings.ContainsAny(text, "$.?!:") || (strings.Contains(text, ";") && !strings.Contains(text, "$") && len(strings.Fields(text)) < 30) {
+	if utf8.RuneCountInString(text) < MinText || titleRE.MatchString(text) || isRef(text) || (len(strings.Fields(text)) < MinWords && !strings.Contains(text, "$")) || !strings.ContainsAny(text, "$.?!:") || (strings.Contains(text, ";") && !strings.Contains(text, "$") && len(strings.Fields(text)) < 30) {
 		s.skip("not a statement")
 		return
 	}
