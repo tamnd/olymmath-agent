@@ -297,3 +297,26 @@ func (s *Store) Sources() ([]string, error) {
 	}
 	return out, nil
 }
+
+// Cursor returns the saved position of a harvest of source, so that a harvest that stops can resume. It returns "" when there is no cursor.
+func (s *Store) Cursor(source string) (string, error) {
+	b, err := os.ReadFile(filepath.Join(s.Dir, "cursors", strings.TrimSuffix(indexName(source), ".jsonl")))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	return strings.TrimSpace(string(b)), err
+}
+
+// SetCursor saves the position of a harvest of source.
+func (s *Store) SetCursor(source, cursor string) error {
+	dir := filepath.Join(s.Dir, "cursors")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return err
+	}
+	name := filepath.Join(dir, strings.TrimSuffix(indexName(source), ".jsonl"))
+	tmp := name + ".tmp"
+	if err := os.WriteFile(tmp, []byte(cursor+"\n"), 0o640); err != nil {
+		return err
+	}
+	return os.Rename(tmp, name)
+}

@@ -193,3 +193,16 @@ func TestValidHash(t *testing.T) {
 		t.Error("ValidHash")
 	}
 }
+
+func TestCursor(t *testing.T) {
+	s, _ := Open(t.TempDir(), nil)
+	if c, err := s.Cursor("aops:c13"); c != "" || err != nil {
+		t.Fatalf("empty: %q %v", c, err)
+	}
+	if err := s.SetCursor("aops:c13", "page 4"); err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := s.Cursor("aops:c13"); c != "page 4" {
+		t.Fatalf("got %q", c)
+	}
+}
