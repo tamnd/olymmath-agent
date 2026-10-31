@@ -121,6 +121,8 @@ type Source struct {
 	Page   int
 	Origin string
 	Zone   string
+	// Traced tells that the text is a transcription that agrees with an official text. Origin is then the class of the official text.
+	Traced bool
 }
 
 // Appearance is the fact that a problem was set in a paper at a position (spec 04.1).
@@ -145,6 +147,8 @@ type Statement struct {
 	Origin   string `yaml:"origin"`
 	Zone     string `yaml:"zone"`
 	DiffFrom string `yaml:"diff_from"`
+	// Traced is the id of the official statement that this transcription agrees with, word for word and number for number. A traced text takes the class of that statement (spec 06.2).
+	Traced string `yaml:"traced"`
 
 	// Text is the text of the statement from the body of the file. It is empty when the statement is only a diff or a link.
 	Text string `yaml:"-"`
@@ -251,6 +255,18 @@ func (p *Problem) CanonicalStatement() *Statement {
 		}
 	}
 	return nil
+}
+
+// Class returns the origin class of a statement of the problem. A traced statement has the class of the statement that it is traced to.
+func (p *Problem) Class(s *Statement) string {
+	if s.Traced != "" {
+		for i := range p.Statements {
+			if o := &p.Statements[i]; o.ID == s.Traced && o.ID != s.ID {
+				return o.Origin
+			}
+		}
+	}
+	return s.Origin
 }
 
 // Proposer returns the name of the proposer, or an empty string.

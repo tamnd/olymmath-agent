@@ -128,7 +128,7 @@ func Add(p *content.Problem, r *Record, original string) Additions {
 	}
 	cur := 99
 	if s := p.CanonicalStatement(); s != nil {
-		cur, _ = Rank(&Candidate{Origin: s.Origin, Lang: s.Lang}, original)
+		cur, _ = Rank(&Candidate{Origin: p.Class(s), Lang: s.Lang}, original)
 	}
 	all := append([]*Candidate{r.Primary.Best}, r.Primary.Kept...)
 	n := len(p.Statements)
@@ -260,5 +260,80 @@ func Promote(file []byte, old, id, text, rule string) ([]byte, error) {
 	}
 	buf.WriteString("---\n")
 	buf.WriteString(text + "\n\n<!-- " + old + " -->\n" + strings.TrimLeft(body, "\n"))
+	return content.Format(buf.Bytes())
+}
+
+// Trace marks the statement id of an existing problem file as traced to the official statement official, and makes it the canonical statement with the rule. The text of id moves to the top of the body, and the other texts keep their markers.
+func Trace(file []byte, id, official, rule string) ([]byte, error) {
+	front, body, err := content.SplitFront(file)
+	if err != nil {
+		return nil, err
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(front, &doc); err != nil {
+		return nil, err
+	}
+	field := func(n *yaml.Node, key string) *yaml.Node {
+		for i := 0; n != nil && i+1 < len(n.Content); i += 2 {
+			if n.Content[i].Value == key {
+				return n.Content[i+1]
+			}
+		}
+		return nil
+	}
+	m := doc.Content[0]
+	canonical, status, list := field(m, "canonical"), field(m, "status"), field(m, "statements")
+	if field(canonical, "statement") == nil || field(canonical, "rule") == nil || field(status, "statement") == nil || list == nil {
+		return nil, fmt.Errorf("the problem has no canonical statement, rule, status or statements")
+	}
+	var target *yaml.Node
+	var ids []string
+	found := false
+	for _, s := range list.Content {
+		sid := field(s, "id")
+		if sid == nil {
+			continue
+		}
+		ids = append(ids, sid.Value)
+		switch sid.Value {
+		case id:
+			target = s
+		case official:
+			found = true
+		}
+	}
+	if target == nil || !found || id == official {
+		return nil, fmt.Errorf("the problem has no statements %s and %s", id, official)
+	}
+	if t := field(target, "traced"); t != nil {
+		t.Value = official
+	} else {
+		target.Content = append(target.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "traced"}, &yaml.Node{Kind: yaml.ScalarNode, Value: official})
+	}
+	old := field(canonical, "statement").Value
+	texts := content.SplitStatements(body, old)
+	if texts[id] == "" {
+		return nil, fmt.Errorf("the statement %s has no text", id)
+	}
+	field(canonical, "statement").Value = id
+	field(canonical, "rule").Value = rule
+	field(status, "statement").Value = "sourced"
+	var buf bytes.Buffer
+	buf.WriteString("---\n")
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(&doc); err != nil {
+		return nil, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, err
+	}
+	buf.WriteString("---\n")
+	buf.WriteString(texts[id] + "\n")
+	for _, sid := range ids {
+		if sid != id && texts[sid] != "" {
+			buf.WriteString("\n<!-- " + sid + " -->\n" + texts[sid] + "\n")
+		}
+	}
 	return content.Format(buf.Bytes())
 }

@@ -97,6 +97,7 @@ func TestRules(t *testing.T) {
 			{"    kind: official\n", "    kind: official\n  - id: S2\n    lang: en\n    source: imo-official\n    origin: H1\n    zone: Z2\n    kind: transcription\n"},
 			{"holds for all integers $n \\geq N$.", "holds for all integers $n \\geq N$.\n<!-- S2 -->\nDetermine all pairs $(a,b)$ of positive integers such that $\\gcd(a^n+2b, b^n+a) = g$ for all integers $n \\geq N$."},
 		}}},
+		{"S03", map[string][][2]string{p2: {{"    kind: official\n", "    kind: official\n    traced: S1\n"}}}},
 		{"S07", map[string][][2]string{p2: {{"zone: Z2", "zone: Z3"}}}},
 		{"S08", map[string][][2]string{p2: {{"holds for all integers $n \\geq N$.", "holds for all integers $n \\geq N$.\n\n![The figure](figure.svg)"}}}},
 		{"D01", map[string][][2]string{p2: {{"Determine all pairs $(a,b)$ of positive integers for which there exist positive integers $g$ and $N$ such that\n$$\\gcd(a^n+b,\\ b^n+a) = g$$\nholds for all integers $n \\geq N$.", "Determine all real numbers $\\alpha$ such that, for every positive integer $n$, the integer\n$$\\lfloor \\alpha \\rfloor + \\lfloor 2\\alpha \\rfloor + \\cdots + \\lfloor n\\alpha \\rfloor$$\nis a multiple of $n$."}}}},

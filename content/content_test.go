@@ -51,7 +51,7 @@ func TestLoadValid(t *testing.T) {
 }
 
 func TestSplitStatements(t *testing.T) {
-	got := splitStatements("Text one.\n\n<!-- S2 lang=fr -->\nTexte deux.\n", "S1")
+	got := SplitStatements("Text one.\n\n<!-- S2 lang=fr -->\nTexte deux.\n", "S1")
 	if got["S1"] != "Text one." || got["S2"] != "Texte deux." {
 		t.Fatalf("got %q", got)
 	}

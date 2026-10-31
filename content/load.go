@@ -210,8 +210,8 @@ func (l *loader) problems() {
 
 var markerRE = regexp.MustCompile(`(?m)^<!--\s*(S[0-9]+)\b[^>]*-->[ \t]*$`)
 
-// splitStatements cuts the body into the texts of the statements. The text before the first marker belongs to the canonical statement.
-func splitStatements(body, canonical string) map[string]string {
+// SplitStatements cuts the body into the texts of the statements. The text before the first marker belongs to the canonical statement.
+func SplitStatements(body, canonical string) map[string]string {
 	texts := map[string]string{}
 	locs := markerRE.FindAllStringSubmatchIndex(body, -1)
 	start, id := 0, canonical
@@ -278,7 +278,7 @@ func (l *loader) problem(rel string) {
 		l.add(rel, "T03", "the path must be %s", want)
 		return
 	}
-	texts := splitStatements(body, p.Canonical.Statement)
+	texts := SplitStatements(body, p.Canonical.Statement)
 	for i := range p.Statements {
 		s := &p.Statements[i]
 		s.Text = texts[s.ID]
@@ -290,6 +290,9 @@ func (l *loader) problem(rel string) {
 	if s := p.CanonicalStatement(); s != nil {
 		p.Statement = s.Text
 		p.Source = l.source(s)
+		if s.Traced != "" {
+			p.Source.Origin, p.Source.Traced = p.Class(s), true
+		}
 		if s.Kind != "official" {
 			for i := range p.Statements {
 				if o := &p.Statements[i]; o.Kind == "official" && o.URL != "" {

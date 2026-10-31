@@ -240,10 +240,10 @@ func measure(c *content.Competition, cand map[int]map[string]bool, seen map[int]
 				if counted {
 					out.C0++
 					if s := pr.CanonicalStatement(); s != nil {
-						if s.Origin == "H1" || s.Origin == "H2" {
+						if c := pr.Class(s); c == "H1" || c == "H2" {
 							out.C1++
 						}
-						if s.Origin == "H1" {
+						if pr.Class(s) == "H1" {
 							out.C2++
 						}
 					}

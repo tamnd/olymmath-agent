@@ -12,6 +12,13 @@ type Link struct {
 	T       float64
 }
 
+// Traced is a problem with a transcription that agrees with the text of a paper (see Trace).
+type Traced struct {
+	Problem *content.Problem
+	// Statement is the id of the transcription.
+	Statement string
+}
+
 // Result is the outcome of the anchor of one paper.
 type Result struct {
 	Links []Link
@@ -19,6 +26,8 @@ type Result struct {
 	Items []canon.Item
 	// Have counts the problems that already link to the source.
 	Have int
+	// Traced are the problems whose canonical class is below H2 and that have a transcription that agrees with its segment.
+	Traced []Traced
 	// Missing are the appearances of the paper that have no problem in the content.
 	Missing []string
 }
@@ -44,7 +53,11 @@ func Anchor(owners map[string]*content.Problem, source string, p Paper, segs []S
 			r.Missing = append(r.Missing, at)
 			continue
 		}
-		if hasSource(pr, source) {
+		linked := hasSource(pr, source)
+		if id := transcription(pr, p.Lang, sg.Text); id != "" {
+			r.Traced = append(r.Traced, Traced{Problem: pr, Statement: id})
+		}
+		if linked {
 			r.Have++
 			continue
 		}
@@ -60,6 +73,25 @@ func Anchor(owners map[string]*content.Problem, source string, p Paper, segs []S
 		r.Items = append(r.Items, canon.Item{ID: canon.ItemID("official", at, source), Kind: "official", At: at, Source: source, Ref: p.URL, T: round(t), Text: text, Other: sg.Text})
 	}
 	return r
+}
+
+// transcription gives the id of the statement of p that is a transcription of the text of a paper in the language lang, with the best order signal. It gives "" when the canonical statement has the class H1 or H2 already, or when no statement agrees.
+func transcription(p *content.Problem, lang, paper string) string {
+	if s := p.CanonicalStatement(); s != nil {
+		if c := p.Class(s); c == "H1" || c == "H2" {
+			return ""
+		}
+	}
+	id, best := "", 0.0
+	for _, s := range p.Statements {
+		if s.Text == "" || s.Lang != lang || s.Kind == "official" || (s.Origin != "D" && s.Origin != "H3") {
+			continue
+		}
+		if t := Order(paper, s.Text); t > best && Trace(paper, s.Text) {
+			id, best = s.ID, t
+		}
+	}
+	return id
 }
 
 func hasSource(p *content.Problem, source string) bool {
