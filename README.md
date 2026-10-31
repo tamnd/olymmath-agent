@@ -93,6 +93,14 @@ om import -content olymmath -comp putnam -promote
 
 An import never changes the canonical text of an existing problem, unless you give `-promote`. With `-promote`, a candidate of class H1 or H2 becomes the canonical statement when it ranks above the canonical statement, its text agrees with the canonical text (the signal T is 0.5 or more) and the answers do not disagree. The old text stays in the file as another statement. Each other better candidate goes to the review queue.
 
+### Link the human solutions
+
+```sh
+om solutions -content olymmath kedlaya-putnam
+```
+
+The Putnam archive also has the solutions of each year from 1995, by Kiran Kedlaya and his co-authors. Kedlaya asks for links, not copies, so these solutions are in zone Z3. The `om solutions` command gets each solution file into the raw store, finds the problems that it solves and writes one solution file for each problem, with the authors and a link to the PDF. A solution file in zone Z3 has no text. The problem page links to the solution. The command does not link a problem two times, so you can run it again each year.
+
 ## Layout
 
 | Path | What it has |

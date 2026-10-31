@@ -80,17 +80,23 @@ func runPapers(env Env, args []string) int {
 
 // get gets a page into the store and returns its text.
 func get(ctx context.Context, fc *fetch.Client, source, url string) (string, error) {
+	text, _, err := getCapture(ctx, fc, source, url)
+	return text, err
+}
+
+// getCapture gets a page into the store and returns its text and the hash of its capture.
+func getCapture(ctx context.Context, fc *fetch.Client, source, url string) (text, hash string, err error) {
 	res, err := fc.Get(ctx, source, url, fetch.Options{})
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	rc, err := fc.Store.Get(ctx, res.Capture.Hash)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer func() { _ = rc.Close() }()
 	b, err := io.ReadAll(rc)
-	return string(b), err
+	return string(b), res.Capture.Hash, err
 }
 
 // setOfficial sets the list of official papers of an edition file. The other fields keep their order.

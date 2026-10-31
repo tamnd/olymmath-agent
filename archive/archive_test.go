@@ -77,3 +77,16 @@ func TestExpand(t *testing.T) {
 		t.Errorf("%q %v", got, err)
 	}
 }
+
+func TestSolutionFiles(t *testing.T) {
+	tex := "\\author{Manjul Bhargava, Kiran Kedlaya, and\nLenny Ng}\n\\begin{itemize}\n\\item[A1] text\n\\begin{itemize}\\item[(a)] x\\end{itemize}\n\\item[A--2] more\n\\item[A1] again\n\\end{itemize}"
+	if got := Labels(tex); len(got) != 2 || got[0] != "A1" || got[1] != "A2" {
+		t.Errorf("labels %q", got)
+	}
+	if got := Authors(tex); got != "Manjul Bhargava, Kiran Kedlaya and Lenny Ng" {
+		t.Errorf("authors %q", got)
+	}
+	if ds := PutnamSolutions(1990, 1995); len(ds) != 1 || ds[0].URL != "https://kskedlaya.org/putnam-archive/1995s.tex" {
+		t.Errorf("%+v", ds)
+	}
+}
