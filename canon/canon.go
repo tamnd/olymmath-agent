@@ -91,6 +91,8 @@ type Choice struct {
 type Doubt struct {
 	C *Candidate
 	T float64
+	// E is signal E of the candidate with Best. Confirm sets it.
+	E float64
 	A match.Answer
 }
 
