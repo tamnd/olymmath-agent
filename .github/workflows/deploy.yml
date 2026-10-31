@@ -1,0 +1,24 @@
+name: deploy
+
+# A push to main of the toolchain changes the site. This workflow calls the deploy workflow of tamnd/olymmath with the commit of the push.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "spec/**"
+      - ".github/ISSUE_TEMPLATE/**"
+
+permissions:
+  contents: read
+
+jobs:
+  site:
+    name: deploy the site
+    # The workflow is in the content repository of this project. main is used on purpose, so that one change to the deploy works for both repositories.
+    uses: tamnd/olymmath/.github/workflows/deploy.yml@main # zizmor: ignore[unpinned-uses]
+    with:
+      toolchain-ref: ${{ github.sha }}
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
