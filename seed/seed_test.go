@@ -38,7 +38,7 @@ func TestNorm(t *testing.T) {
 }
 
 func TestPosition(t *testing.T) {
-	cases := map[string]string{"3": "p3", "P3": "p3", "Problem 12": "p12", "A1": "a1", "A-1": "a1", "B_6": "b6", "c7": "c7", "": "", "3a": "", "0": ""}
+	cases := map[string]string{"3": "p3", "P3": "p3", "Problem 12": "p12", "A1": "a1", "A-1": "a1", "B_6": "b6", "c7": "c7", "": "", "3a": "", "0": "", "B3802": "b3802", "K914": "k914", "1995": "", "P1234": ""}
 	for in, want := range cases {
 		if got := Position(in); got != want {
 			t.Errorf("Position(%q) = %q, want %q", in, got, want)

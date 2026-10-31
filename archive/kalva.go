@@ -49,6 +49,7 @@ var (
 	// kalvaScript is a run of text before a superscript or a subscript, for example the 4 of 4<sup>2x</sup>.
 	kalvaScript = regexp.MustCompile(`(?i)([^\s(){}\[\],;:<>]*)<(sup|sub)>(.*?)</(?:sup|sub)>`)
 	kalvaTag    = regexp.MustCompile(`<[^>]*>`)
+	htmlItem    = regexp.MustCompile(`(?i)<li[^>]*>`)
 	kalvaSpace  = regexp.MustCompile(`\s+`)
 )
 
@@ -71,15 +72,16 @@ func ParseKalva(page string) []Problem {
 		if strings.Contains(strings.ToLower(body), "<img") {
 			p.Err = errKalvaImage
 		} else {
-			p.Text = kalvaText(body)
+			p.Text = htmlText(body)
 		}
 		out = append(out, p)
 	}
 	return out
 }
 
-// kalvaText turns the HTML of a problem into Markdown. A superscript or a subscript and the text just before it become inline TeX: 4<sup>2x</sup> is $4^{2x}$ and a<sub>1</sub> is $a_1$.
-func kalvaText(s string) string {
+// htmlText turns the HTML of a problem into Markdown. A superscript or a subscript and the text just before it become inline TeX: 4<sup>2x</sup> is $4^{2x}$ and a<sub>1</sub> is $a_1$. An item of a list starts a new line.
+func htmlText(s string) string {
+	// The TeX made here uses the mark \x02 for its dollars, so that two pieces next to each other join and the TeX of the page stays as it is.
 	s = strings.NewReplacer("\r", "", "&nbsp;", " ").Replace(s)
 	for {
 		t := kalvaScript.ReplaceAllStringFunc(s, func(m string) string {
@@ -88,20 +90,22 @@ func kalvaText(s string) string {
 			if strings.EqualFold(g[2], "sub") {
 				op = "_"
 			}
-			base := strings.TrimSuffix(strings.TrimPrefix(g[1], "$"), "$")
+			base := strings.Trim(g[1], "\x02")
 			arg := strings.TrimSpace(kalvaTag.ReplaceAllString(g[3], ""))
 			if len([]rune(arg)) != 1 {
 				arg = "{" + arg + "}"
 			}
-			return "$" + base + op + arg + "$"
+			return "\x02" + base + op + arg + "\x02"
 		})
 		if t == s {
 			break
 		}
 		s = t
 	}
+	s = htmlItem.ReplaceAllString(s, " \x01 ")
 	s = kalvaTag.ReplaceAllString(s, " ")
 	s = html.UnescapeString(s)
-	s = strings.ReplaceAll(s, "$$", "")
-	return strings.TrimSpace(kalvaSpace.ReplaceAllString(s, " "))
+	s = strings.NewReplacer("\x02\x02", "", "\x02", "$").Replace(s)
+	s = strings.TrimSpace(kalvaSpace.ReplaceAllString(s, " "))
+	return strings.ReplaceAll(s, " \x01 ", "\n- ")
 }
