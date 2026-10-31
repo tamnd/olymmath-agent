@@ -114,6 +114,14 @@ func (s *Seeds) Add(r seed.Row) {
 		return
 	}
 	pos := seed.Position(r.Number)
+	// A line such as "Paper 2 P1" at the start of the text is surer than the number, because some sources number each paper from 1.
+	if p, rest, ok := PaperPosition(comp, r.Statement); ok {
+		pos, r.Statement = p, rest
+		if pos == "" {
+			s.skip("no valid position")
+			return
+		}
+	}
 	if pos == "" && r.Number == "" && s.Topics != nil {
 		if pos = s.Topics.Position(r.Ref, code, r.Year); pos != "" {
 			s.Numbered++

@@ -67,12 +67,20 @@ func TestTopics(t *testing.T) {
 	}
 	tp := &Topics{Aliases: al}
 	url := "https://artofproblemsolving.com/community/c6h"
+	// The second IMO paper of 2024 numbers its problems from 1.
+	corpus.Competition("imo").Layout = []content.Layout{{Positions: []string{"p1", "p2", "p3"}}, {Positions: []string{"p4", "p5", "p6"}}}
+	tp.Corpus = corpus
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2024, Number: "1", Ref: url + "200p1", Statement: "IMO 2024 Day 1 Problem 1"})
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2024, Number: "1", Ref: url + "201p1", Statement: "IMO 2024 Day 2 Problem 1"})
 	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2023, Number: "4", Ref: url + "100p1"})
 	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2023, Number: "1", Ref: url + "101p2"})
 	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2023, Number: "1", Ref: url + "102p3"})
 	tp.Add(seed.Row{Labels: []string{"IMO"}, Number: "2", Ref: url + "103p4"})
 	if got := tp.Position("aops-topic:100", "imo", 2023); got != "p4" {
 		t.Errorf("topic 100 gives %q", got)
+	}
+	if a, b := tp.Position("aops-topic:200", "imo", 2024), tp.Position("aops-topic:201", "imo", 2024); a != "p1" || b != "p4" {
+		t.Errorf("the topics of the two papers give %q and %q", a, b)
 	}
 	if got := tp.Position("aops-topic:100", "imo", 2022); got != "" {
 		t.Errorf("topic 100 in 2022 gives %q", got)
@@ -81,5 +89,30 @@ func TestTopics(t *testing.T) {
 		if got := tp.Position(ref, "imo", 2023); got != "" {
 			t.Errorf("%s gives %q", ref, got)
 		}
+	}
+}
+
+func TestPaperPosition(t *testing.T) {
+	c := &content.Competition{Layout: []content.Layout{{Positions: []string{"p1", "p2", "p3"}}, {Positions: []string{"p4", "p5", "p6"}}}}
+	cases := []struct {
+		text, pos, rest string
+		ok              bool
+	}{
+		{"2006 IrMO Paper 2 P1", "p4", "", true},
+		{"1990 IrMO Paper 1 P3\nLet $n$ be odd.", "p3", "Let $n$ be odd.", true},
+		{"IMO 2023 Day 2, Problem 5", "p5", "", true},
+		{"Paper 1 P6", "", "", true},
+		{"Paper 3 P1", "", "", true},
+		{"Let $n$ be odd.", "", "Let $n$ be odd.", false},
+		{"On day 1 problem 2 of the test, Ana wrote $n$.", "", "On day 1 problem 2 of the test, Ana wrote $n$.", false},
+	}
+	for _, tc := range cases {
+		pos, rest, ok := PaperPosition(c, tc.text)
+		if pos != tc.pos || rest != tc.rest || ok != tc.ok {
+			t.Errorf("PaperPosition(%q) = %q, %q, %v, want %q, %q, %v", tc.text, pos, rest, ok, tc.pos, tc.rest, tc.ok)
+		}
+	}
+	if _, _, ok := PaperPosition(&content.Competition{}, "Paper 1 P1"); ok {
+		t.Error("a competition with no layout reads the paper line")
 	}
 }
