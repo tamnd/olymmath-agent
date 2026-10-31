@@ -34,3 +34,17 @@ func TestStore(t *testing.T) {
 		t.Errorf("unknown: want %d, got %d", ExitUsage, code)
 	}
 }
+
+func TestFetchErrors(t *testing.T) {
+	root := "../content/testdata/valid"
+	raw := t.TempDir()
+	if code, _, _ := run("fetch", "-content", root, "-raw", raw); code != ExitUsage {
+		t.Errorf("no source: want %d, got %d", ExitUsage, code)
+	}
+	if code, _, _ := run("fetch", "nothing", "-content", root, "-raw", raw); code != ExitUsage {
+		t.Errorf("unknown source: want %d, got %d", ExitUsage, code)
+	}
+	if code, _, errs := run("fetch", "imo-official", "-content", root, "-raw", raw); code != ExitLater || !strings.Contains(errs, "later milestone") {
+		t.Errorf("web source: want %d, got %d %s", ExitLater, code, errs)
+	}
+}
