@@ -111,7 +111,7 @@ func (m *Markup) HTML(src string) (string, []error) {
 	for i, code := range figures {
 		fig, err := m.figure(code)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("figure %d is not drawn: %w", i+1, err))
+			errs = append(errs, fmt.Errorf("figure %d is not drawn: %w: %w", i+1, ErrFigure, err))
 		}
 		token := "@@ASY" + strconv.Itoa(i) + "@@"
 		out = strings.ReplaceAll(out, "<p>"+token+"</p>", fig)

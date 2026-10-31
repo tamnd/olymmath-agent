@@ -1,6 +1,7 @@
 package site
 
 import (
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"html"
@@ -14,6 +15,9 @@ var asyBlock = regexp.MustCompile(`(?is)\[asy\](.*?)\[/asy\]`)
 
 // sizeCommands are TeX font commands in labels. The figure sets the font size, so they go.
 var sizeCommands = regexp.MustCompile(`\\(?:tiny|scriptsize|footnotesize|small|normalsize|large|Large|LARGE|huge|Huge)\b\s*`)
+
+// ErrFigure marks the error of a figure that is not in the subset of Asymptote that the site draws. The page shows the source of the figure, so the error is a warning and not a broken text.
+var ErrFigure = errors.New("the figure is shown as source")
 
 // splitFigures replaces each Asymptote block of src with a token in a paragraph of its own, and returns the text and the blocks.
 func splitFigures(src string) (string, []string) {

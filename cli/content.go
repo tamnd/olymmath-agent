@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -40,6 +41,10 @@ func runCheck(env Env, args []string) int {
 		for _, text := range []string{p.Statement, p.Answer} {
 			_, errs := m.HTML(text)
 			for _, e := range errs {
+				if errors.Is(e, site.ErrFigure) {
+					findings = append(findings, content.Finding{Path: p.Path, Level: content.Warning, Message: e.Error()})
+					continue
+				}
 				findings = append(findings, content.Finding{Path: p.Path, Message: "a formula does not render: " + e.Error()})
 			}
 		}
@@ -50,7 +55,7 @@ func runCheck(env Env, args []string) int {
 	if !*quiet {
 		fmt.Fprintf(env.Stdout, "%d competitions, %d editions, %d problems, %d findings\n", len(corpus.Competitions), len(corpus.Editions()), len(corpus.Problems()), len(findings))
 	}
-	if len(findings) > 0 {
+	if findings.Errors() > 0 {
 		return ExitFindings
 	}
 	return ExitOK
