@@ -69,6 +69,17 @@ Some datasets give the IMO problems of a year with no problem number. The comman
 
 A text in zone Z3 is a link only, so the import does not take it. For example, the NuminaMath rows from the notes files have the texts of Evan Chen, and the register gives these texts the zone Z3. With `-anchor`, the import uses these texts only to find the position of a row with no number in other competitions, such as an AoPS row of a USAMO problem. The same thresholds apply. Two copies of one text do not compete with each other.
 
+## Read a curated archive
+
+Some curated sources give their problems as TeX files. For such a source, `om seed` gets each file into the raw store, converts each problem to Markdown with math and writes one seed row for each problem. The math does not change. A problem with TeX that has no Markdown form, for example a figure, gets no row. The command prints the reason for each such problem. The first archive is the Putnam archive of Kiran Kedlaya, from 1985:
+
+```sh
+om seed -content olymmath kedlaya-putnam
+om import -content olymmath -comp putnam -promote
+```
+
+An import never changes the canonical text of an existing problem, unless you give `-promote`. With `-promote`, a candidate of class H1 or H2 becomes the canonical statement when it ranks above the canonical statement, its text agrees with the canonical text (the signal T is 0.5 or more) and the answers do not disagree. The old text stays in the file as another statement. Each other better candidate goes to the review queue.
+
 ## Layout
 
 | Path | What it has |
