@@ -15,6 +15,7 @@ import (
 	"go.yaml.in/yaml/v3"
 
 	"github.com/tamnd/olymmath-agent/canon"
+	"github.com/tamnd/olymmath-agent/match"
 )
 
 // Dir is the directory of the reviews in the content repository.
@@ -142,6 +143,8 @@ type Merge struct {
 	A      string
 	Rule   string
 	Review string
+	// E is the signal E of the merge, or 0 for a row with no E column.
+	E float64
 }
 
 // ID gives the id of the review of the merge.
@@ -149,20 +152,17 @@ func (m Merge) ID() string { return canon.ItemID("merge", m.Into, m.At) }
 
 // Strict tells if the merge has two strict signals (spec 06.4).
 func (m Merge) Strict() bool {
-	n := 0
+	s := match.Signals{T: m.T, E: m.E}
 	if m.K == "strong" {
-		n++
-	}
-	if m.T >= 0.8 {
-		n++
+		s.K = match.StrongKey
 	}
 	if m.A == "match" {
-		n++
+		s.A = match.AnswerMatch
 	}
-	return n >= 2
+	return match.Strict(s)
 }
 
-// Merges reads the merges register under root. A missing register is empty.
+// Merges reads the merges register under root. A missing register is empty. A row has seven columns, or eight when it has the signal E.
 func Merges(root string) ([]Merge, error) {
 	b, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(MergesFile))) // #nosec G304 -- the path is inside the content root.
 	if os.IsNotExist(err) {
@@ -177,12 +177,17 @@ func Merges(root string) ([]Merge, error) {
 			continue
 		}
 		f := strings.Split(line, "\t")
-		if len(f) != 7 {
-			return nil, fmt.Errorf("%s:%d: %d columns, want 7", MergesFile, i+1, len(f))
+		if len(f) != 7 && len(f) != 8 {
+			return nil, fmt.Errorf("%s:%d: %d columns, want 7 or 8", MergesFile, i+1, len(f))
 		}
 		m := Merge{Line: i + 1, At: f[0], Into: f[1], K: f[2], A: f[4], Rule: f[5], Review: f[6]}
 		if _, err := fmt.Sscanf(f[3], "%g", &m.T); err != nil {
 			return nil, fmt.Errorf("%s:%d: the signal T %q is not a number", MergesFile, i+1, f[3])
+		}
+		if len(f) == 8 {
+			if _, err := fmt.Sscanf(f[7], "%g", &m.E); err != nil {
+				return nil, fmt.Errorf("%s:%d: the signal E %q is not a number", MergesFile, i+1, f[7])
+			}
 		}
 		out = append(out, m)
 	}

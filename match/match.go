@@ -1,4 +1,4 @@
-// Package match decides whether two candidates are the same problem (spec 06.5). It uses the signal K (both candidates locate to the same appearance), the signal T (the Jaccard similarity of word 5-grams) and the signal A (both answers are equal). The embedding signal E comes later. Version names the thresholds.
+// Package match decides whether two candidates are the same problem (spec 06.5). It uses the signal K (both candidates locate to the same appearance), the signal T (the Jaccard similarity of word 5-grams) and the signal A (both answers are equal). The signal E (the cosine of the TF-IDF weights of the words and the TeX) can count as a text match for a pair with a strong key. Version names the thresholds.
 package match
 
 import (
@@ -11,7 +11,7 @@ import (
 )
 
 // Version names the matcher and its thresholds. Change it when a threshold changes.
-const Version = "match/1"
+const Version = "match/2"
 
 // Thresholds of the signal T.
 const (
@@ -100,7 +100,12 @@ type Signals struct {
 	K Key
 	T float64
 	A Answer
+	// E is the cosine of the TF-IDF weights of the words and the TeX of the two texts, or 0 when it was not measured.
+	E float64
 }
+
+// EStrict is the least signal E that counts as a text match for a pair with a strong key. Two transcriptions of one problem can have a low T, because their TeX and their words differ in form, but they keep a high E.
+const EStrict = 0.7
 
 // Decision is the result of the matcher.
 type Decision int
@@ -137,13 +142,13 @@ func Decide(s Signals) Decision {
 	return New
 }
 
-// Strict reports whether a merge has two strict signals: a strong key and a text match, or a key and an answer match with a text match. Audit rule D03 accepts such a merge with no review.
+// Strict reports whether a merge has two strict signals: a strong key and a text match, or a key and an answer match with a text match. A text match is T of at least Same, or E of at least EStrict when the key is strong. Audit rule D03 accepts such a merge with no review.
 func Strict(s Signals) bool {
 	n := 0
 	if s.K == StrongKey {
 		n++
 	}
-	if s.T >= Same {
+	if s.T >= Same || (s.K == StrongKey && s.E >= EStrict) {
 		n++
 	}
 	if s.A == AnswerMatch {

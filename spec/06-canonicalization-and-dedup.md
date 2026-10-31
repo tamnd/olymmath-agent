@@ -81,6 +81,8 @@ The decision:
 
 Thresholds are fixed per matcher version and tuned on a labelled set of 2,000 pairs (document 09.4). A merge that a person reverses becomes a labelled pair.
 
+Strict signals (matcher `match/2`): a merge with two strict signals needs no review (rule D03). The strict signals are a strong key, a text match and an answer match. A text match is T ≥ 0.8. For a pair with a strong key, E ≥ 0.7 is also a text match, when one of the two problems is the nearest problem of the other by E. Here E is the cosine of the TF-IDF weights of the words and of the runs of four characters of the TeX. The reason is that two transcriptions of one problem, for example the shortlist booklet and an AoPS post, often have T below 0.3, because the TeX and the words differ in form. `om merge -pattern` uses this rule to join the records of a known duplicate pattern that two imports made apart. On the corpus of October 2026 it joined 40 pairs of a contest and its shortlist, and a check of the texts found no wrong merge. A pair below the rule waits for a review, and `om merge -review` joins it when the review accepts it.
+
 Translations: a statement in another language is matched by E across languages and by K. The project embeds a model translation into English for matching only. The translation is not stored as a statement unless a person keeps it.
 
 ### Known duplicate patterns

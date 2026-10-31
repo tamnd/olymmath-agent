@@ -103,6 +103,7 @@ func TestRules(t *testing.T) {
 		{"D01", map[string][][2]string{p2: {{"Determine all pairs $(a,b)$ of positive integers for which there exist positive integers $g$ and $N$ such that\n$$\\gcd(a^n+b,\\ b^n+a) = g$$\nholds for all integers $n \\geq N$.", "Determine all real numbers $\\alpha$ such that, for every positive integer $n$, the integer\n$$\\lfloor \\alpha \\rfloor + \\lfloor 2\\alpha \\rfloor + \\cdots + \\lfloor n\\alpha \\rfloor$$\nis a multiple of $n$."}}}},
 		{"D02", map[string][][2]string{"reports/review/queue.jsonl": {{"", `{"id":"0123456789ab","kind":"pair","at":"imo/2024/p1","with":"imo/2024/p2","t":0.9,"text":"a","other":"b"}` + "\n"}}}},
 		{"D03", map[string][][2]string{"registers/merges.tsv": {{"", "isl/2024/a1\timo/2024/p1\tweak\t0.700\tnone\ttext\t-\n"}}}},
+		{"D03", map[string][][2]string{"registers/merges.tsv": {{"", "isl/2024/a1\timo/2024/p1\tstrong\t0.200\tnone\tisl-imo\t-\t0.650\n"}}}},
 		{"L02", map[string][][2]string{sol: {{"origin: human", "origin: ai"}}}},
 		{"L03", map[string][][2]string{sol: {{"complete: true", "complete: true\nrun:\n  model: claude-opus-5-5"}}}},
 		{"L04", map[string][][2]string{sol: {{"zone: Z1", "zone: Z3"}}}},
@@ -119,6 +120,18 @@ func TestRules(t *testing.T) {
 				t.Errorf("want a finding of %s, got %v", tc.rule, fs)
 			}
 		})
+	}
+}
+
+// TestD03E checks that a strong key and E of at least match.EStrict are two strict signals.
+func TestD03E(t *testing.T) {
+	dir := fixture(t, map[string][][2]string{"registers/merges.tsv": {{"", "isl/2024/a1\timo/2024/p1\tstrong\t0.200\tnone\tisl-imo\t-\t0.900\n"}}})
+	_, fs, err := Run(dir, "D03")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fs) != 0 {
+		t.Errorf("want no finding, got %v", fs)
 	}
 }
 
