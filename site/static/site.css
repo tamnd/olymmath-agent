@@ -123,6 +123,9 @@ main { flex: 1 0 auto; width: 100%; padding-bottom: 5rem; }
 .button.ghost { background: var(--surface); color: var(--ink); }
 .button:hover, .search-box button:hover { background: var(--accent); color: #fff; text-decoration: none; }
 .actions { display: flex; gap: 2px; flex-wrap: wrap; margin: 0; }
+.languages { max-width: var(--measure); margin: 1rem 0 0; font: 400 0.88rem/1.8 var(--sans); }
+.languages summary { cursor: pointer; color: var(--ink-2); }
+.languages p { margin: 0.5rem 0 0; }
 
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 2px; margin: 3rem 0 0; max-width: 40rem; }
 .stats div { display: flex; flex-direction: column-reverse; background: var(--surface); padding: 1rem 1.2rem; }
@@ -279,7 +282,7 @@ table.years { width: 100%; border-collapse: collapse; font: 400 0.9rem/1.5 var(-
 }
 
 @media print {
-  .top, .foot, .crumbs, .actions, .card-foot, .pager, .meta-line, .reveal, .block, .skip { display: none !important; }
+  .top, .foot, .crumbs, .actions, .languages, .card-foot, .pager, .meta-line, .reveal, .block, .skip { display: none !important; }
   body { background: #fff; color: #000; font-size: 11pt; }
   .statement-card { background: none; box-shadow: none; padding: 0 0 1rem; max-width: none; }
   .paper { break-after: page; }

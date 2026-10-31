@@ -154,3 +154,22 @@ func TestShortlist(t *testing.T) {
 		t.Errorf("%+v", ps)
 	}
 }
+
+func TestLanguages(t *testing.T) {
+	page := `<select data-settings-problems-language><option value="afr">Afrikaans</option></select>
+<select data-download-widget="language-select">
+<option
+  value="/assets/documents/problems/2023/2023_eng.pdf"
+  data-lang-code="eng"
+  selected
+>
+  English
+</option>
+<option value="/assets/documents/problems/2023/2023_alk.pdf" data-lang-code="alk">Albanian (Kosovo)</option>
+<option value="/assets/documents/problems/2023/2023_alk.pdf" data-lang-code="alk">Albanian (Kosovo)</option>
+</select>`
+	ls := Languages(page)
+	if len(ls) != 2 || ls[0].Lang != "English" || ls[0].Code != "eng" || ls[1].Lang != "Albanian (Kosovo)" || ls[1].URL != "https://www.imo-official.org/assets/documents/problems/2023/2023_alk.pdf" {
+		t.Errorf("%+v", ls)
+	}
+}

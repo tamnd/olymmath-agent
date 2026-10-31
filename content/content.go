@@ -83,6 +83,8 @@ type Edition struct {
 	URL      string  `yaml:"url"`
 	Papers   []Paper `yaml:"papers"`
 	Language string  `yaml:"language"`
+	// Official are the official papers of the edition in each language, as links.
+	Official []OfficialPaper `yaml:"official"`
 
 	// ID is the edition part of the locator: the name of the file, for example 2024 or 2021a.
 	ID          string       `yaml:"-"`
@@ -103,6 +105,15 @@ func (e *Edition) Positions() []string {
 		ps = append(ps, p.Problems...)
 	}
 	return ps
+}
+
+// OfficialPaper is the official paper of an edition in one language.
+type OfficialPaper struct {
+	// Lang is the name of the language, as the organizer gives it, for example Albanian (Kosovo).
+	Lang string `yaml:"lang"`
+	// Code is the code of the language that the organizer uses.
+	Code string `yaml:"code"`
+	URL  string `yaml:"url"`
 }
 
 // Paper is one sitting of an edition, for example day 1 of the IMO.

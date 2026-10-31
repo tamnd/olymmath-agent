@@ -3,7 +3,8 @@
 <header class="page-head">
   <h1>{{.Title}}</h1>
   <p class="lede">{{if .Number}}The {{ordinal .Number}} {{.Competition.Name}}{{else}}{{.Competition.Name}} {{.Year}}{{end}}{{if .Place}}, {{.Place}}{{if .Country}}, {{.Country}}{{end}}{{end}}{{if .Dates}}, {{.Dates}}{{end}}.</p>
-  <p class="actions">{{if .URL}}<a class="button" href="{{.URL}}" rel="noopener">Official paper</a>{{end}}<button class="button ghost" type="button" data-print>Print the paper</button></p>
+  <p class="actions">{{if .URL}}<a class="button" href="{{.URL}}" rel="noopener">Official paper</a>{{else}}{{with .Official}}<a class="button" href="{{(index . 0).URL}}" rel="noopener">Official paper</a>{{end}}{{end}}<button class="button ghost" type="button" data-print>Print the paper</button></p>
+  {{with .Official}}<details class="languages"><summary>The official paper in {{len .}} {{if eq (len .) 1}}language{{else}}languages{{end}}</summary><p>{{range $i, $o := .}}{{if $i}} · {{end}}<a href="{{$o.URL}}" rel="noopener">{{$o.Lang}}</a>{{end}}</p></details>{{end}}
 </header>
 {{range .Papers}}
 <section class="paper">
