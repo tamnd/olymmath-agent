@@ -207,6 +207,11 @@ var (
 	genLang      = []string{"language", "lang"}
 )
 
+// GenericFiles selects the data files of a dataset that the generic profile reads. Putnam-AXIOM has the original problems, versions with a changed answer form and variations made by a program. Only the originals are human text.
+var GenericFiles = map[string]func(path string) bool{
+	"hf-putnam-axiom": func(p string) bool { return strings.Contains(p, "originals") },
+}
+
 // Generic makes a profile from the column names of a table. It serves the small human sets, which have the usual names.
 func Generic(cols []string) Profile {
 	has := map[string]bool{}

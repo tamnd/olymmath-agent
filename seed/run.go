@@ -49,7 +49,7 @@ func (r *Runner) Run(ctx context.Context, source string, w io.Writer) (Stats, er
 	enc.SetEscapeHTML(false)
 	prof, known := Profiles[source]
 	for _, f := range m.Files {
-		if !IsData(f.Path) || (known && prof.Files != nil && !prof.Files(f.Path)) {
+		if !IsData(f.Path) || (known && prof.Files != nil && !prof.Files(f.Path)) || (GenericFiles[source] != nil && !GenericFiles[source](f.Path)) {
 			continue
 		}
 		ra, closer, ranged, err := r.open(ctx, f)

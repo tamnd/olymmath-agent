@@ -194,6 +194,7 @@ type Problem struct {
 	Statements  []Statement       `yaml:"statements"`
 	Xref        map[string]string `yaml:"xref"`
 	Links       []Link            `yaml:"links"`
+	Status      Status            `yaml:"status"`
 
 	// Statement is the canonical statement: Markdown with TeX math.
 	Statement string `yaml:"-"`
@@ -209,6 +210,15 @@ type Problem struct {
 	Paper     *Paper      `yaml:"-"`
 	Solutions []*Solution `yaml:"-"`
 }
+
+// Status is the state of the records of a problem (spec 09.1).
+type Status struct {
+	// Statement is one of Statuses.
+	Statement string `yaml:"statement"`
+}
+
+// Statuses are the states of a canonical statement (spec 09.1). The pipeline sets captured, normalized, sourced and disputed. Only a reviewer sets verified.
+var Statuses = []string{"captured", "normalized", "sourced", "verified", "disputed"}
 
 // Types are the problem types of spec 04.3.
 var Types = []string{"proof", "answer", "answer+proof", "construction", "multiple-choice"}

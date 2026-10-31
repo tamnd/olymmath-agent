@@ -10,7 +10,7 @@ import (
 )
 
 // Version names the normalization rules. Change it when a rule changes.
-const Version = "norm/1"
+const Version = "norm/2"
 
 var punct = strings.NewReplacer(
 	"‘", "'", "’", "'", "‚", "'", "‛", "'",
@@ -64,8 +64,36 @@ func StripMarker(s, pos string) string {
 	return s[m[1]:]
 }
 
-// Statement is Text, then StripMarker.
-func Statement(s, pos string) string { return StripMarker(Text(s), pos) }
+// Statement is Text, then StripMarker, then StripCountry, then CutTail.
+func Statement(s, pos string) string { return CutTail(StripCountry(StripMarker(Text(s), pos))) }
+
+// countryRE matches the code of the proposing country at the start of a shortlist text, for example "BEL Let $ABC$ be a triangle".
+var countryRE = regexp.MustCompile(`^[A-Z]{3} (?:Variant [0-9]+\. )?([A-Z][a-z]|[A-Z] )`)
+
+// StripCountry removes the code of the proposing country at the start of a text.
+func StripCountry(s string) string {
+	m := countryRE.FindStringSubmatchIndex(s)
+	if m == nil {
+		return s
+	}
+	return s[m[2]:]
+}
+
+// tailRE finds the start of text that follows a statement in some datasets: a heading of the next problem, such as "## C2", or the start of an answer or a solution.
+var tailRE = regexp.MustCompile(`\s(?:#{1,6}\s|(?:Answer|Solution|Proof|Hint)\s*[.:]\s)`)
+
+// minHead is the shortest text, in bytes, that CutTail keeps before a cut.
+const minHead = 40
+
+// CutTail removes the text after the end of a statement: the next problem or the answer that a dataset joined to the statement. It does not cut in the first minHead bytes.
+func CutTail(s string) string {
+	for _, m := range tailRE.FindAllStringIndex(s, -1) {
+		if m[0] >= minHead {
+			return strings.TrimSpace(s[:m[0]])
+		}
+	}
+	return s
+}
 
 // Tokens splits a normalized text into lower case words for matching. A word is a run of letters or digits. A TeX command, such as \frac, is one token, and each other symbol is one token. Thus "$x^2$" and "$x ^ 2$" give the same tokens.
 func Tokens(s string) []string {
