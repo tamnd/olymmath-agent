@@ -20,6 +20,7 @@ func runFetch(env Env, args []string) int {
 	root := fs.String("content", ".", "the root of the content repository")
 	dir, remote := storeFlags(fs)
 	localMax := fs.Int64("local-max", 64, "the largest file in MB that goes to the local disk; a larger file goes to R2 with -r2, or else stays a reference")
+	remoteMax := fs.Int64("remote-max", 95, "the largest file in MB that goes to R2; a larger file stays a reference to its pinned URL")
 	maxFiles := fs.Int("max-files", 100, "the largest number of data files to get one by one; a dataset with more files uses the Parquet form of the hub")
 	wave := fs.Int("wave", -1, "harvest each source of this wave that the tool can harvest")
 	pos, err := parseMixed(fs, args)
@@ -59,7 +60,7 @@ func runFetch(env Env, args []string) int {
 	fc := fetch.New(st)
 	fc.Agent = fmt.Sprintf("olymmath/%s (+https://olymmath.tamnd.com/about/)", env.Version)
 	fc.Delay = 200 * time.Millisecond
-	h := &hf.Harvest{Hub: &hf.Client{Agent: fc.Agent, Token: os.Getenv("HF_TOKEN")}, Fetch: fc, LocalMax: *localMax << 20, MaxFiles: *maxFiles, Log: env.Stdout}
+	h := &hf.Harvest{Hub: &hf.Client{Agent: fc.Agent, Token: os.Getenv("HF_TOKEN")}, Fetch: fc, LocalMax: *localMax << 20, RemoteMax: *remoteMax << 20, MaxFiles: *maxFiles, Log: env.Stdout}
 	code := ExitOK
 	for _, s := range sources {
 		id, ok := hf.DatasetID(s.URL)
