@@ -91,4 +91,9 @@ func TestLocate(t *testing.T) {
 	if got := ps.Locate("imo/2023", "Let ABC be a triangle with AB < AC < BC."); got != "" {
 		t.Errorf("locate no paper: %q", got)
 	}
+	text := "Prove that every positive integer greater than one has a prime divisor."
+	twice := Papers{"usamo/2001": {{Position: "p1", Text: text}, {Position: "p1", Text: text}, {Position: "p2", Text: "Find all real numbers with a property."}}}
+	if got := twice.Locate("usamo/2001", text); got != "p1" {
+		t.Errorf("locate with two copies: %q", got)
+	}
 }

@@ -21,3 +21,13 @@
   ai_train: allowed
   wave: 1
   state: planned
+- id: evanchen
+  name: Evan Chen problems page
+  kind: curated
+  origin: H2
+  url: https://web.evanchen.cc/problems.html
+  access: tex
+  zone: {statement: Z3, solution: Z3}
+  ai_train: unknown
+  wave: 1
+  state: planned

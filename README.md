@@ -67,6 +67,8 @@ The `om anchor` command gets the official English IMO papers into the raw store 
 
 Some datasets give the IMO problems of a year with no problem number. The command `om import -anchor -comp imo` compares each such text with the official papers in the raw store and gives it the position of the problem whose words agree best. The best signal must be 0.3 or more, and it must be at least 0.15 above the second best signal. Otherwise the row has no position, and the import skips it.
 
+A text in zone Z3 is a link only, so the import does not take it. For example, the NuminaMath rows from the notes files have the texts of Evan Chen, and the register gives these texts the zone Z3. With `-anchor`, the import uses these texts only to find the position of a row with no number in other competitions, such as an AoPS row of a USAMO problem. The same thresholds apply. Two copies of one text do not compete with each other.
+
 ## Layout
 
 | Path | What it has |

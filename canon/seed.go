@@ -123,6 +123,11 @@ func (s *Seeds) Add(r seed.Row) {
 		s.skip("source not usable")
 		return
 	}
+	// A text in zone Z3 is a link only (spec 11.2), so the import does not take it.
+	if a := s.Corpus.Source(r.Author); src.Zone.Statement == "Z3" || (a != nil && a.Zone.Statement == "Z3") {
+		s.skip("text in zone Z3")
+		return
+	}
 	text := normalize.Statement(r.Statement, pos)
 	if utf8.RuneCountInString(text) < MinText || titleRE.MatchString(text) || isRef(text) || (len(strings.Fields(text)) < MinWords && !strings.Contains(text, "$")) || !strings.ContainsAny(text, "$.?!:") || (strings.Contains(text, ";") && !strings.Contains(text, "$") && len(strings.Fields(text)) < 30) {
 		s.skip("not a statement")
