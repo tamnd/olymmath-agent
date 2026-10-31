@@ -10,13 +10,14 @@ import (
 
 	"go.yaml.in/yaml/v3"
 
+	"github.com/tamnd/olymmath-agent/archive"
 	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/fetch"
 	"github.com/tamnd/olymmath-agent/official"
 )
 
 func init() {
-	register(command{"papers", "record the official papers of each IMO edition in all languages (om papers imo-official)", runPapers})
+	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive)", runPapers})
 }
 
 func runPapers(env Env, args []string) int {
@@ -29,8 +30,8 @@ func runPapers(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || pos[0] != "imo-official" {
-		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official")
+	if len(pos) != 1 || (pos[0] != "imo-official" && pos[0] != "usa-tst-archive") {
+		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -38,9 +39,8 @@ func runPapers(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om papers: the content has %d errors. Run om check first.\n", findings.Errors())
 		return ExitFindings
 	}
-	comp := corpus.Competition("imo")
-	if comp == nil || corpus.Source(pos[0]) == nil {
-		fmt.Fprintln(env.Stderr, "om papers: the content has no competition imo or no source imo-official")
+	if corpus.Source(pos[0]) == nil {
+		fmt.Fprintf(env.Stderr, "om papers: the content has no source %s\n", pos[0])
 		return ExitUsage
 	}
 	st, err := openStore(*dir, *remote)
@@ -51,6 +51,14 @@ func runPapers(env Env, args []string) int {
 	fc := fetch.New(st)
 	fc.Agent = fmt.Sprintf("olymmath/%s (+https://olymmath.tamnd.com/about/)", env.Version)
 	ctx := context.Background()
+	if pos[0] == "usa-tst-archive" {
+		return tstPapers(ctx, env, fc, corpus, *root, *from, *to)
+	}
+	comp := corpus.Competition("imo")
+	if comp == nil {
+		fmt.Fprintln(env.Stderr, "om papers: the content has no competition imo")
+		return ExitUsage
+	}
 	code := ExitOK
 	var editions, papers int
 	for _, e := range comp.Editions {
@@ -76,6 +84,46 @@ func runPapers(env Env, args []string) int {
 	}
 	fmt.Fprintf(env.Stdout, "%d editions, %d official papers.\n", editions, papers)
 	return code
+}
+
+// tstPapers records the problems file of each test of the USA TST Archive as the official English paper of its edition. It writes the edition file when the corpus does not have the edition.
+func tstPapers(ctx context.Context, env Env, fc *fetch.Client, corpus *content.Corpus, root string, from, to int) int {
+	listing, err := get(ctx, fc, "usa-tst-archive", archive.TSTContents)
+	if err != nil {
+		fmt.Fprintf(env.Stderr, "om papers: %v\n", err)
+		return ExitFailure
+	}
+	ps, err := archive.TSTPapers([]byte(listing))
+	if err != nil {
+		fmt.Fprintf(env.Stderr, "om papers: the listing: %v\n", err)
+		return ExitFailure
+	}
+	var editions, created int
+	for _, p := range ps {
+		if p.Year < from || p.Year > to {
+			continue
+		}
+		if corpus.Competition(p.Competition) == nil {
+			fmt.Fprintf(env.Stderr, "om papers: the content has no competition %s\n", p.Competition)
+			return ExitUsage
+		}
+		rel, err := newEdition(root, corpus, fmt.Sprintf("%s/%d/p1", p.Competition, p.Year))
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om papers: %s/%d: %v\n", p.Competition, p.Year, err)
+			return ExitFailure
+		}
+		if rel != "" {
+			created++
+		}
+		file := filepath.Join(root, "editions", p.Competition, fmt.Sprintf("%d.yaml", p.Year))
+		if err := setOfficial(file, []content.OfficialPaper{{Lang: "English", Code: "en", URL: p.URL}}); err != nil {
+			fmt.Fprintf(env.Stderr, "om papers: %s: %v\n", file, err)
+			return ExitFailure
+		}
+		editions++
+	}
+	fmt.Fprintf(env.Stdout, "%d editions, %d new, %d official papers.\n", editions, created, editions)
+	return ExitOK
 }
 
 // get gets a page into the store and returns its text.

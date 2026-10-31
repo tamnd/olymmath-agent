@@ -90,3 +90,14 @@ func TestSolutionFiles(t *testing.T) {
 		t.Errorf("%+v", ds)
 	}
 }
+
+func TestTSTPapers(t *testing.T) {
+	listing := `[{"name":"README.md","html_url":"r"},{"name":"TSTST2025Problems.pdf","html_url":"a"},{"name":"TSTST2025Solutions.pdf","html_url":"b"},{"name":"IMOTST2026Problems.pdf","html_url":"c"},{"name":"EGMOTST2026Problems.pdf","html_url":"d"}]`
+	ps, err := TSTPapers([]byte(listing))
+	if err != nil || len(ps) != 3 {
+		t.Fatalf("%+v %v", ps, err)
+	}
+	if ps[0] != (TSTPaper{"tstst", 2025, "a"}) || ps[1].Competition != "us-egmo-tst" || ps[2] != (TSTPaper{"us-tst", 2026, "c"}) {
+		t.Errorf("%+v", ps)
+	}
+}
