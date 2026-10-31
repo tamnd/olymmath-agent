@@ -1,17 +1,20 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/tamnd/olymmath-agent/canon"
 	"github.com/tamnd/olymmath-agent/content"
+	"github.com/tamnd/olymmath-agent/official"
 	"github.com/tamnd/olymmath-agent/review"
 	"github.com/tamnd/olymmath-agent/seed"
 	"github.com/tamnd/olymmath-agent/site"
@@ -27,6 +30,8 @@ func runImport(env Env, args []string) int {
 	dir := fs.String("seed", seed.DefaultDir(), "the directory of the seed rows")
 	comps := fs.String("comp", "", "a comma-separated list of competition codes; the default is all competitions")
 	dry := fs.Bool("dry", false, "print the plan and write no file")
+	anchor := fs.Bool("anchor", false, "give a position to each IMO row with no number from the official papers in the raw store")
+	dir2, remote := storeFlags(fs)
 	maxDoubt := fs.Float64("max-doubt", canon.MaxDoubt, "skip a competition whose review doubts per appearance are above this share")
 	if _, err := parseMixed(fs, args); err != nil {
 		return ExitUsage
@@ -52,6 +57,25 @@ func runImport(env Env, args []string) int {
 	}}
 	if *comps != "" {
 		s.Comps = strings.Split(*comps, ",")
+	}
+	if *anchor {
+		st, err := openStore(*dir2, *remote)
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
+			return ExitFailure
+		}
+		papers, err := official.Load(context.Background(), st, "imo-official", official.IMO(1959, time.Now().Year()))
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
+			return ExitFailure
+		}
+		fmt.Fprintf(env.Stderr, "om import: %d official papers.\n", len(papers))
+		s.Locate = func(code string, year int, text string) string {
+			if code != "imo" {
+				return ""
+			}
+			return papers.Locate("imo/"+strconv.Itoa(year), text)
+		}
 	}
 	sources, err := seed.Sources(*dir)
 	if err != nil {
@@ -178,6 +202,9 @@ func runImport(env Env, args []string) int {
 		reasons = append(reasons, fmt.Sprintf("%s %d", k, n))
 	}
 	sort.Strings(reasons)
+	if *anchor {
+		fmt.Fprintf(env.Stdout, "%d rows got a position from an official paper.\n", s.Located)
+	}
 	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, len(items), strings.Join(reasons, ", "))
 	return ExitOK
 }

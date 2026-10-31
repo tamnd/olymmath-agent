@@ -30,6 +30,10 @@ func TestSplit(t *testing.T) {
 	if segs[2].Position != "p4" || segs[2].Page != 2 || segs[2].Text != "Let ABC be a triangle with AB < AC < BC." {
 		t.Errorf("segment 3: %+v", segs[2])
 	}
+	bare := Split("1. Let p be a prime.\n 1. a list item\n2. Find all n.\n3. Prove it.\n2. another item\n")
+	if len(bare) != 3 || bare[1].Text != "Find all n." || bare[2].Text != "Prove it. 2. another item" {
+		t.Errorf("bare markers: %+v", bare)
+	}
 	old := Split("1959/1. Prove that the fraction is irreducible.\n1959/2. For what real values of x")
 	if len(old) != 2 || old[1].Position != "p2" {
 		t.Errorf("old markers: %+v", old)
@@ -73,5 +77,18 @@ func TestAnchor(t *testing.T) {
 	}
 	if r.Have != 1 || len(r.Missing) != 1 || r.Missing[0] != "imo/2024/p5" {
 		t.Errorf("have %d, missing %v", r.Have, r.Missing)
+	}
+}
+
+func TestLocate(t *testing.T) {
+	ps := Papers{"imo/2024": Split(paperText)}
+	if got := ps.Locate("imo/2024", "Determine all pairs $(a,b)$ of positive integers for which there exist positive integers $g$ and $N$ such that $\\gcd(a^n+b,b^n+a)=g$ holds for all integers $n\\ge N$."); got != "p2" {
+		t.Errorf("locate p2: %q", got)
+	}
+	if got := ps.Locate("imo/2024", "Find all functions on the reals."); got != "" {
+		t.Errorf("locate other: %q", got)
+	}
+	if got := ps.Locate("imo/2023", "Let ABC be a triangle with AB < AC < BC."); got != "" {
+		t.Errorf("locate no paper: %q", got)
 	}
 }

@@ -197,6 +197,14 @@ func TestProfiles(t *testing.T) {
 	if _, ok := Profiles["hf-numinamath-1-5"].Map(Record{"synthetic": {"false"}, "problem": {"x"}, "source": {"cn_k12"}}); ok {
 		t.Error("a textbook row was kept")
 	}
+	row, _ = Profiles["hf-numina-olympiads"].Map(Record{"exam": {"IMO"}, "year": {"1990"}, "problem_label": {"1"}, "problem": {"x"}, "metadata.resource_path": {"IMO/segmented/en-compendium.jsonl"}})
+	if row.Labels[0] != "IMO Compendium" {
+		t.Errorf("compendium label %q", row.Labels[0])
+	}
+	row, _ = Profiles["hf-numina-olympiads-ref"].Map(Record{"metadata.exam": {"IMO"}, "problem": {"x"}, "metadata.resource_path": {"IMO/segmented/en-IMO-2010-notes.jsonl"}})
+	if row.Labels[0] != "IMO" {
+		t.Errorf("notes label %q", row.Labels[0])
+	}
 	row, _ = Profiles["hf-ai-mo-aops"].Map(Record{"metadata.path": {"Contest Collections/2022 Contests/2022 3rd Memorial &quot;A&quot;/1.json"}, "problem": {"x"}})
 	if row.Labels[0] != `3rd Memorial "A"` {
 		t.Errorf("label %q", row.Labels[0])

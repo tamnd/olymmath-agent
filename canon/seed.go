@@ -52,6 +52,8 @@ type Seeds struct {
 	ThisYear int
 	// Accept, when it is not nil, can refuse a text, for example a text with a formula that does not render.
 	Accept func(text string) bool
+	// Locate, when it is not nil, gives the position of a row that has no number, for example from the official paper of the edition. It gives "" when it does not know the position.
+	Locate func(code string, year int, text string) string
 
 	pending []pendingRow
 	// lettered[code][year] is true when a row of the year has an edition letter.
@@ -60,6 +62,8 @@ type Seeds struct {
 	sections map[string]map[int]bool
 	// Skipped counts the rows that were not accepted, by reason.
 	Skipped map[string]int
+	// Located counts the rows that got a position from Locate.
+	Located int
 }
 
 type pendingRow struct {
@@ -98,6 +102,11 @@ func (s *Seeds) Add(r seed.Row) {
 		return
 	}
 	pos := seed.Position(r.Number)
+	if pos == "" && r.Number == "" && s.Locate != nil {
+		if pos = s.Locate(code, r.Year, normalize.Statement(r.Statement, "")); pos != "" {
+			s.Located++
+		}
+	}
 	if pos == "" || !validPosition(comp, pos) {
 		s.skip("no valid position")
 		return
