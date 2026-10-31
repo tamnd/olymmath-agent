@@ -13,25 +13,27 @@ import (
 
 // Competition is one row of the competition register (spec 05.2).
 type Competition struct {
-	Code              string            `yaml:"code"`
-	Name              string            `yaml:"name"`
-	Short             string            `yaml:"short"`
-	Names             map[string]string `yaml:"names"`
-	Group             string            `yaml:"group"`
-	Level             string            `yaml:"level"`
-	Country           string            `yaml:"country"`
-	Organizer         string            `yaml:"organizer"`
-	URL               string            `yaml:"url"`
-	FirstYear         int               `yaml:"first_year"`
-	LastYear          int               `yaml:"last_year"`
-	EditionForm       string            `yaml:"edition_form"`
-	Layout            []Layout          `yaml:"layout"`
-	PerYear           int               `yaml:"per_year"`
-	OfficialSolutions *bool             `yaml:"official_solutions"`
-	Languages         []string          `yaml:"languages"`
-	Copyright         string            `yaml:"copyright"`
-	Sources           []string          `yaml:"sources"`
-	Description       string            `yaml:"description"`
+	Code      string            `yaml:"code"`
+	Name      string            `yaml:"name"`
+	Short     string            `yaml:"short"`
+	Names     map[string]string `yaml:"names"`
+	Group     string            `yaml:"group"`
+	Level     string            `yaml:"level"`
+	Country   string            `yaml:"country"`
+	Organizer string            `yaml:"organizer"`
+	URL       string            `yaml:"url"`
+	FirstYear int               `yaml:"first_year"`
+	LastYear  int               `yaml:"last_year"`
+	// Gaps are the years with no edition between the first year and the last year, for example 1980 for the IMO.
+	Gaps              []int    `yaml:"gaps"`
+	EditionForm       string   `yaml:"edition_form"`
+	Layout            []Layout `yaml:"layout"`
+	PerYear           int      `yaml:"per_year"`
+	OfficialSolutions *bool    `yaml:"official_solutions"`
+	Languages         []string `yaml:"languages"`
+	Copyright         string   `yaml:"copyright"`
+	Sources           []string `yaml:"sources"`
+	Description       string   `yaml:"description"`
 
 	Editions []*Edition `yaml:"-"`
 }

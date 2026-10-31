@@ -65,3 +65,30 @@
 <p><a class="button" href="{{link ""}}">Go to the home page</a> <a class="button ghost" href="{{link "search/"}}">Search</a></p>
 </div>
 {{template "bottom" .}}{{end}}
+
+{{define "coverage.html"}}{{template "top" .}}{{with .Data}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Coverage</span></nav>
+<div class="prose">
+<h1>Coverage</h1>
+<p class="lede">The register gives the expected positions of each competition. These measures tell how many of them olymmath has, and how good the texts are.</p>
+<p>C0 is the share of expected positions with a problem. C1 is the share with a canonical statement written by a person (class H1 or H2). C2 is the share with an official text. C3 is the share with a verified statement. C4 is the share with a human or official solution. C5 to C8 count graded solutions, checked answers, formal statements and formal proofs. olymmath does not record these yet, so they show a dash. When the register gives no positions for a competition, the problems that olymmath has are the expected positions, and C0 shows a dash.</p>
+</div>
+<dl class="measures">
+  <div><dt>Expected positions</dt><dd>{{.Expected}}</dd></div>
+  {{range .Total}}<div><dt><abbr title="{{.Name}}">{{.Code}}</abbr> {{.Name}}</dt><dd>{{.Value}}</dd></div>{{end}}
+</dl>
+{{$names := .Names}}
+{{range .Groups}}
+<h2>{{.Name}}</h2>
+<div class="table-wrap">
+<table class="years coverage">
+  <thead><tr><th scope="col">Competition</th><th scope="col">Positions</th>{{range $names}}<th scope="col"><abbr title="{{.Name}}">{{.Code}}</abbr></th>{{end}}</tr></thead>
+  <tbody>
+  {{range .Rows}}
+    <tr><th scope="row"><a href="{{link (printf "c/%s/" .Competition.Code)}}">{{.Competition.Short}}</a></th><td>{{.Count.Expected}}</td>{{range .Measures}}<td>{{.Value}}</td>{{end}}</tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
+{{end}}{{template "bottom" .}}{{end}}

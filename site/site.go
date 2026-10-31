@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/tamnd/olymmath-agent/content"
+	"github.com/tamnd/olymmath-agent/coverage"
 	"github.com/tamnd/olymmath-agent/katex"
 	"github.com/tamnd/olymmath-agent/tag"
 )
@@ -121,6 +122,7 @@ func (b *builder) all() error {
 		b.problems,
 		b.redirects,
 		b.static,
+		b.coverage,
 		b.searchIndex,
 		b.machine,
 	}
@@ -166,6 +168,7 @@ func (b *builder) funcs() template.FuncMap {
 		"country":   countryName,
 		"problems":  competitionProblems,
 		"solorigin": solutionOrigin,
+		"lower":     strings.ToLower,
 	}
 }
 
@@ -550,17 +553,40 @@ func (b *builder) competitions() error {
 		return err
 	}
 	for _, c := range b.corpus.Competitions {
+		rows, total := coverage.Grid(c, b.opts.Date.Year())
 		if err := b.render("competition.html", page{
 			Title:       c.Name,
 			Description: c.Description,
 			Path:        "/c/" + c.Code + "/",
 			Section:     "competitions",
-			Data:        c,
+			Data:        competitionView{Competition: c, Rows: rows, Total: total, Measures: measures(total)},
 		}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// competitionView is a competition with its year grid (spec 10.3).
+type competitionView struct {
+	*content.Competition
+	Rows     []coverage.Row
+	Total    coverage.Count
+	Measures []measureView
+}
+
+// measureView is one coverage measure with its value.
+type measureView struct {
+	Code, Name, Value string
+}
+
+// measures gives the measures C0 to C8 of a count.
+func measures(c coverage.Count) []measureView {
+	out := make([]measureView, coverage.Measures)
+	for m := range out {
+		out[m] = measureView{Code: "C" + strconv.Itoa(m), Name: coverage.Names[m], Value: c.Percent(m)}
+	}
+	return out
 }
 
 type paperView struct {
@@ -742,6 +768,62 @@ func (b *builder) static() error {
 		}
 	}
 	return nil
+}
+
+// coverageRow is one competition on the coverage page.
+type coverageRow struct {
+	Competition *content.Competition
+	Count       coverage.Count
+	Measures    []measureView
+}
+
+// coverageGroup is one group of competitions on the coverage page.
+type coverageGroup struct {
+	Name string
+	Rows []coverageRow
+}
+
+// coverageView is the data of the coverage page (spec 14.3).
+type coverageView struct {
+	Names    []measureView
+	Total    []measureView
+	Expected int
+	Groups   []coverageGroup
+}
+
+// coverage writes the coverage page: the measures C0 to C8 of each competition and of the whole corpus.
+func (b *builder) coverage() error {
+	v := coverageView{}
+	for m := range coverage.Measures {
+		v.Names = append(v.Names, measureView{Code: "C" + strconv.Itoa(m), Name: coverage.Names[m]})
+	}
+	var total coverage.Count
+	byGroup := map[string][]coverageRow{}
+	for _, c := range b.corpus.Competitions {
+		_, n := coverage.Grid(c, b.opts.Date.Year())
+		if n.Expected == 0 {
+			continue
+		}
+		total.Add(n)
+		byGroup[c.Group] = append(byGroup[c.Group], coverageRow{Competition: c, Count: n, Measures: measures(n)})
+	}
+	for _, g := range content.Groups {
+		if rows := byGroup[g]; len(rows) > 0 {
+			name := groupTitles[g]
+			if name == "" {
+				name = g
+			}
+			v.Groups = append(v.Groups, coverageGroup{Name: name, Rows: rows})
+		}
+	}
+	v.Total, v.Expected = measures(total), total.Expected
+	return b.render("coverage.html", page{
+		Title:       "Coverage",
+		Description: "How much of each competition olymmath has: positions, human texts, official texts and solutions.",
+		Path:        "/coverage/",
+		Section:     "coverage",
+		Data:        v,
+	})
 }
 
 // searchEntry is one problem in search.json. The keys are short because the file goes to each reader.

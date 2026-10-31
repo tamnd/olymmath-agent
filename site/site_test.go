@@ -107,6 +107,22 @@ func TestCompetitionsPage(t *testing.T) {
 	}
 }
 
+func TestYearGridAndCoverage(t *testing.T) {
+	out := build(t, "/")
+	c := read(t, out, "c/imo/index.html")
+	for _, want := range []string{`class="cell cell-`, `href="/imo/2024/p1"`, "C0", "human solution"} {
+		if !strings.Contains(c, want) {
+			t.Errorf("c/imo/index.html has no %q", want)
+		}
+	}
+	cov := read(t, out, "coverage/index.html")
+	for _, want := range []string{"<h1>Coverage</h1>", `href="/c/imo/"`, "Expected positions"} {
+		if !strings.Contains(cov, want) {
+			t.Errorf("coverage/index.html has no %q", want)
+		}
+	}
+}
+
 func TestCountryName(t *testing.T) {
 	if countryName("VN") != "Vietnam" || countryName("ZZ") != "ZZ" {
 		t.Error("countryName is wrong")
