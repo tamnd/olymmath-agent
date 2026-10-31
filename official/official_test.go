@@ -173,3 +173,11 @@ func TestLanguages(t *testing.T) {
 		t.Errorf("%+v", ls)
 	}
 }
+
+func TestSolutionPages(t *testing.T) {
+	text := "A1. Find all x.\nA2. Find all y.\n\fA1. Find all x.\nSolution. Let x be\nA1 B1 C1 is a triangle.\nSolution. Again.\n\fA2. Find all y.\nAnswer. 3."
+	got := SolutionPages(text)
+	if got["a1"] != 2 || got["a2"] != 3 || len(got) != 2 {
+		t.Errorf("%v", got)
+	}
+}

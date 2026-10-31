@@ -101,6 +101,12 @@ om solutions -content olymmath kedlaya-putnam
 
 The Putnam archive also has the solutions of each year from 1995, by Kiran Kedlaya and his co-authors. Kedlaya asks for links, not copies, so these solutions are in zone Z3. The `om solutions` command gets each solution file into the raw store, finds the problems that it solves and writes one solution file for each problem, with the authors and a link to the PDF. A solution file in zone Z3 has no text. The problem page links to the solution. The command does not link a problem two times, so you can run it again each year.
 
+```sh
+om solutions -content olymmath imo-official
+```
+
+The ISL booklets on imo-official.org have the official solutions, from 2006. The solution part of a booklet repeats each problem and then gives its solution. For `imo-official`, the command finds the page where each solution starts and writes a link to that page of the booklet. These solutions are in zone Z2, but olymmath copies no excerpt.
+
 ## Layout
 
 | Path | What it has |

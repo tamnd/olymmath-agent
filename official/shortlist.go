@@ -110,3 +110,25 @@ func furniture(text string) string {
 	}
 	return sectionRE.ReplaceAllString(strings.Join(pages, "\f"), "")
 }
+
+// SolutionPages gives, for each problem of a booklet, the page where its solution starts, from 1. The solution part of a booklet repeats the label and the text of each problem and then gives the solution, so the page is the page of the first label of the problem that a solution follows. A later label is often a point of a figure, for example A1.
+func SolutionPages(text string) map[string]int {
+	text = strings.ReplaceAll(furniture(text), "\f", "\f\n")
+	ms := labelRE.FindAllStringSubmatchIndex(text, -1)
+	out := map[string]int{}
+	for i, m := range ms {
+		n := strings.TrimLeft(text[m[4]:m[5]], "0")
+		if n == "" {
+			continue
+		}
+		end := len(text)
+		if i+1 < len(ms) {
+			end = ms[i+1][0]
+		}
+		pos := strings.ToLower(text[m[2]:m[3]]) + n
+		if _, ok := out[pos]; !ok && solutionRE.MatchString(text[m[1]:end]) {
+			out[pos] = strings.Count(text[:m[0]], "\f") + 1
+		}
+	}
+	return out
+}
