@@ -134,3 +134,33 @@
 {{end}}</ul>
 {{end}}
 {{end}}{{template "bottom" .}}{{end}}
+
+{{define "problems.html"}}{{template "top" .}}{{with .Data}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Problems</span></nav>
+<h1>Problems</h1>
+<form class="facets" data-facets="{{.Index}}">
+  <label>Competition <select name="c"><option value="">All</option>{{range .Competitions}}<option value="{{.Value}}" data-country="{{.Country}}">{{.Name}}</option>{{end}}</select></label>
+  <label>Country <select name="n"><option value="">All</option>{{range .Countries}}<option value="{{.Value}}">{{.Name}}</option>{{end}}</select></label>
+  <label>Topic <select name="g"><option value="">All</option>{{range .Topics}}<option value="{{.Value}}">{{.Name}}</option>{{end}}</select></label>
+  <label>Type <select name="k"><option value="">All</option>{{range .Types}}<option value="{{.Value}}">{{.Name}}</option>{{end}}</select></label>
+  <label>From year <input name="y0" type="number" min="1890" max="2100" inputmode="numeric"></label>
+  <label>To year <input name="y1" type="number" min="1890" max="2100" inputmode="numeric"></label>
+  <label>From band <input name="d0" type="number" min="1" max="10" inputmode="numeric"></label>
+  <label>To band <input name="d1" type="number" min="1" max="10" inputmode="numeric"></label>
+  <label>Sort <select name="s"><option value="">Newest first</option><option value="old">Oldest first</option><option value="hard">Hardest first</option><option value="easy">Easiest first</option></select></label>
+  <fieldset><legend>Only problems with</legend>
+    <label><input type="checkbox" name="h" value="1"> a human solution</label>
+    <label><input type="checkbox" name="a" value="1"> an AI solution</label>
+    <label><input type="checkbox" name="v" value="1"> a verified statement</label>
+  </fieldset>
+</form>
+<p class="muted" id="facet-status" aria-live="polite">Loading the list…</p>
+<div class="table-wrap">
+<table class="years facet-list">
+  <thead><tr><th scope="col">Problem</th><th scope="col">Topic</th><th scope="col">Difficulty</th></tr></thead>
+  <tbody id="facet-rows"></tbody>
+</table>
+</div>
+<p><button type="button" class="button ghost" id="facet-more" hidden>Show more</button></p>
+<noscript><p>The list needs JavaScript. Use the <a href="{{link "c/"}}">list of competitions</a> or the <a href="{{link "t/"}}">topics</a>.</p></noscript>
+{{end}}{{template "bottom" .}}{{end}}
