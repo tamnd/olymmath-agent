@@ -98,7 +98,7 @@ func runImport(env Env, args []string) int {
 		}
 	}
 	if slices.Contains(sources, "hf-aops-wiki") {
-		s.Topics = &canon.Topics{Aliases: al}
+		s.Topics = &canon.Topics{Aliases: al, Corpus: corpus}
 		if err := seed.Read(*dir, "hf-aops-wiki", func(r seed.Row) error { s.Topics.Add(r); return nil }); err != nil {
 			fmt.Fprintf(env.Stderr, "om import: hf-aops-wiki: %v\n", err)
 			return ExitFailure
