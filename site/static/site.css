@@ -233,6 +233,9 @@ table.years { width: 100%; border-collapse: collapse; font: 400 0.9rem/1.5 var(-
 .legend .cell { width: 1rem; height: 1rem; }
 .coverage td { font-variant-numeric: tabular-nums; text-align: right; }
 .coverage thead th:not(:first-child) { text-align: right; }
+.sources tbody th .muted { display: block; font: 400 0.75rem/1.4 var(--sans); max-width: 26rem; }
+.planned { columns: 2 20rem; column-gap: 2rem; padding: 0; list-style: none; font: 400 0.9rem/1.5 var(--sans); }
+.planned li { break-inside: avoid; padding: 0.2rem 0; }
 .measures { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 0 1.2rem; }
 .measures div { background: var(--surface); padding: 0.5rem 0.8rem; min-width: 6.5rem; }
 .measures dt { font: 600 0.65rem/1.4 var(--sans); color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
