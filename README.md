@@ -82,6 +82,14 @@ om papers -content olymmath imo-official
 
 The `om papers` command reads the page of each IMO year on imo-official.org and records the official paper in each language in the edition file, under `official`. Each entry has the name of the language, the code that the organizer uses and the URL of the PDF. The edition page of the site lists these papers. The texts stay in the PDFs, so the command stores only links.
 
+### Check a sample against the papers
+
+```sh
+om sample -content olymmath -n 200 imo-official
+```
+
+The `om sample` command takes a random sample of the IMO and ISL problems that have a text in an official English paper. It compares the canonical text of each problem with the text of the paper and writes the report `reports/sample/imo-official.md`. A problem is exact when the order signal is at least 0.9 and the numbers agree, and it agrees when the order signal is at least 0.6 and the numbers agree. For each other problem, the report gives the two texts, so that a person can compare them. The same seed gives the same sample.
+
 ## Read a curated archive
 
 Some curated sources give their problems as TeX files. For such a source, `om seed` gets each file into the raw store, converts each problem to Markdown with math and writes one seed row for each problem. The math does not change. A problem with TeX that has no Markdown form, for example a figure, gets no row. The command prints the reason for each such problem. The first archive is the Putnam archive of Kiran Kedlaya, from 1985:
