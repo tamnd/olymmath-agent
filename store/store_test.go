@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/parquet-go/parquet-go"
 )
 
 type memRemote struct {
@@ -222,8 +224,13 @@ func TestSyncRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.Blobs != 2 || st.Indexes != 2 || rem.objs[Key(a.Hash)] == nil || rem.objs[ListKey] == nil {
+	if st.Blobs != 2 || st.Indexes != 2 || st.Captures != 2 || rem.objs[Key(a.Hash)] == nil || rem.objs[ListKey] == nil || len(rem.objs[ParquetKey]) == 0 {
 		t.Fatalf("sync %+v, keys %d", st, len(rem.objs))
+	}
+	pq := rem.objs[ParquetKey]
+	rows, err := parquet.Read[Capture](bytes.NewReader(pq), int64(len(pq)))
+	if err != nil || len(rows) != 2 || rows[0].Source == "" || rows[0].Fetched.IsZero() {
+		t.Errorf("parquet index %+v %v", rows, err)
 	}
 	// A second run sends no blob again.
 	if st, _ := s.Sync(context.Background(), nil); st.Blobs != 0 || st.Skipped != 2 {

@@ -11,13 +11,17 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/parquet-go/parquet-go"
 )
 
 // The remote keeps a copy of each index under IndexKey and the list of the index files under ListKey. The index is small, and with the copy a new machine can read the raw store from R2 alone.
 const (
 	indexPrefix = "index/"
 	ListKey     = indexPrefix + "LIST"
-	syncedFile  = "synced"
+	// ParquetKey is the remote key of all captures of all sources in one Parquet file, for queries with DuckDB.
+	ParquetKey = indexPrefix + "captures.parquet"
+	syncedFile = "synced"
 )
 
 // IndexKey is the remote key of the index file name.
@@ -29,6 +33,8 @@ type SyncStats struct {
 	Bytes   int64
 	Skipped int
 	Indexes int
+	// Captures is the number of rows of the Parquet index.
+	Captures int
 }
 
 // Sync sends each local blob that the remote does not have yet, then each index file and the list of the index files. The file "synced" in the store directory keeps the hashes that Sync sent, so a second run sends only the new blobs.
@@ -86,8 +92,37 @@ func (s *Store) Sync(ctx context.Context, log io.Writer) (SyncStats, error) {
 		}
 		st.Indexes++
 	}
+	var all []Capture
+	for _, name := range names {
+		cs, err := s.readIndex(name)
+		if err != nil {
+			return st, err
+		}
+		all = append(all, cs...)
+	}
+	pq, err := ParquetIndex(all)
+	if err != nil {
+		return st, err
+	}
+	if err := s.Remote.Put(ctx, ParquetKey, bytes.NewReader(pq), int64(len(pq))); err != nil {
+		return st, err
+	}
+	st.Captures = len(all)
 	list := []byte(strings.Join(names, "\n") + "\n")
 	return st, s.Remote.Put(ctx, ListKey, bytes.NewReader(list), int64(len(list)))
+}
+
+// ParquetIndex writes the captures as one Parquet file.
+func ParquetIndex(cs []Capture) ([]byte, error) {
+	var buf bytes.Buffer
+	w := parquet.NewGenericWriter[Capture](&buf)
+	if _, err := w.Write(cs); err != nil {
+		return nil, err
+	}
+	if err := w.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 // Restore gets the index files from the remote. It does not get the blobs: Get reads a blob from the remote when the local disk does not have it. A local index file that exists is kept when it is longer than the remote copy.
