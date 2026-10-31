@@ -43,6 +43,8 @@ The canonical statement of a problem is chosen by this precedence. The first rul
 4. `community`: the earliest H3 text that the matcher links with high confidence to the appearance.
 5. `derived`: a D text. The site marks it "text from dataset X; original source not yet found", and the problem goes to the queue "find the original".
 
+A source that changed the wording of each problem on purpose, such as Kalva, has `reworded: true` in the source register. Its texts come after all other texts, whatever their class, so a text with the original wording wins. When a reworded text is not canonical, its key and its answer decide alone: a low text match is expected, so it is kept as a link unless its answer disagrees.
+
 The site shows the canonical statement in the language of the reader when one exists at the same rank, and otherwise the canonical statement with a translation below it. A model translation is always labelled as such.
 
 ## 6.4 Normalization

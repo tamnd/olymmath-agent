@@ -31,6 +31,8 @@ type Candidate struct {
 	Answer string
 	// Key is the strength of the locator of the candidate: strong when it comes from H1 or H2 metadata, weak when it comes from the free text of a dataset.
 	Key match.Key
+	// Reworded is true when the source changed the wording on purpose (the reworded field of the source register).
+	Reworded bool
 
 	sh []uint64
 }
@@ -120,6 +122,7 @@ func Choose(at string, cands []*Candidate, original string) (Choice, bool) {
 		ra, _ := Rank(a, original)
 		rb, _ := Rank(b, original)
 		return cmp.Or(
+			cmp.Compare(reworded(a), reworded(b)),
 			cmp.Compare(ra, rb),
 			cmp.Compare(priority(a.Source), priority(b.Source)),
 			cmp.Compare(agree[b], agree[a]),
@@ -137,6 +140,17 @@ func Choose(at string, cands []*Candidate, original string) (Choice, bool) {
 	for _, c := range ok[1:] {
 		t := match.Jaccard(ch.Best.Shingles(), c.Shingles())
 		a := match.Answers(ch.Best.Answer, c.Answer)
+		// A reworded text has a low T by design, so only its key and its answer can decide.
+		if c.Reworded && c.Key != match.NoKey && a != match.AnswerMismatch {
+			if c.Answer != "" {
+				answers = append(answers, c.Answer)
+			}
+			if !seen[c.Source] {
+				seen[c.Source] = true
+				ch.Kept = append(ch.Kept, c)
+			}
+			continue
+		}
 		if match.Decide(match.Signals{K: c.Key, T: t, A: a}) == match.Review {
 			ch.Doubts = append(ch.Doubts, Doubt{C: c, T: t, A: a})
 			if a == match.AnswerMismatch && t >= match.Same {
@@ -166,6 +180,14 @@ func Choose(at string, cands []*Candidate, original string) (Choice, bool) {
 		ch.Answer = ""
 	}
 	return ch, true
+}
+
+// reworded gives 1 for a reworded candidate, so that it sorts after the others.
+func reworded(c *Candidate) int {
+	if c.Reworded {
+		return 1
+	}
+	return 0
 }
 
 // Status gives the status of the statement of a choice (spec 09.1).

@@ -189,7 +189,7 @@ func (s *Seeds) Add(r seed.Row) {
 	c := &Candidate{
 		Source: r.Source, Origin: src.Origin, Zone: src.Zone.Statement, Lang: lang,
 		Name: src.Name, URL: url, Ref: r.File + "#" + strconv.Itoa(r.Row),
-		Text: text, Answer: Answer(r.Answer), Key: key,
+		Text: text, Answer: Answer(r.Answer), Key: key, Reworded: src.Reworded,
 	}
 	s.pending = append(s.pending, pendingRow{c: c, comp: comp, year: r.Year, letter: letter, pos: pos})
 }
