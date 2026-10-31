@@ -77,6 +77,14 @@ func labels(ls ...string) []string {
 	return out
 }
 
+// numinaLabels gives the labels of a NuminaMath row. The rows from the IMO Compendium have the exam IMO, but they are the longlist and shortlist problems of the year in the order of the book, so problem 1 of the book is not problem 1 of the IMO. These rows get the label "IMO Compendium".
+func numinaLabels(exam, path string) []string {
+	if strings.Contains(path, "compendium") {
+		return labels("IMO Compendium")
+	}
+	return labels(exam)
+}
+
 // Profiles maps a source id of the source register to the profile of its dataset. A source with no profile uses Generic.
 var Profiles = map[string]Profile{
 	"hf-mathnet": {
@@ -96,7 +104,7 @@ var Profiles = map[string]Profile{
 		Map: func(r Record) (Row, bool) {
 			y, _ := strconv.Atoi(r.Get("year"))
 			return Row{
-				Labels: labels(r.Get("exam")), Year: y, Number: r.Get("problem_label"), Lang: "en",
+				Labels: numinaLabels(r.Get("exam"), r.Get("metadata.resource_path")), Year: y, Number: r.Get("problem_label"), Lang: "en",
 				Statement: r.Get("problem"), Solutions: count(r, "solution"), Ref: r.Get("metadata.resource_path"),
 			}, r.Get("problem") != ""
 		},
@@ -106,7 +114,7 @@ var Profiles = map[string]Profile{
 		Map: func(r Record) (Row, bool) {
 			y, _ := strconv.Atoi(r.Get("metadata.year"))
 			return Row{
-				Labels: labels(r.Get("metadata.exam")), Year: y, Number: r.Get("metadata.problem_label"), Lang: "en",
+				Labels: numinaLabels(r.Get("metadata.exam"), r.Get("metadata.resource_path")), Year: y, Number: r.Get("metadata.problem_label"), Lang: "en",
 				Statement: r.Get("problem"), Answer: r.Get("answer"), Solutions: count(r, "solution"), Ref: r.Get("metadata.resource_path"),
 			}, r.Get("problem") != ""
 		},

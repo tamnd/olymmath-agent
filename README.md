@@ -65,6 +65,8 @@ om anchor -content olymmath imo-official
 
 The `om anchor` command gets the official English IMO papers into the raw store and reads their text with `pdftotext`. You must install Poppler to get `pdftotext`. The command compares each problem of a paper with the canonical text of the same problem in the content. When the words agree, the command adds a link to the paper and its page. When the words do not agree, the command adds a review item of kind `official` to the review queue. The command does not change a canonical text. Use `-from` and `-to` to select the years.
 
+Some datasets give the IMO problems of a year with no problem number. The command `om import -anchor -comp imo` compares each such text with the official papers in the raw store and gives it the position of the problem whose words agree best. The best signal must be 0.3 or more, and it must be at least 0.15 above the second best signal. Otherwise the row has no position, and the import skips it.
+
 ## Layout
 
 | Path | What it has |

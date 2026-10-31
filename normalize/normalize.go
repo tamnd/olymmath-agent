@@ -10,7 +10,7 @@ import (
 )
 
 // Version names the normalization rules. Change it when a rule changes.
-const Version = "norm/2"
+const Version = "norm/3"
 
 var punct = strings.NewReplacer(
 	"‘", "'", "’", "'", "‚", "'", "‛", "'",
@@ -19,6 +19,9 @@ var punct = strings.NewReplacer(
 	"\u00a0", " ", "\u2009", " ", "\u202f", " ", "\u200b", "",
 	"\r\n", "\n", "\r", "\n", "\t", " ",
 )
+
+// aops replaces the old AoPS macros \plus{}, \minus{} and \equal{} with their signs. KaTeX does not know these macros.
+var aops = strings.NewReplacer(`\plus{}`, "+", `\minus{}`, "-", `\equal{}`, "=")
 
 var (
 	displayRE = regexp.MustCompile(`(?s)\\\[(.*?)\\\]`)
@@ -31,10 +34,11 @@ var (
 	markerRE = regexp.MustCompile(`(?i)^\s*(?:\*\*)?(?:problem|prob\.?|p|#)?\s*([a-z]?\s*[0-9]{1,2})\s*(?:[.):]|\s-)(?:\*\*)?\s+`)
 )
 
-// Text normalizes a statement: Unicode NFC, a fixed set of quotes and dashes, `\[...\]` to `$$...$$`, `\(...\)` to `$...$`, no spacing commands that have no meaning, no `[hide]` blocks, one space between words and one blank line between paragraphs.
+// Text normalizes a statement: Unicode NFC, a fixed set of quotes and dashes, the signs for the old AoPS macros \plus{}, \minus{} and \equal{}, `\[...\]` to `$$...$$`, `\(...\)` to `$...$`, no spacing commands that have no meaning, no `[hide]` blocks, one space between words and one blank line between paragraphs.
 func Text(s string) string {
 	s = norm.NFC.String(s)
 	s = punct.Replace(s)
+	s = aops.Replace(s)
 	s = displayRE.ReplaceAllString(s, "$$$$$1$$$$")
 	s = inlineRE.ReplaceAllString(s, "$$$1$$")
 	s = noOpRE.ReplaceAllString(s, " ")

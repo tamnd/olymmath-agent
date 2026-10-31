@@ -152,3 +152,14 @@ func TestEditionYear(t *testing.T) {
 		}
 	}
 }
+
+func TestWithdrawnTag(t *testing.T) {
+	tags := map[string][][2]string{"registers/tags.tsv": {{"006SZE6NAS\tsolution", "006SZE6NAS\tsolution\n0000000000\tproblem"}}}
+	if _, fs, _ := Run(fixture(t, tags), "T02"); len(fs) != 1 {
+		t.Fatalf("a tag with no record: want 1 finding, got %v", fs)
+	}
+	tags["registers/aliases.tsv"] = [][2]string{{"", "0000000000\t-\tthe text was of another problem\n"}}
+	if _, fs, _ := Run(fixture(t, tags), "T02"); len(fs) != 0 {
+		t.Errorf("a withdrawn tag: want no finding, got %v", fs)
+	}
+}

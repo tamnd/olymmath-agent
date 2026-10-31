@@ -156,6 +156,9 @@ type Canonical struct {
 	Rule      string `yaml:"rule"`
 }
 
+// Withdrawn is the target in registers/aliases.tsv of a tag whose record was wrong and has no replacement, for example a problem at a position that did not have that problem. A withdrawn tag is never given again.
+const Withdrawn = "-"
+
 // Rules are the precedence rules for the canonical statement, best first (spec 06.3).
 var Rules = []string{"official-original", "official-translation", "curated", "community", "derived"}
 

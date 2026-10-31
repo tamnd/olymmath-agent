@@ -4,6 +4,7 @@ package official
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os/exec"
 	"regexp"
@@ -52,7 +53,10 @@ func IMO(from, to int) []Paper {
 	return out
 }
 
-// Text runs pdftotext on the bytes of a PDF and returns the text, with a form feed between pages.
+// ErrNoText is the error when the text layer of a PDF is not readable, for example when a font has no map to Unicode. Such a paper needs the vision lane.
+var ErrNoText = errors.New("the text layer of the PDF is not readable")
+
+// Text runs pdftotext on the bytes of a PDF and returns the text, with a form feed between pages. It returns ErrNoText when less than half of the letters are ASCII letters.
 func Text(ctx context.Context, pdf []byte) (string, error) {
 	cmd := exec.CommandContext(ctx, "pdftotext", "-layout", "-enc", "UTF-8", "-", "-")
 	cmd.Stdin = bytes.NewReader(pdf)
@@ -62,20 +66,45 @@ func Text(ctx context.Context, pdf []byte) (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("pdftotext: %w: %s", err, strings.TrimSpace(errb.String()))
 	}
-	return out.String(), nil
+	text := out.String()
+	var ascii, all int
+	for _, r := range text {
+		if unicode.IsLetter(r) || unicode.IsSymbol(r) {
+			all++
+			if r < unicode.MaxASCII {
+				ascii++
+			}
+		}
+	}
+	if ascii*2 < all {
+		return "", ErrNoText
+	}
+	return text, nil
 }
 
 // markerRE finds the start of a problem: "Problem 3." or "1959/3." at the start of a line.
 var markerRE = regexp.MustCompile(`(?m)^\s*(?:Problem\s+([0-9]{1,2})\s*[.:]|(?:19|20)[0-9]{2}\s*/\s*([0-9]{1,2})\s*\.)`)
 
-// Split cuts the text of a paper into problems. A problem that has a marker twice, for example in two languages, keeps its first text.
+// bareRE finds the start of a problem in a paper with no word before the number: "3." at the start of a line.
+var bareRE = regexp.MustCompile(`(?m)^\s*()([0-9]{1,2})\.\s`)
+
+// Split cuts the text of a paper into problems. A problem that has a marker twice, for example in two languages, keeps its first text. When the paper has no marker with a word or a year, Split uses the numbers at the start of a line, but only in the sequence 1, 2, 3 and so on, because a list in a problem also has numbers.
 func Split(text string) []Segment {
 	ms := markerRE.FindAllStringSubmatchIndex(text, -1)
+	if len(ms) == 0 {
+		next := 1
+		for _, m := range bareRE.FindAllStringSubmatchIndex(text, -1) {
+			if n, _ := strconv.Atoi(text[m[4]:m[5]]); n == next {
+				ms = append(ms, m)
+				next++
+			}
+		}
+	}
 	var out []Segment
 	seen := map[string]bool{}
 	for i, m := range ms {
 		var n string
-		if m[2] >= 0 {
+		if m[3] > m[2] {
 			n = text[m[2]:m[3]]
 		} else {
 			n = text[m[4]:m[5]]
@@ -144,4 +173,31 @@ func Signal(a, b string) float64 {
 		}
 	}
 	return float64(n) / float64(len(wa)+len(wb)-n)
+}
+
+// Least is the lowest word signal for which Locate gives a position. It is lower than Agree, because Locate compares a text with the few problems of one paper, and the margin to the second best signal must also be clear.
+const Least = 0.3
+
+// Margin is the smallest difference between the best and the second best word signal for which Locate gives a position.
+const Margin = 0.15
+
+// Papers holds the segments of the papers of each edition.
+type Papers map[string][]Segment
+
+// Locate gives the position of a text in the paper of an edition: the position of the segment with the best word signal. It gives "" when the edition has no paper, when the best signal is less than Least, or when the second best signal is less than Margin below the best.
+func (ps Papers) Locate(edition, text string) string {
+	best, second, pos := 0.0, 0.0, ""
+	for _, sg := range ps[edition] {
+		t := Signal(text, sg.Text)
+		switch {
+		case t > best:
+			best, second, pos = t, best, sg.Position
+		case t > second:
+			second = t
+		}
+	}
+	if best < Least || best-second < Margin {
+		return ""
+	}
+	return pos
 }

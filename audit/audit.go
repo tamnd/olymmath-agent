@@ -46,7 +46,7 @@ func (c *Context) add(p, format string, args ...any) {
 // Rules are the audit rules, in the order of spec 09.3.
 var Rules = []*Rule{
 	{ID: "T01", Level: content.Error, Summary: "each tag is valid and unique", Loader: true},
-	{ID: "T02", Level: content.Error, Summary: "each tag is in registers/tags.tsv, and each removed tag is in registers/aliases.tsv", check: t02},
+	{ID: "T02", Level: content.Error, Summary: "each tag is in registers/tags.tsv, and each removed tag is in registers/aliases.tsv with a target tag or with - for a withdrawn record", check: t02},
 	{ID: "T03", Level: content.Error, Summary: "each locator is in the competition register, and each redirect goes to a problem", check: t03},
 	{ID: "T04", Level: content.Error, Summary: "each appearance belongs to exactly one problem", check: t04},
 	{ID: "S01", Level: content.Error, Summary: "each problem has a canonical statement with a valid rule", check: s01},
@@ -133,6 +133,7 @@ func t02(c *Context) {
 		switch {
 		case !ok:
 			c.add("registers/tags.tsv", "the tag %s has no record and is not in registers/aliases.tsv", t)
+		case to == content.Withdrawn:
 		case !used[to]:
 			c.add("registers/aliases.tsv", "the tag %s points to %s, which has no record", t, to)
 		}

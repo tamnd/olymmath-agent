@@ -674,8 +674,20 @@ func (b *builder) problem(v *problemView) error {
 	return nil
 }
 
-// redirects writes a page for each old locator in registers/redirects.tsv.
+// redirects writes a page for each old locator in registers/redirects.tsv and for each old tag in registers/aliases.tsv. A withdrawn tag, with the target "-", gets no page.
 func (b *builder) redirects() error {
+	tags := make([]string, 0, len(b.corpus.Aliases))
+	for old, to := range b.corpus.Aliases {
+		if to != content.Withdrawn && b.corpus.ByTag(to) != nil {
+			tags = append(tags, old)
+		}
+	}
+	sort.Strings(tags)
+	for _, old := range tags {
+		if err := b.redirect("/p/"+old, "/p/"+b.corpus.Aliases[old]); err != nil {
+			return err
+		}
+	}
 	olds := make([]string, 0, len(b.corpus.Redirects))
 	for old := range b.corpus.Redirects {
 		olds = append(olds, old)
