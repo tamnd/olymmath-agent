@@ -56,10 +56,11 @@
 <h1>Search</h1>
 <form class="search-box" action="{{link "search/"}}" method="get" role="search" data-search>
   <label class="sr" for="q">Search the problems</label>
-  <input id="q" name="q" type="search" placeholder="Words, a formula or a locator such as imo/2024/p1" autocomplete="off" autofocus>
+  <input id="q" name="q" type="search" placeholder="Words, a formula such as \frac{a}{b}, or a locator such as imo/2024/p1" autocomplete="off" autofocus>
   <button type="submit">Search</button>
 </form>
 <p class="muted" id="search-status" aria-live="polite">Type words to search the statements.</p>
+<p class="muted search-help">Words find the problems that have all of them. A query with a TeX command, a script, a brace or an equals sign is a formula: <code>x^2+y^2</code> finds the statements with that formula, and <code>\frac12</code> is the same as <code>\frac{1}{2}</code>. A locator such as <code>imo/2024/p1</code> or a tag goes to its page when you press Enter.</p>
 <ol class="results" id="results" data-index="{{link "search.json"}}"></ol>
 <noscript><p>The search needs JavaScript. Use the <a href="{{link "c/"}}">list of competitions</a>.</p></noscript>
 {{template "bottom" .}}{{end}}

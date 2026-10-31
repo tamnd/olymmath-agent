@@ -880,26 +880,29 @@ func (b *builder) sources() error {
 
 // searchEntry is one problem in search.json. The keys are short because the file goes to each reader.
 type searchEntry struct {
-	Title   string   `json:"t"`
-	Link    string   `json:"u"`
-	Text    string   `json:"x"`
-	Year    int      `json:"y"`
-	Comp    string   `json:"c"`
-	Topics  []string `json:"g,omitempty"`
-	Locator string   `json:"l"`
+	Title string `json:"t"`
+	Link  string `json:"u"`
+	Text  string `json:"x"`
+	// Formulas are the tokens of the formulas of the statement, for the formula search.
+	Formulas string   `json:"f,omitempty"`
+	Year     int      `json:"y"`
+	Comp     string   `json:"c"`
+	Topics   []string `json:"g,omitempty"`
+	Locator  string   `json:"l"`
 }
 
 func (b *builder) searchIndex() error {
 	var entries []searchEntry
 	for _, p := range append(b.corpus.Problems(), b.corpus.Loose...) {
 		entries = append(entries, searchEntry{
-			Title:   problemTitle(p),
-			Link:    b.link(problemPath(p)),
-			Text:    Plain(p.Statement),
-			Year:    p.Year,
-			Comp:    p.Competition,
-			Topics:  p.Topics,
-			Locator: p.Locator(),
+			Title:    problemTitle(p),
+			Link:     b.link(problemPath(p)),
+			Text:     Plain(p.Statement),
+			Formulas: formulas(p.Statement),
+			Year:     p.Year,
+			Comp:     p.Competition,
+			Topics:   p.Topics,
+			Locator:  p.Locator(),
 		})
 	}
 	data, err := json.Marshal(entries)

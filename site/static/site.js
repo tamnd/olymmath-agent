@@ -61,6 +61,35 @@
     });
     return out;
   }
+  // formulaTokens follows FormulaTokens of the site package: a command gives its name, and a letter, a digit or an operator gives itself.
+  var skip = " left right big Big bigg Bigg bigl bigr Bigl Bigr displaystyle textstyle mathrm mathbf mathit text operatorname quad qquad ";
+  var same = { leq: "le", geq: "ge", neq: "ne", dfrac: "frac", tfrac: "frac", lvert: "|", rvert: "|", vert: "|", mid: "|", ldots: "dots", cdots: "dots", leqslant: "le", geqslant: "ge" };
+  function formulaTokens(tex) {
+    var out = [], i = 0, cs = Array.from(tex);
+    while (i < cs.length) {
+      var c = cs[i];
+      if (c === "\\") {
+        var j = i + 1;
+        while (j < cs.length && /[a-zA-Z]/.test(cs[j])) j++;
+        var name = cs.slice(i + 1, j).join("");
+        if (!name) {
+          if (j < cs.length && "{}|".indexOf(cs[j]) >= 0) out.push(cs[j]);
+          j++;
+        } else if (skip.indexOf(" " + name + " ") < 0) {
+          out.push(same[name] || name);
+        }
+        i = j;
+      } else if (/[a-zA-Z0-9]/.test(c) || "+-=<>()[]|,.!/*:;".indexOf(c) >= 0) {
+        out.push(c); i++;
+      } else {
+        if (c.charCodeAt(0) >= 128 && !/\s/.test(c)) out.push(c);
+        i++;
+      }
+    }
+    return out.join(" ");
+  }
+  // isFormula tells if a query is a formula: it has a TeX command, a script, a brace, a dollar or an equals sign.
+  function isFormula(q) { return /[\\^_{}$=]/.test(q); }
   function run() {
     var q = input.value.trim();
     var url = new URL(location.href);
@@ -68,11 +97,17 @@
     history.replaceState(null, "", url);
     results.innerHTML = "";
     if (!q) { status.textContent = "Type words to search the statements."; return; }
-    var words = norm(q).split(/\s+/).filter(Boolean);
-    var hits = index.filter(function (e) {
-      var hay = norm(e.t + " " + e.l + " " + e.x);
-      return words.every(function (w) { return hay.indexOf(w) >= 0; });
-    });
+    var words = norm(q).split(/\s+/).filter(Boolean), hits;
+    if (isFormula(q)) {
+      var f = " " + formulaTokens(q.replace(/\$/g, "")) + " ";
+      words = [];
+      hits = index.filter(function (e) { return e.f && (" " + e.f + " ").indexOf(f) >= 0; });
+    } else {
+      hits = index.filter(function (e) {
+        var hay = norm(e.t + " " + e.l + " " + e.x);
+        return words.every(function (w) { return hay.indexOf(w) >= 0; });
+      });
+    }
     hits.sort(function (a, b) { return b.y - a.y || (a.l < b.l ? -1 : 1); });
     status.textContent = hits.length === 1 ? "1 problem" : hits.length + " problems";
     var frag = document.createDocumentFragment();
@@ -88,11 +123,19 @@
   status.textContent = "Loading the index…";
   fetch(results.getAttribute("data-index")).then(function (r) { return r.json(); }).then(function (data) {
     index = data;
-    var exact = index.filter(function (e) { return e.l === input.value.trim().toLowerCase(); });
+    var exact = index.filter(function (e) { return e.l.toLowerCase() === input.value.trim().toLowerCase(); });
     if (exact.length === 1) { location.replace(exact[0].u); return; }
     run();
     input.addEventListener("input", run);
-    document.querySelector("[data-search]").addEventListener("submit", function (e) { e.preventDefault(); run(); });
+    // A locator or a tag goes straight to its page.
+    document.querySelector("[data-search]").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var q = input.value.trim().toLowerCase().replace(/^\/+|\/+$/g, "");
+      var hit = index.filter(function (x) { return x.l.toLowerCase() === q; });
+      if (hit.length === 1) { location.href = hit[0].u; return; }
+      if (/^[0-9a-z]{10}$/.test(q) && /\d/.test(q)) { location.href = document.body.getAttribute("data-base") + "p/" + q.toUpperCase(); return; }
+      run();
+    });
   }).catch(function () { status.textContent = "The search index did not load. Try again later."; });
   // The filter of the competition list hides each row that does not contain the text, and each group that has no row left.
   var filter = document.querySelector("[data-filter]");
