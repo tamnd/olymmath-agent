@@ -153,11 +153,17 @@ func TestDataFiles(t *testing.T) {
 	}
 }
 
-type putCounter struct{ puts int }
+type putCounter struct {
+	puts int
+	err  error
+}
 
 func (p *putCounter) Put(_ context.Context, _ string, r io.Reader, _ int64) error {
 	p.puts++
 	_, err := io.Copy(io.Discard, r)
+	if p.err != nil {
+		return p.err
+	}
 	return err
 }
 func (p *putCounter) Get(context.Context, string) (io.ReadCloser, error) {
@@ -183,5 +189,17 @@ func TestHarvestRemoteMax(t *testing.T) {
 	}
 	if f := m.Files[1]; f.Where != "ref" || f.SHA256 != sum(big) || rem.puts != 0 {
 		t.Errorf("large file %+v, %d puts", f, rem.puts)
+	}
+	// A remote that refuses the body with 413 also gives a reference.
+	rem = &putCounter{err: store.ErrTooLarge}
+	st, _ = store.Open(t.TempDir(), rem)
+	fc = fetch.New(st)
+	fc.Delay = 0
+	m, _, err = (&Harvest{Hub: &Client{}, Fetch: fc, LocalMax: 1024}).Run(context.Background(), "hf-set", "org/set")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := m.Files[1]; f.Where != "ref" || rem.puts != 1 {
+		t.Errorf("refused file %+v, %d puts", f, rem.puts)
 	}
 }
