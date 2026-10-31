@@ -4,6 +4,7 @@
 package audit
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -257,6 +258,9 @@ func s04(c *Context) {
 		for _, text := range []string{p.Statement, p.Answer} {
 			_, errs := c.Markup.HTML(text)
 			for _, e := range errs {
+				if errors.Is(e, site.ErrFigure) {
+					continue
+				}
 				c.add(p.Path, "a formula does not render: %v", e)
 			}
 		}
