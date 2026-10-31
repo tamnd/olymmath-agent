@@ -1,6 +1,7 @@
 package seed
 
 import (
+	"html"
 	"regexp"
 	"strconv"
 	"strings"
@@ -67,7 +68,7 @@ func labels(ls ...string) []string {
 	var out []string
 	seen := map[string]bool{}
 	for _, l := range ls {
-		l = strings.TrimSpace(l)
+		l = strings.TrimSpace(html.UnescapeString(l))
 		if l != "" && !seen[l] {
 			seen[l] = true
 			out = append(out, l)
@@ -187,9 +188,9 @@ var Profiles = map[string]Profile{
 
 // The columns that Generic looks for, in order.
 var (
-	genStatement = []string{"problem", "question", "Problem", "Question", "problem_markdown", "statement", "informal_statement", "informal_problem", "prompt"}
+	genStatement = []string{"problem", "question", "Problem", "Question", "problem_markdown", "statement", "informal_statement", "informal_problem", "problem_statement", "prompt"}
 	genAnswer    = []string{"answer", "final_answer", "Answer", "ground_truth", "expected_answer"}
-	genSolution  = []string{"solution", "solutions", "Solution", "proof", "reference_solution"}
+	genSolution  = []string{"solution", "solutions", "Solution", "proof", "reference_solution", "reasoning"}
 	genLabel     = []string{"competition", "contest", "exam", "source", "Source", "origin", "category", "subject"}
 	genYear      = []string{"year", "Year"}
 	genNumber    = []string{"problem_label", "problem_number", "number", "problem_idx", "No"}
