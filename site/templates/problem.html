@@ -24,8 +24,8 @@
     {{range $i, $s := .Solutions}}
     <article class="card solution" id="s{{add $i 1}}">
       <p class="card-kicker"><span class="badge badge-sol-{{$s.Origin}}">{{solorigin $s.Origin}}</span> Solution {{add $i 1}}{{with $s.Author.Display}} by {{.}}{{end}}{{with $s.Run}} · {{.Model}}{{end}}</p>
-      <div class="statement">{{$s.Body}}</div>
-      {{if $s.URL}}<p class="source"><a href="{{$s.URL}}" rel="noopener">{{$s.Source}}</a>. {{zone $s.Zone}}.</p>{{end}}
+      {{if $s.Body}}<div class="statement">{{$s.Body}}</div>
+      {{if $s.URL}}<p class="source"><a href="{{$s.URL}}" rel="noopener">{{$s.SourceName}}</a>. {{zone $s.Zone}}.</p>{{end}}{{else}}<p>The terms of the source let olymmath link to this solution but not copy it. <a href="{{$s.URL}}" rel="noopener">Read the solution in the {{$s.SourceName}}</a>.</p>{{end}}
     </article>
     {{else}}
     <div class="card empty">

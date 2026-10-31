@@ -100,3 +100,45 @@ func ParsePutnam(tex string) []Problem {
 	}
 	return out
 }
+
+// PutnamSolutionsFirst is the first year with solutions in the Putnam archive.
+const PutnamSolutionsFirst = 1995
+
+// PutnamSolutions gives the solution files of the Putnam archive from the year from to the year to. Each Doc is the TeX file, which olymmath reads. SolutionLink gives the PDF, which a reader opens.
+func PutnamSolutions(from, to int) []Doc {
+	var out []Doc
+	for y := max(from, PutnamSolutionsFirst); y <= to; y++ {
+		out = append(out, Doc{Year: y, URL: fmt.Sprintf("https://kskedlaya.org/putnam-archive/%ds.tex", y)})
+	}
+	return out
+}
+
+// SolutionLink gives the PDF of the solutions of one year.
+func SolutionLink(year int) string {
+	return fmt.Sprintf("https://kskedlaya.org/putnam-archive/%ds.pdf", year)
+}
+
+var authorRE = regexp.MustCompile(`\\author\{([^}]*)\}`)
+
+// Labels gives the labels of the problems that a file of the archive has, for example A1, in the order of the file. It reads only the labels, so it also works for the solution files, whose texts olymmath does not copy.
+func Labels(tex string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, m := range putnamRE.FindAllStringSubmatch(Expand(tex), -1) {
+		if l := m[1] + m[2]; !seen[l] {
+			seen[l] = true
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// Authors gives the authors of a file of the archive as one line, or an empty string.
+func Authors(tex string) string {
+	m := authorRE.FindStringSubmatch(tex)
+	if m == nil {
+		return ""
+	}
+	s := strings.Join(strings.Fields(strings.NewReplacer(`\\`, " ", "~", " ").Replace(m[1])), " ")
+	return strings.ReplaceAll(s, ", and ", " and ")
+}

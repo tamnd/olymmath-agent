@@ -355,6 +355,8 @@ func appearanceTitle(c *content.Competition, edition, pos string) string {
 type solutionView struct {
 	*content.Solution
 	Body template.HTML
+	// SourceName is the name of the source in the source register, or the source id.
+	SourceName string
 }
 
 func (b *builder) view(p *content.Problem) *problemView {
@@ -369,7 +371,11 @@ func (b *builder) view(p *content.Problem) *problemView {
 		v.Answer = b.html(p.Answer, p.Path)
 	}
 	for _, s := range p.Solutions {
-		v.Solutions = append(v.Solutions, solutionView{Solution: s, Body: b.html(s.Body, s.Path)})
+		sv := solutionView{Solution: s, Body: b.html(s.Body, s.Path), SourceName: s.Source}
+		if r := b.corpus.Source(s.Source); r != nil {
+			sv.SourceName = r.Name
+		}
+		v.Solutions = append(v.Solutions, sv)
 	}
 	for _, a := range p.Appearances {
 		if a.Primary {
