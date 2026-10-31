@@ -81,7 +81,7 @@ func ParseKalva(page string) []Problem {
 
 // htmlText turns the HTML of a problem into Markdown. A superscript or a subscript and the text just before it become inline TeX: 4<sup>2x</sup> is $4^{2x}$ and a<sub>1</sub> is $a_1$. An item of a list starts a new line.
 func htmlText(s string) string {
-	// The TeX made here uses the mark \x02 for its dollars, so that two pieces next to each other join and the TeX of the page stays as it is.
+	// The TeX made here uses the mark \x02 for its dollars, so that two pieces next to each other join with a space and the TeX of the page stays as it is.
 	s = strings.NewReplacer("\r", "", "&nbsp;", " ").Replace(s)
 	for {
 		t := kalvaScript.ReplaceAllStringFunc(s, func(m string) string {
@@ -96,7 +96,7 @@ func htmlText(s string) string {
 				i := strings.LastIndex(t, "\x02")
 				pre, base = t[:max(i, 0)], t[i+1:]
 			}
-			arg := strings.TrimSpace(kalvaTag.ReplaceAllString(g[3], ""))
+			arg := strings.TrimSpace(strings.ReplaceAll(kalvaTag.ReplaceAllString(g[3], ""), "\x02", ""))
 			if len([]rune(arg)) != 1 {
 				arg = "{" + arg + "}"
 			}
@@ -110,7 +110,7 @@ func htmlText(s string) string {
 	s = htmlItem.ReplaceAllString(s, " \x01 ")
 	s = kalvaTag.ReplaceAllString(s, " ")
 	s = html.UnescapeString(s)
-	s = strings.NewReplacer("\x02\x02", "", "\x02", "$").Replace(s)
+	s = strings.NewReplacer("\x02\x02", " ", "\x02", "$").Replace(s)
 	s = strings.TrimSpace(kalvaSpace.ReplaceAllString(s, " "))
 	return strings.ReplaceAll(s, " \x01 ", "\n- ")
 }

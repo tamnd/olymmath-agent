@@ -74,7 +74,7 @@ func ParseKomal(page string) []Problem {
 		}
 		body = komalItalic.ReplaceAllString(body, "\x02$1\x02")
 		body = komalShow.ReplaceAllString(body, "$$$$$1$$$$")
-		body = komalTeX.ReplaceAllString(body, "$$$1$$")
+		body = komalTeX.ReplaceAllString(body, "\x02$1\x02")
 		if p.Text = htmlText(body); strings.HasPrefix(p.Text, "Subscribers can reach the text") {
 			p.Text, p.Err = "", errKomalLocked
 		}
