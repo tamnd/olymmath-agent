@@ -1,0 +1,137 @@
+package publish
+
+import (
+	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"testing"
+
+	"github.com/tamnd/olymmath-agent/content"
+)
+
+// fakeR2 keeps the objects of one bucket in memory.
+type fakeR2 struct {
+	mu      sync.Mutex
+	objects map[string]string
+	types   map[string]string
+	puts    int
+}
+
+func (f *fakeR2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if r.Header.Get("Authorization") != "Bearer token" {
+		http.Error(w, "no", http.StatusForbidden)
+		return
+	}
+	key := strings.TrimPrefix(r.URL.Path, "/accounts/acc/r2/buckets/site/objects/")
+	switch r.Method {
+	case http.MethodPut:
+		b, _ := io.ReadAll(r.Body)
+		f.objects[key] = string(b)
+		f.types[key] = r.Header.Get("Content-Type")
+		f.puts++
+	case http.MethodGet:
+		b, ok := f.objects[key]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = io.WriteString(w, b)
+	case http.MethodDelete:
+		delete(f.objects, key)
+	}
+}
+
+func write(t *testing.T, dir, rel, text string) {
+	t.Helper()
+	p := filepath.Join(dir, filepath.FromSlash(rel))
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(p, []byte(text), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSync(t *testing.T) {
+	f := &fakeR2{objects: map[string]string{}, types: map[string]string{}}
+	srv := httptest.NewServer(f)
+	defer srv.Close()
+	r := &R2{Account: "acc", Bucket: "site", Token: "token", Base: srv.URL}
+	dir := t.TempDir()
+	write(t, dir, "nz/2020/p1.html", "one")
+	write(t, dir, "nz/2020/p2.md", "two")
+	ctx := context.Background()
+	res, err := Sync(ctx, r, dir, 4)
+	if err != nil || res.Put != 2 || res.Files != 2 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	if f.objects["nz/2020/p1.html"] != "one" || f.types["nz/2020/p2.md"] != "text/markdown; charset=utf-8" || f.objects[ManifestKey] == "" {
+		t.Errorf("%v %v", f.objects, f.types)
+	}
+	write(t, dir, "nz/2020/p1.html", "new")
+	if err := os.Remove(filepath.Join(dir, "nz", "2020", "p2.md")); err != nil {
+		t.Fatal(err)
+	}
+	res, err = Sync(ctx, r, dir, 4)
+	if err != nil || res.Put != 1 || res.Deleted != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	if _, ok := f.objects["nz/2020/p2.md"]; ok || f.objects["nz/2020/p1.html"] != "new" {
+		t.Errorf("%v", f.objects)
+	}
+	if res, _ = Sync(ctx, r, dir, 4); res.Put != 0 || res.Deleted != 0 {
+		t.Errorf("a sync with no change did %+v", res)
+	}
+}
+
+func TestSplit(t *testing.T) {
+	dir, out := t.TempDir(), t.TempDir()
+	write(t, dir, "redirects.json", `{"/p/ABC":"/imo/2024/p1","/isl/2024/n1":"/imo/2024/p1"}`)
+	write(t, dir, "p/ABC.html", "moved")
+	write(t, dir, "isl/2024/n1.html", "moved")
+	write(t, dir, "imo/2024/p1.html", "imo")
+	write(t, dir, "nz/index.html", "nz")
+	write(t, dir, "nz/2020/index.html", "edition")
+	write(t, dir, "nz/2020/p1.html", "problem")
+	write(t, dir, "nz/2020/p1.json", "{}")
+	corpus := &content.Corpus{Competitions: []*content.Competition{
+		{Code: "imo", Group: "international"},
+		{Code: "isl", Group: "international"},
+		{Code: "nz", Group: "national", Country: "NZ"},
+	}}
+	tiers := Tiers{Groups: []string{"international"}, Countries: []string{"US"}}
+	deleted, moved, err := Split(dir, out, corpus, tiers)
+	if err != nil || deleted != 2 || moved != 2 {
+		t.Fatalf("%d %d %v", deleted, moved, err)
+	}
+	for _, rel := range []string{"imo/2024/p1.html", "nz/index.html", "nz/2020/index.html"} {
+		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
+			t.Errorf("%s: %v", rel, err)
+		}
+	}
+	for _, rel := range []string{"nz/2020/p1.html", "nz/2020/p1.json"} {
+		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
+			t.Errorf("%s did not move: %v", rel, err)
+		}
+	}
+}
+
+func TestLoadTiers(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "t.yaml", "groups: [international]\ncountries: [RU]\ncodes: [aime]\n")
+	tiers, err := LoadTiers(filepath.Join(dir, "t.yaml"))
+	if err != nil || !tiers.First(&content.Competition{Code: "ru-spb", Country: "RU"}) || tiers.First(&content.Competition{Code: "nz-nzmo", Country: "NZ"}) || !tiers.First(&content.Competition{Code: "aime"}) {
+		t.Errorf("%+v %v", tiers, err)
+	}
+	write(t, dir, "bad.yaml", "group: [x]\n")
+	if _, err := LoadTiers(filepath.Join(dir, "bad.yaml")); err == nil {
+		t.Error("an unknown key was accepted")
+	}
+}

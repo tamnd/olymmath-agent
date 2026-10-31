@@ -13,7 +13,7 @@ import (
 
 func init() {
 	register(command{"check", "check the content files and report the errors", runCheck})
-	register(command{"site", "build the site (om site build)", runSite})
+	register(command{"site", "build the site, split it into its outlets and upload the R2 part (om site build, om site split, om site upload)", runSite})
 }
 
 func newFlags(name string, w io.Writer) *flag.FlagSet {
@@ -57,8 +57,14 @@ func runCheck(env Env, args []string) int {
 }
 
 func runSite(env Env, args []string) int {
+	if len(args) > 0 && args[0] == "split" {
+		return runSiteSplit(env, args[1:])
+	}
+	if len(args) > 0 && args[0] == "upload" {
+		return runSiteUpload(env, args[1:])
+	}
 	if len(args) == 0 || args[0] != "build" {
-		fmt.Fprintln(env.Stderr, "Usage: om site build [flags]. Run om site build -h to see the flags.")
+		fmt.Fprintln(env.Stderr, "Usage: om site build|split|upload [flags]. Run om site build -h to see the flags.")
 		return ExitUsage
 	}
 	fs := newFlags("site build", env.Stderr)
