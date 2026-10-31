@@ -10,7 +10,7 @@
   <div class="paper-head"><h2>{{.Name}}</h2><p>{{if .Date}}{{date .Date}}{{end}}{{if .Time}} · {{.Time}}{{end}}</p></div>
   {{range .Problems}}
   <article class="card statement-card" id="{{.Position}}">
-    <p class="card-kicker"><a href="{{.Link}}">Problem {{.Number}}</a></p>
+    <p class="card-kicker"><a href="{{.Link}}">{{.Label}}</a>{{with .Primary}} · Also {{.}}{{end}}</p>
     {{template "chips" .}}
     <div class="statement">{{.Statement}}</div>
     <p class="card-foot"><a href="{{.Link}}">Answer, solutions and source</a></p>
@@ -23,7 +23,7 @@
   <div class="paper-head"><h2>Other problems</h2></div>
   {{range .Other}}
   <article class="card statement-card" id="{{.Position}}">
-    <p class="card-kicker"><a href="{{.Link}}">Problem {{.Number}}</a></p>
+    <p class="card-kicker"><a href="{{.Link}}">{{.Label}}</a>{{with .Primary}} · Also {{.}}{{end}}</p>
     <div class="statement">{{.Statement}}</div>
   </article>
   {{end}}

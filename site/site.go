@@ -14,7 +14,9 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -156,6 +158,8 @@ func (b *builder) funcs() template.FuncMap {
 			return t.Format("2 January 2006")
 		},
 		"ordinal":   ordinal,
+		"poslabel":  positionLabel,
+		"poscell":   positionCell,
 		"add":       func(a, b int) int { return a + b },
 		"origin":    originName,
 		"zone":      zoneName,
@@ -324,6 +328,27 @@ type problemView struct {
 	Prev      *problemView
 	Next      *problemView
 	Solutions []solutionView
+	// Also lists the other appearances of the problem, with links to their editions.
+	Also []alsoView
+	// Label names the position in its edition, for example "Problem 3" or "G1".
+	Label string
+	// Primary is the title of the primary appearance when the view shows the problem in another edition.
+	Primary string
+}
+
+// alsoView is one other appearance of a problem.
+type alsoView struct {
+	Title string
+	Link  string
+}
+
+// appearanceTitle returns the title of an appearance, for example "ISL 2006 G1" or "IMO 2006 Problem 1".
+func appearanceTitle(c *content.Competition, edition, pos string) string {
+	q := &content.Problem{Position: pos}
+	if n := q.Number(); n > 0 && strings.HasPrefix(pos, "p") {
+		return fmt.Sprintf("%s %s Problem %d", c.Short, edition, n)
+	}
+	return fmt.Sprintf("%s %s %s", c.Short, edition, strings.ToUpper(pos))
 }
 
 // solutionView is a solution with its rendered body.
@@ -338,6 +363,7 @@ func (b *builder) view(p *content.Problem) *problemView {
 		Title:     problemTitle(p),
 		Link:      b.link(problemPath(p)),
 		Statement: b.html(p.Statement, p.Path),
+		Label:     positionLabel(p.Position),
 	}
 	if p.Answer != "" {
 		v.Answer = b.html(p.Answer, p.Path)
@@ -345,6 +371,31 @@ func (b *builder) view(p *content.Problem) *problemView {
 	for _, s := range p.Solutions {
 		v.Solutions = append(v.Solutions, solutionView{Solution: s, Body: b.html(s.Body, s.Path)})
 	}
+	for _, a := range p.Appearances {
+		if a.Primary {
+			continue
+		}
+		if c := b.corpus.Competition(a.Locator.Comp); c != nil {
+			v.Also = append(v.Also, alsoView{Title: appearanceTitle(c, a.Locator.Edition, a.Locator.Position), Link: b.link("/" + a.Locator.Comp + "/" + a.Locator.Edition + "/#" + a.Locator.Position)})
+		}
+	}
+	return v
+}
+
+// alsoIn returns a view of a problem as it appears in an edition that is not its primary edition. The view links to the page of the problem.
+func (b *builder) alsoIn(p *content.Problem, e *content.Edition) *problemView {
+	q := *p
+	q.Position = p.PositionIn(e)
+	q.Edition = e
+	q.Paper = nil
+	for i := range e.Papers {
+		if slices.Contains(e.Papers[i].Problems, q.Position) {
+			q.Paper = &e.Papers[i]
+		}
+	}
+	v := b.view(&q)
+	v.Link = b.link(problemPath(p))
+	v.Primary = problemTitle(p)
 	return v
 }
 
@@ -355,10 +406,8 @@ func problemTitle(p *content.Problem) string {
 		return p.Title
 	case p.Edition == nil:
 		return "Problem " + tag.Display(p.Tag)
-	case p.Number() == 0:
-		return fmt.Sprintf("%s %s %s", p.Edition.Competition.Short, p.Edition.ID, p.Position)
 	}
-	return fmt.Sprintf("%s %s Problem %d", p.Edition.Competition.Short, p.Edition.ID, p.Number())
+	return fmt.Sprintf("%s %s %s", p.Edition.Competition.Short, p.Edition.ID, positionLabel(p.Position))
 }
 
 // problemPath returns the URL path of the page of a problem. A loose problem has its page at /p/<tag>.
@@ -528,6 +577,13 @@ func (b *builder) editions() error {
 			for _, p := range e.Problems {
 				byPos[p.Position] = b.view(p)
 			}
+			var also []*problemView
+			for _, p := range e.Also {
+				if v := b.alsoIn(p, e); byPos[v.Position] == nil {
+					byPos[v.Position] = v
+					also = append(also, v)
+				}
+			}
 			used := map[string]bool{}
 			for _, paper := range e.Papers {
 				pv := paperView{Paper: paper}
@@ -544,6 +600,12 @@ func (b *builder) editions() error {
 					ev.Other = append(ev.Other, byPos[p.Position])
 				}
 			}
+			for _, v := range also {
+				if !used[v.Position] {
+					ev.Other = append(ev.Other, v)
+				}
+			}
+			slices.SortStableFunc(ev.Other, func(x, y *problemView) int { return comparePositions(x.Position, y.Position) })
 			if err := b.render("edition.html", page{
 				Title:       ev.Title,
 				Description: fmt.Sprintf("The problems of %s %d.", c.Name, e.Year),
@@ -598,6 +660,13 @@ func (b *builder) problem(v *problemView) error {
 		return err
 	}
 	b.stats.Problems++
+	for _, a := range v.Appearances {
+		if !a.Primary && v.Edition != nil {
+			if err := b.redirect("/"+a.Locator.String(), p); err != nil {
+				return err
+			}
+		}
+	}
 	if v.Edition != nil {
 		// The tag URL of a problem with a locator goes to the locator URL.
 		return b.redirect("/p/"+v.Tag, p)
@@ -722,4 +791,29 @@ func (b *builder) machine() error {
   Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 `
 	return b.write("_headers", []byte(headers))
+}
+
+// comparePositions orders positions by their letters, then by their numbers, so that g2 comes before g10.
+func comparePositions(a, b string) int {
+	la := strings.TrimRight(a, "0123456789")
+	lb := strings.TrimRight(b, "0123456789")
+	if la != lb {
+		return strings.Compare(la, lb)
+	}
+	na, _ := strconv.Atoi(a[len(la):])
+	nb, _ := strconv.Atoi(b[len(lb):])
+	return na - nb
+}
+
+// positionCell names a position in the grid of a competition: "3" for p3, and "G1" for g1.
+func positionCell(pos string) string {
+	return strings.TrimPrefix(positionLabel(pos), "Problem ")
+}
+
+// positionLabel names a position for a list of the problems of an edition: "Problem 3" for p3, and "G1" for g1.
+func positionLabel(pos string) string {
+	if n, err := strconv.Atoi(strings.TrimPrefix(pos, "p")); err == nil && pos != "" {
+		return "Problem " + strconv.Itoa(n)
+	}
+	return strings.ToUpper(pos)
 }
