@@ -4,6 +4,7 @@ go 1.27.3
 
 require (
 	github.com/dop251/goja v0.0.0-20261024144015-2a9269b6b6de
+	github.com/yuin/goldmark v1.8.7
 	go.yaml.in/yaml/v3 v3.0.5
 )
 

@@ -1,0 +1,34 @@
+{{define "problem.html"}}{{template "top" .}}{{with .Data}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><a href="{{link "c/"}}">Competitions</a><a href="{{link (printf "c/%s/" .Competition)}}">{{.Edition.Competition.Short}}</a><a href="{{link (printf "%s/%d/" .Competition .Year)}}">{{.Year}}</a><span>Problem {{.Number}}</span></nav>
+<article class="problem"{{with .Prev}} data-prev="{{.Link}}"{{end}}{{with .Next}} data-next="{{.Link}}"{{end}}>
+  <header class="page-head">
+    <h1>{{.Edition.Competition.Short}} {{.Year}} <span class="muted">Problem {{.Number}}</span></h1>
+    {{template "chips" .}}
+  </header>
+  <div class="card statement-card">
+    <div class="statement">{{.Statement}}</div>
+    <p class="source"><span class="badge badge-{{.Source.Origin}}">{{origin .Source.Origin}}</span> <a href="{{.Source.URL}}" rel="noopener">{{.Source.Name}}</a>{{if .Source.Page}}, page {{.Source.Page}}{{end}}. {{zone .Source.Zone}}.</p>
+  </div>
+
+  {{if .Answer}}
+  <details class="card reveal">
+    <summary>Show the answer</summary>
+    <div class="statement">{{.Answer}}</div>
+  </details>
+  {{end}}
+
+  <section class="block">
+    <h2>Solutions</h2>
+    <div class="card empty">
+      <p>No solution is on olymmath yet. Official and human solutions come first when they arrive. AI solutions come after them, with a label.</p>
+      <p><a href="https://github.com/tamnd/olymmath/blob/main/CONTRIBUTING.md">Add a solution</a></p>
+    </div>
+  </section>
+
+  <nav class="pager" aria-label="Problems of this paper">
+    {{with .Prev}}<a class="pager-prev" href="{{.Link}}" rel="prev"><span>Previous</span>Problem {{.Number}}</a>{{else}}<span></span>{{end}}
+    {{with .Next}}<a class="pager-next" href="{{.Link}}" rel="next"><span>Next</span>Problem {{.Number}}</a>{{end}}
+  </nav>
+  <p class="meta-line">Locator <code>{{.Locator}}</code> · <a href="{{$.Site.Repo}}/blob/main/{{.Path}}">Edit this page on GitHub</a> · Keys: <kbd>j</kbd> next, <kbd>k</kbd> previous</p>
+</article>
+{{end}}{{template "bottom" .}}{{end}}

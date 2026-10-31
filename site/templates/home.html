@@ -1,0 +1,51 @@
+{{define "home.html"}}{{template "top" .}}{{with .Data}}
+<section class="hero">
+  <p class="eyebrow">Olympiad mathematics, from the source</p>
+  <h1>Every olympiad problem, with its source and its solutions.</h1>
+  <p class="lede">olymmath collects the problems of the mathematical olympiads of the world. Each statement comes from the official paper or from a human collection, and each text shows where it comes from.</p>
+  <form class="search-box" action="{{link "search/"}}" method="get" role="search">
+    <label class="sr" for="q">Search the problems</label>
+    <input id="q" name="q" type="search" placeholder="Search problems, for example: floor function, sunny lines, imo/2024/p1" autocomplete="off">
+    <button type="submit">Search</button>
+  </form>
+  <dl class="stats">
+    <div><dt>Problems</dt><dd>{{.Problems}}</dd></div>
+    <div><dt>Papers</dt><dd>{{.Editions}}</dd></div>
+    <div><dt>Competitions</dt><dd>{{.Competitions}}</dd></div>
+  </dl>
+</section>
+
+{{with .Daily}}
+<section class="block">
+  <div class="block-head"><h2>Problem of the day</h2><a href="{{.Link}}">Open the problem</a></div>
+  <article class="card statement-card">
+    <p class="card-kicker"><a href="{{.Link}}">{{.Title}}</a></p>
+    {{template "chips" .}}
+    <div class="statement">{{.Statement}}</div>
+  </article>
+</section>
+{{end}}
+
+<section class="block">
+  <div class="block-head"><h2>Latest papers</h2><a href="{{link "c/"}}">All competitions</a></div>
+  <div class="grid">
+  {{range .Latest}}
+    <a class="card tile" href="{{link (printf "%s/%d/" .Competition.Code .Year)}}">
+      <span class="tile-kicker">{{.Competition.Short}}</span>
+      <span class="tile-title">{{.Competition.Short}} {{.Year}}</span>
+      <span class="tile-meta">{{.Place}}{{if .Country}}, {{.Country}}{{end}}</span>
+      <span class="tile-meta">{{len .Problems}} problems</span>
+    </a>
+  {{end}}
+  </div>
+</section>
+
+<section class="block principles">
+  <h2>How olymmath works</h2>
+  <div class="grid three">
+    <div><h3>Human text first</h3><p>The statement of each problem comes from the official paper or a human collection. A model never writes a statement.</p></div>
+    <div><h3>Each text has a source</h3><p>Each statement and each solution shows its source, its origin and its licence zone, with a link to the original.</p></div>
+    <div><h3>AI with a label</h3><p>AI solutions come after the human solutions. Each one shows its model, its grade and who graded it.</p></div>
+  </div>
+</section>
+{{end}}{{template "bottom" .}}{{end}}
