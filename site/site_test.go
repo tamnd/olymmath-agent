@@ -115,6 +115,10 @@ func TestYearGridAndCoverage(t *testing.T) {
 			t.Errorf("c/imo/index.html has no %q", want)
 		}
 	}
+	src := read(t, out, "sources/index.html")
+	if !strings.Contains(src, "Sources in use") || !strings.Contains(src, `id="imo-official"`) {
+		t.Errorf("sources/index.html: %.200s", src)
+	}
 	cov := read(t, out, "coverage/index.html")
 	for _, want := range []string{"<h1>Coverage</h1>", `href="/c/imo/"`, "Expected positions"} {
 		if !strings.Contains(cov, want) {

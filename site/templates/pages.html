@@ -26,23 +26,30 @@
 </div>
 {{template "bottom" .}}{{end}}
 
-{{define "sources.html"}}{{template "top" .}}
+{{define "sources.html"}}{{template "top" .}}{{with .Data}}
 <nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Sources</span></nav>
 <div class="prose">
 <h1>Sources</h1>
-<p class="lede">Each statement on olymmath comes from one of these sources. The list grows with each release.</p>
+<p class="lede">Each statement and each solution on olymmath comes from one of these sources. The zone of a source tells what olymmath can show.</p>
+<p>Zone Z1 is an open licence: olymmath shows the full text. Zone Z2 is quoted with source: olymmath shows at most a short excerpt and a link. Zone Z3 is link only: olymmath shows no text, only a link.</p>
 </div>
+<h2>Sources in use</h2>
 <div class="table-wrap">
-<table class="years">
-  <thead><tr><th scope="col">Competition</th><th scope="col">Source</th><th scope="col">Problems</th></tr></thead>
+<table class="years sources">
+  <thead><tr><th scope="col">Source</th><th scope="col">Kind</th><th scope="col">Statements</th><th scope="col">Solutions</th><th scope="col">Statement zone</th><th scope="col">Solution zone</th></tr></thead>
   <tbody>
-  {{range .Site.Corpus.Competitions}}
-    <tr><th scope="row"><a href="{{link (printf "c/%s/" .Code)}}">{{.Short}}</a></th><td>{{if .URL}}<a href="{{.URL}}" rel="noopener">{{.Organizer}}</a>{{else}}{{.Organizer}}{{end}}</td><td>{{$n := 0}}{{range .Editions}}{{$n = len .Problems | add $n}}{{end}}{{$n}}</td></tr>
+  {{range .Used}}
+    <tr id="{{.ID}}"><th scope="row">{{if .URL}}<a href="{{.URL}}" rel="noopener">{{.Name}}</a>{{else}}{{.Name}}{{end}}{{with .Terms}}<span class="muted">{{.}}</span>{{end}}</th><td>{{.Kind}}</td><td>{{.Statements}}{{if .Canonical}} <span class="muted">({{.Canonical}} canonical)</span>{{end}}</td><td>{{.Solutions}}</td><td>{{with .Zone.Statement}}{{.}} {{zone .}}{{end}}</td><td>{{with .Zone.Solution}}{{.}} {{zone .}}{{end}}</td></tr>
   {{end}}
   </tbody>
 </table>
 </div>
-{{template "bottom" .}}{{end}}
+<h2>Planned sources</h2>
+<p class="muted">olymmath has no text from these sources yet.</p>
+<ul class="planned">
+  {{range .Planned}}<li id="{{.ID}}">{{if .URL}}<a href="{{.URL}}" rel="noopener">{{.Name}}</a>{{else}}{{.Name}}{{end}} <span class="muted">{{.Kind}}{{with .Zone.Statement}} · {{.}}{{end}}</span></li>{{end}}
+</ul>
+{{end}}{{template "bottom" .}}{{end}}
 
 {{define "search.html"}}{{template "top" .}}
 <nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Search</span></nav>

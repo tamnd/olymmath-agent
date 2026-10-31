@@ -123,6 +123,7 @@ func (b *builder) all() error {
 		b.redirects,
 		b.static,
 		b.coverage,
+		b.sources,
 		b.searchIndex,
 		b.machine,
 	}
@@ -758,7 +759,6 @@ func truncate(s string, n int) string {
 func (b *builder) static() error {
 	pages := []struct{ tmpl, title, desc, path, section string }{
 		{"about.html", "About", "What olymmath is, and the rules that it follows.", "/about/", "about"},
-		{"sources.html", "Sources", "The sources of the texts on olymmath, and their licence zones.", "/sources/", "sources"},
 		{"search.html", "Search", "Search the problems of olymmath.", "/search/", "search"},
 		{"404.html", "Page not found", "This page is not on olymmath.", "/404.html", ""},
 	}
@@ -822,6 +822,58 @@ func (b *builder) coverage() error {
 		Description: "How much of each competition olymmath has: positions, human texts, official texts and solutions.",
 		Path:        "/coverage/",
 		Section:     "coverage",
+		Data:        v,
+	})
+}
+
+// sourceView is one source on the sources page, with the number of texts that olymmath takes from it.
+type sourceView struct {
+	*content.SourceRecord
+	Statements, Canonical, Solutions int
+}
+
+// sourcesView is the data of the sources page. Used are the sources of at least one text. Planned are the other sources of the register.
+type sourcesView struct {
+	Used, Planned []sourceView
+}
+
+// sources writes the sources page: each source with its licence zones and the number of its texts (spec 10.1).
+func (b *builder) sources() error {
+	count := map[string]*sourceView{}
+	for _, r := range b.corpus.Sources {
+		count[r.ID] = &sourceView{SourceRecord: r}
+	}
+	for _, p := range b.corpus.All() {
+		for i := range p.Statements {
+			if v := count[p.Statements[i].Source]; v != nil {
+				v.Statements++
+				if p.Statements[i].ID == p.Canonical.Statement {
+					v.Canonical++
+				}
+			}
+		}
+		for _, sol := range p.Solutions {
+			if v := count[sol.Source]; v != nil {
+				v.Solutions++
+			}
+		}
+	}
+	var v sourcesView
+	for _, r := range b.corpus.Sources {
+		if c := count[r.ID]; c.Statements+c.Solutions > 0 {
+			v.Used = append(v.Used, *c)
+		} else {
+			v.Planned = append(v.Planned, *c)
+		}
+	}
+	sort.SliceStable(v.Used, func(i, j int) bool {
+		return v.Used[i].Statements+v.Used[i].Solutions > v.Used[j].Statements+v.Used[j].Solutions
+	})
+	return b.render("sources.html", page{
+		Title:       "Sources",
+		Description: "The sources of the texts on olymmath, their licence zones and the number of texts from each.",
+		Path:        "/sources/",
+		Section:     "sources",
 		Data:        v,
 	})
 }
