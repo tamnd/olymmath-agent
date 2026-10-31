@@ -204,6 +204,18 @@ func TestProfiles(t *testing.T) {
 	if p := Generic([]string{"problem_statement", "reasoning", "label"}); len(p.Columns) != 2 {
 		t.Errorf("generic columns %v", p.Columns)
 	}
+	if !IsData("data/x.parquet") || IsData("config.json") || IsData("sub/dataset_info.json") {
+		t.Error("IsData")
+	}
+	g := Generic([]string{"question", "id", "part", "index"})
+	row, _ = g.Map(Record{"question": {"q"}, "id": {"A-1"}})
+	if row.Number != "A-1" {
+		t.Errorf("number from id %+v", row)
+	}
+	row, _ = g.Map(Record{"question": {"q"}, "part": {"AIME I"}, "index": {"7"}})
+	if row.Number != "7" || row.Labels[0] != "AIME I" {
+		t.Errorf("aime row %+v", row)
+	}
 	row, ok = Profiles["hf-mathnet"].Map(Record{"problem_markdown": {"Problem:\nShow it."}, "competition": {"IRL_ABooklet_2023"}, "country": {"Ireland"}})
 	if !ok || row.Statement != "Show it." || row.Year != 2023 {
 		t.Errorf("mathnet row %+v", row)
