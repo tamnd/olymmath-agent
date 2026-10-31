@@ -59,7 +59,7 @@ func runAnchor(env Env, args []string) int {
 	done := map[string]bool{}
 	var links, have, missing, traced int
 	code := ExitOK
-	for _, p := range official.IMO(*from, *to) {
+	for _, p := range append(official.IMO(*from, *to), official.Shortlist(*from, min(*to, time.Now().Year()-1))...) {
 		segs, err := paper(ctx, fc, src.ID, p)
 		if err != nil {
 			fmt.Fprintf(env.Stderr, "om anchor: %s: %v\n", p.Edition, err)
@@ -88,7 +88,7 @@ func runAnchor(env Env, args []string) int {
 			}
 			paperID[l.Problem] = a.ID(c)
 		}
-		_, rule := canon.Rank(&canon.Candidate{Origin: src.Origin, Lang: p.Lang}, original(corpus.Competition("imo")))
+		_, rule := canon.Rank(&canon.Candidate{Origin: src.Origin, Lang: p.Lang}, original(corpus.Competition(path.Dir(p.Edition))))
 		for _, t := range r.Traced {
 			id := paperID[t.Problem]
 			for _, s := range t.Problem.Statements {
@@ -140,7 +140,7 @@ func paper(ctx context.Context, fc *fetch.Client, source string, p official.Pape
 	if err != nil {
 		return nil, err
 	}
-	return official.Split(text), nil
+	return p.Segments(text), nil
 }
 
 func addLink(root string, p *content.Problem, a canon.Additions) error {

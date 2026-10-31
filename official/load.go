@@ -31,7 +31,7 @@ func Load(ctx context.Context, st *store.Store, source string, papers []Paper) (
 		if err != nil {
 			continue
 		}
-		out[p.Edition] = Split(text)
+		out[p.Edition] = p.Segments(text)
 	}
 	return out, nil
 }
