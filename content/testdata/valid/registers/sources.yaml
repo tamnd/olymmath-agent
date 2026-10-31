@@ -1,0 +1,23 @@
+- id: imo-official
+  name: IMO official site
+  kind: official
+  origin: H1
+  url: https://www.imo-official.org/
+  access: pdf
+  terms: Copyright of the International Mathematical Olympiad. No licence is stated.
+  zone: {statement: Z2, solution: Z2}
+  ai_train: unknown
+  wave: 1
+  state: active
+- id: mathse
+  name: Mathematics Stack Exchange
+  kind: community
+  origin: H3
+  url: https://math.stackexchange.com/
+  access: api
+  terms: Posts have the CC BY-SA licence, with attribution.
+  licence: CC-BY-SA-4.0
+  zone: {statement: Z1, solution: Z1}
+  ai_train: allowed
+  wave: 1
+  state: planned

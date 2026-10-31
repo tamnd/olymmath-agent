@@ -21,7 +21,7 @@ func build(t *testing.T, base string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(stats.Errors) != 0 || stats.Problems != 2 {
+	if len(stats.Errors) != 0 || stats.Problems != 3 || stats.Redirects != 3 {
 		t.Fatalf("stats: %+v", stats)
 	}
 	return out
@@ -41,6 +41,7 @@ func TestBuildPages(t *testing.T) {
 	for _, rel := range []string{
 		"index.html", "c/index.html", "c/imo/index.html", "imo/2024/index.html", "imo/2024/p1.html", "imo/2024/p2.html",
 		"about/index.html", "sources/index.html", "search/index.html", "404.html",
+		"p/0J8TP3MFS9.html", "p/0HVHSDNNMY.html", "imo/2024/q1.html",
 		"search.json", "sitemap.xml", "robots.txt", "llms.txt", "_headers",
 		"assets/site.css", "assets/site.js", "assets/theme.js", "assets/favicon.svg", "assets/katex/katex.min.css",
 	} {
@@ -67,6 +68,32 @@ func TestBuildPages(t *testing.T) {
 	}
 	if strings.Contains(read(t, out, "sitemap.xml"), "404") {
 		t.Error("the sitemap has the 404 page")
+	}
+}
+
+func TestBuildTagsAndRedirects(t *testing.T) {
+	out := build(t, "/")
+	loose := read(t, out, "p/0J8TP3MFS9.html")
+	if !strings.Contains(loose, `<link rel="canonical" href="https://example.org/p/0J8TP3MFS9">`) || !strings.Contains(loose, "Problems with no known competition") {
+		t.Error("the page of the loose problem is wrong")
+	}
+	for rel, want := range map[string]string{
+		"p/0HVHSDNNMY.html": `content="0; url=/imo/2024/p1"`,
+		"imo/2024/q1.html":  `href="https://example.org/imo/2024/p1"`,
+	} {
+		if !strings.Contains(read(t, out, rel), want) {
+			t.Errorf("%s has no %q", rel, want)
+		}
+	}
+	if strings.Contains(read(t, out, "sitemap.xml"), "/p/0HVHSDNNMY") {
+		t.Error("the sitemap has a redirect page")
+	}
+	if !strings.Contains(read(t, out, "search.json"), `"u":"/p/0J8TP3MFS9"`) {
+		t.Error("the search index has no loose problem")
+	}
+	p1 := read(t, out, "imo/2024/p1.html")
+	if !strings.Contains(p1, "Human solution") || strings.Contains(p1, "No solution is on olymmath yet") {
+		t.Error("the solution of imo/2024/p1 is not on its page")
 	}
 }
 

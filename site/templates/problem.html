@@ -1,8 +1,8 @@
 {{define "problem.html"}}{{template "top" .}}{{with .Data}}
-<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><a href="{{link "c/"}}">Competitions</a><a href="{{link (printf "c/%s/" .Competition)}}">{{.Edition.Competition.Short}}</a><a href="{{link (printf "%s/%d/" .Competition .Year)}}">{{.Year}}</a><span>Problem {{.Number}}</span></nav>
+{{if .Edition}}<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><a href="{{link "c/"}}">Competitions</a><a href="{{link (printf "c/%s/" .Competition)}}">{{.Edition.Competition.Short}}</a><a href="{{link (printf "%s/" .Edition.Locator)}}">{{.Edition.ID}}</a><span>{{if .Number}}Problem {{.Number}}{{else}}{{.Position}}{{end}}</span></nav>{{else}}<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Problems with no known competition</span></nav>{{end}}
 <article class="problem"{{with .Prev}} data-prev="{{.Link}}"{{end}}{{with .Next}} data-next="{{.Link}}"{{end}}>
   <header class="page-head">
-    <h1>{{.Edition.Competition.Short}} {{.Year}} <span class="muted">Problem {{.Number}}</span></h1>
+    <h1>{{.Title}}</h1>
     {{template "chips" .}}
   </header>
   <div class="card statement-card">
@@ -19,16 +19,24 @@
 
   <section class="block">
     <h2>Solutions</h2>
+    {{range $i, $s := .Solutions}}
+    <article class="card solution" id="s{{add $i 1}}">
+      <p class="card-kicker"><span class="badge badge-sol-{{$s.Origin}}">{{solorigin $s.Origin}}</span> Solution {{add $i 1}}{{with $s.Author.Display}} by {{.}}{{end}}{{with $s.Run}} · {{.Model}}{{end}}</p>
+      <div class="statement">{{$s.Body}}</div>
+      {{if $s.URL}}<p class="source"><a href="{{$s.URL}}" rel="noopener">{{$s.Source}}</a>. {{zone $s.Zone}}.</p>{{end}}
+    </article>
+    {{else}}
     <div class="card empty">
       <p>No solution is on olymmath yet. Official and human solutions come first when they arrive. AI solutions come after them, with a label.</p>
       <p><a href="https://github.com/tamnd/olymmath/blob/main/CONTRIBUTING.md">Add a solution</a></p>
     </div>
+    {{end}}
   </section>
 
   <nav class="pager" aria-label="Problems of this paper">
     {{with .Prev}}<a class="pager-prev" href="{{.Link}}" rel="prev"><span>Previous</span>Problem {{.Number}}</a>{{else}}<span></span>{{end}}
     {{with .Next}}<a class="pager-next" href="{{.Link}}" rel="next"><span>Next</span>Problem {{.Number}}</a>{{end}}
   </nav>
-  <p class="meta-line">Locator <code>{{.Locator}}</code> · <a href="{{$.Site.Repo}}/blob/main/{{.Path}}">Edit this page on GitHub</a> · Keys: <kbd>j</kbd> next, <kbd>k</kbd> previous</p>
+  <p class="meta-line">{{if .Edition}}Locator <code>{{.Locator}}</code> · {{end}}Tag <code>{{.Tag}}</code> · <a href="{{$.Site.Repo}}/blob/main/{{.Path}}">Edit this page on GitHub</a>{{if .Edition}} · Keys: <kbd>j</kbd> next, <kbd>k</kbd> previous{{end}}</p>
 </article>
 {{end}}{{template "bottom" .}}{{end}}
