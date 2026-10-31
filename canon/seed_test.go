@@ -55,3 +55,31 @@ func TestIsRef(t *testing.T) {
 		}
 	}
 }
+
+func TestTopics(t *testing.T) {
+	corpus, fs := content.Load("../content/testdata/valid")
+	if fs.Errors() > 0 {
+		t.Fatal(fs)
+	}
+	al, err := seed.LoadAliases("../content/testdata/valid", corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tp := &Topics{Aliases: al}
+	url := "https://artofproblemsolving.com/community/c6h"
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2023, Number: "4", Ref: url + "100p1"})
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2023, Number: "1", Ref: url + "101p2"})
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2023, Number: "1", Ref: url + "102p3"})
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Number: "2", Ref: url + "103p4"})
+	if got := tp.Position("aops-topic:100", "imo", 2023); got != "p4" {
+		t.Errorf("topic 100 gives %q", got)
+	}
+	if got := tp.Position("aops-topic:100", "imo", 2022); got != "" {
+		t.Errorf("topic 100 in 2022 gives %q", got)
+	}
+	for _, ref := range []string{"aops-topic:101", "aops-topic:103", "aops-topic:999", "x"} {
+		if got := tp.Position(ref, "imo", 2023); got != "" {
+			t.Errorf("%s gives %q", ref, got)
+		}
+	}
+}

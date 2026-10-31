@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -55,7 +56,12 @@ func runImport(env Env, args []string) int {
 	}
 	s := &canon.Seeds{Corpus: corpus, Aliases: al, ThisYear: time.Now().Year(), Accept: func(t string) bool {
 		_, errs := mk.HTML(t)
-		return len(errs) == 0
+		for _, e := range errs {
+			if !errors.Is(e, site.ErrFigure) {
+				return false
+			}
+		}
+		return true
 	}}
 	if *comps != "" {
 		s.Comps = strings.Split(*comps, ",")
@@ -88,6 +94,13 @@ func runImport(env Env, args []string) int {
 				return papers.Locate(ed, text)
 			}
 			return keys.Locate(ed, text)
+		}
+	}
+	if slices.Contains(sources, "hf-aops-wiki") {
+		s.Topics = &canon.Topics{Aliases: al}
+		if err := seed.Read(*dir, "hf-aops-wiki", func(r seed.Row) error { s.Topics.Add(r); return nil }); err != nil {
+			fmt.Fprintf(env.Stderr, "om import: hf-aops-wiki: %v\n", err)
+			return ExitFailure
 		}
 	}
 	for _, src := range sources {
@@ -232,6 +245,9 @@ func runImport(env Env, args []string) int {
 	sort.Strings(reasons)
 	if *anchor {
 		fmt.Fprintf(env.Stdout, "%d rows got a position from an official paper or from a text of zone Z3.\n", s.Located)
+	}
+	if s.Numbered > 0 {
+		fmt.Fprintf(env.Stdout, "%d rows got a position from the number of their AoPS topic.\n", s.Numbered)
 	}
 	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d promoted statements, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, promoted, len(items), strings.Join(reasons, ", "))
 	return ExitOK
