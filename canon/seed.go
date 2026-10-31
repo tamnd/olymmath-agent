@@ -62,6 +62,9 @@ type Seeds struct {
 	// Locate, when it is not nil, gives the position of a row that has no number, for example from the official paper of the edition. It gives "" when it does not know the position.
 	Locate func(code string, year int, text string) string
 
+	// Topics, when it is not nil, gives the numbers of AoPS topics. A row with no number and the reference of a topic takes the number of the topic when the topic has the same competition and year.
+	Topics *Topics
+
 	pending []pendingRow
 	// lettered[code][year] is true when a row of the year has an edition letter.
 	lettered map[string]map[int]bool
@@ -71,6 +74,8 @@ type Seeds struct {
 	Skipped map[string]int
 	// Located counts the rows that got a position from Locate.
 	Located int
+	// Numbered counts the rows that got a position from Topics.
+	Numbered int
 }
 
 type pendingRow struct {
@@ -109,6 +114,11 @@ func (s *Seeds) Add(r seed.Row) {
 		return
 	}
 	pos := seed.Position(r.Number)
+	if pos == "" && r.Number == "" && s.Topics != nil {
+		if pos = s.Topics.Position(r.Ref, code, r.Year); pos != "" {
+			s.Numbered++
+		}
+	}
 	if pos == "" && r.Number == "" && s.Locate != nil {
 		if pos = s.Locate(code, r.Year, normalize.Statement(r.Statement, "")); pos != "" {
 			s.Located++
