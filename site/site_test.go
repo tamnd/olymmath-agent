@@ -127,6 +127,25 @@ func TestYearGridAndCoverage(t *testing.T) {
 	}
 }
 
+func TestTopics(t *testing.T) {
+	out := build(t, "/")
+	if idx := read(t, out, "t/index.html"); !strings.Contains(idx, `href="/t/n/"`) || !strings.Contains(idx, "2 problems") {
+		t.Errorf("t/index.html: %.300s", idx)
+	}
+	n := read(t, out, "t/n/index.html")
+	for _, want := range []string{"<h1>Number theory</h1>", `href="/c/imo/"`, `href="/imo/2024/p1"`} {
+		if !strings.Contains(n, want) {
+			t.Errorf("t/n/index.html has no %q", want)
+		}
+	}
+	if !strings.Contains(read(t, out, "t/a/index.html"), "Other problems") {
+		t.Error("t/a/index.html has no loose problems")
+	}
+	if !strings.Contains(read(t, out, "imo/2024/p1.html"), `<a href="/t/n/">Number theory</a>`) {
+		t.Error("the topic chip has no link")
+	}
+}
+
 func TestCountryName(t *testing.T) {
 	if countryName("VN") != "Vietnam" || countryName("ZZ") != "ZZ" {
 		t.Error("countryName is wrong")

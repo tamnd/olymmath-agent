@@ -124,6 +124,7 @@ func (b *builder) all() error {
 		b.static,
 		b.coverage,
 		b.sources,
+		b.topics,
 		b.searchIndex,
 		b.machine,
 	}
@@ -142,11 +143,12 @@ func (b *builder) link(p string) string {
 
 func (b *builder) funcs() template.FuncMap {
 	return template.FuncMap{
-		"link":  b.link,
-		"asset": func(p string) string { return b.link("assets/"+p) + "?v=" + b.asset },
-		"topic": topicName,
-		"root":  content.TopicRoot,
-		"year":  func() int { return b.opts.Date.Year() },
+		"link":      b.link,
+		"asset":     func(p string) string { return b.link("assets/"+p) + "?v=" + b.asset },
+		"topic":     topicName,
+		"root":      content.TopicRoot,
+		"topicLink": func(t string) string { return b.link(topicPath(t)) },
+		"year":      func() int { return b.opts.Date.Year() },
 		"short": func(s string) string {
 			if len(s) > 7 {
 				return s[:7]
