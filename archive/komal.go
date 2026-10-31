@@ -32,11 +32,13 @@ var (
 	// komalStart finds a mathematics problem of a month page, for example <p id="B3802" ...>. The series P, M and G are physics, and I and S are informatics.
 	komalStart = regexp.MustCompile(`(?i)<p id="([ABCK])(\d+)"[^>]*>\s*<b>[^<]*</b>`)
 	// komalEnd is the end of a statement: the line of the proposer, the points or the rule between problems.
-	komalEnd   = regexp.MustCompile(`(?i)<p align="(?:right|left)">|<hr`)
-	komalImage = regexp.MustCompile(`(?i)<img[^>]*>`)
-	komalAlt   = regexp.MustCompile(`(?i)\balt="([^"]*)"`)
-	komalTeX   = regexp.MustCompile(`(?s)\\\(\s*(?:\\displaystyle)?\s*(.*?)\s*\\\)`)
-	komalShow  = regexp.MustCompile(`(?s)\\\[\s*(?:\\displaystyle)?\s*(.*?)\s*\\\]`)
+	komalEnd = regexp.MustCompile(`(?i)<p align="?(?:right|left)"?>|<hr|<p[^>]*>\s*\(?\s*Proposed by`)
+	// komalItalic is a variable in italics, for example <I>x</I> or <I>AB</I>. A longer text in italics is a word.
+	komalItalic = regexp.MustCompile(`(?i)<i>\s*([a-z]{1,2}'*|[a-z][0-9]{1,2})\s*</i>`)
+	komalImage  = regexp.MustCompile(`(?i)<img[^>]*>`)
+	komalAlt    = regexp.MustCompile(`(?i)\balt="([^"]*)"`)
+	komalTeX    = regexp.MustCompile(`(?s)\\\(\s*(?:\\displaystyle)?\s*(.*?)\s*\\\)`)
+	komalShow   = regexp.MustCompile(`(?s)\\\[\s*(?:\\displaystyle)?\s*(.*?)\s*\\\]`)
 )
 
 var (
@@ -70,6 +72,7 @@ func ParseKomal(page string) []Problem {
 			out = append(out, p)
 			continue
 		}
+		body = komalItalic.ReplaceAllString(body, "\x02$1\x02")
 		body = komalShow.ReplaceAllString(body, "$$$$$1$$$$")
 		body = komalTeX.ReplaceAllString(body, "$$$1$$")
 		if p.Text = htmlText(body); strings.HasPrefix(p.Text, "Subscribers can reach the text") {

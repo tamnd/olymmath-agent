@@ -90,12 +90,17 @@ func htmlText(s string) string {
 			if strings.EqualFold(g[2], "sub") {
 				op = "_"
 			}
-			base := strings.Trim(g[1], "\x02")
+			// A base that ends in TeX is that TeX only, so that the text before it stays text.
+			pre, base := "", g[1]
+			if t, ok := strings.CutSuffix(base, "\x02"); ok {
+				i := strings.LastIndex(t, "\x02")
+				pre, base = t[:max(i, 0)], t[i+1:]
+			}
 			arg := strings.TrimSpace(kalvaTag.ReplaceAllString(g[3], ""))
 			if len([]rune(arg)) != 1 {
 				arg = "{" + arg + "}"
 			}
-			return "\x02" + base + op + arg + "\x02"
+			return pre + "\x02" + base + op + arg + "\x02"
 		})
 		if t == s {
 			break
