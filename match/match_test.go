@@ -47,6 +47,10 @@ func TestDecide(t *testing.T) {
 	if !Strict(Signals{K: StrongKey, T: 0.9}) || Strict(Signals{K: StrongKey}) {
 		t.Error("Strict")
 	}
+	// E counts as a text match only with a strong key.
+	if !Strict(Signals{K: StrongKey, T: 0.2, E: 0.8}) || Strict(Signals{K: StrongKey, E: 0.6}) || Strict(Signals{A: AnswerMatch, E: 0.9}) {
+		t.Error("Strict with E")
+	}
 }
 
 func TestAnswers(t *testing.T) {

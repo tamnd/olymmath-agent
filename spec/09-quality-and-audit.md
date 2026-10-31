@@ -48,7 +48,7 @@ The badge on the site is derived: "official", "human, graded 7/7", "human, not g
 | **D, duplicates** |||
 | D01 | error | no two problems have T-signal Jaccard ≥ 0.95 without a `variant_of` edge or a reviewed "not same" record |
 | D02 | warning | pairs above the review threshold that no one reviewed |
-| D03 | error | each merge of the last commit has a review or two strict signals |
+| D03 | error | each merge of the last commit has a review or two strict signals (6.5). The merges register has the signal E in an eighth column when the merge used it |
 | **L, solutions** |||
 | L01 | error | each solution points to an existing problem |
 | L02 | error | each AI solution has a run block (model, prompt version, date, run id, transcript hash) |

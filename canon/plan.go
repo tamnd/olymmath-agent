@@ -65,8 +65,8 @@ var keyNames = map[match.Key]string{match.NoKey: "", match.WeakKey: "weak", matc
 // Primary is the order of the competitions for the primary appearance of a merged problem. The contest comes before its shortlist, and the shortlist comes before the selection tests that used its problems. A competition that is not in the list goes after the listed ones.
 var Primary = []string{"imo", "isl", "usamo", "usajmo", "amc12", "amc10", "amc8"}
 
-// pattern tells if two appearances are a known duplicate pattern of spec 06.5: a shortlist problem that became a contest problem (isl and imo, or a code X-sl and X), an AMC 10 problem that is also an AMC 12 problem, or a USAJMO problem that is also a USAMO problem. Such a pair has a strong key.
-func pattern(a, b string) string {
+// Pattern tells if two appearances are a known duplicate pattern of spec 06.5: a shortlist problem that became a contest problem (isl and imo, or a code X-sl and X), an AMC 10 problem that is also an AMC 12 problem, or a USAJMO problem that is also a USAMO problem. Such a pair has a strong key.
+func Pattern(a, b string) string {
 	la, ea := locator.Parse(a)
 	lb, eb := locator.Parse(b)
 	if ea != nil || eb != nil {
@@ -96,6 +96,22 @@ func editionYear(e string) int {
 		y = y*10 + int(e[i]-'0')
 	}
 	return y
+}
+
+// First tells if the appearance a goes before the appearance b as the primary appearance of a merged problem: a competition of Primary first, then a contest before its shortlist X-sl, then the earlier year.
+func First(a, b string) bool {
+	if oa, ob := primaryOrder(a), primaryOrder(b); oa != ob {
+		return oa < ob
+	}
+	ca, ra, _ := strings.Cut(a, "/")
+	cb, rb, _ := strings.Cut(b, "/")
+	if sa, sb := strings.HasSuffix(ca, "-sl"), strings.HasSuffix(cb, "-sl"); sa != sb {
+		return sb
+	}
+	if ya, yb := editionYear(ra), editionYear(rb); ya != yb {
+		return ya < yb
+	}
+	return a < b
 }
 
 func primaryOrder(at string) int {
@@ -167,7 +183,7 @@ func Plan(choices []Choice) ([]*Record, []Item) {
 	for _, p := range pairs {
 		a, b := choices[p.a], choices[p.b]
 		s := match.Signals{T: p.t, A: match.Answers(a.Answer, b.Answer)}
-		rule := pattern(a.At, b.At)
+		rule := Pattern(a.At, b.At)
 		if rule != "" {
 			s.K = match.StrongKey
 		}
