@@ -26,6 +26,7 @@ type outStatement struct {
 	Source string `yaml:"source"`
 	Name   string `yaml:"name,omitempty"`
 	URL    string `yaml:"url,omitempty"`
+	Page   int    `yaml:"page,omitempty"`
 	Origin string `yaml:"origin"`
 	Zone   string `yaml:"zone"`
 	Kind   string `yaml:"kind"`
@@ -143,6 +144,13 @@ func Add(p *content.Problem, r *Record, original string) Additions {
 		}
 	}
 	return a
+}
+
+// AddLink gives the addition of one link with no text to an existing problem, for example a link to the page of an official paper where the problem is.
+func AddLink(p *content.Problem, c *Candidate, page int) Additions {
+	s := statementOf(fmt.Sprintf("S%d", len(p.Statements)+1), c)
+	s.Page = page
+	return Additions{Statements: []outStatement{s}}
 }
 
 // Apply adds the statements of a to the front matter of an existing problem file. The body does not change, so each added statement is a link with no text.
