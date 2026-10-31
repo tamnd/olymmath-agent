@@ -1,0 +1,67 @@
+{{define "about.html"}}{{template "top" .}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>About</span></nav>
+<div class="prose">
+<h1>About olymmath</h1>
+<p class="lede">olymmath collects the problems and the solutions of all mathematical olympiads in one place. It shows the human text first, and it shows the source of each text.</p>
+<h2>The rules</h2>
+<ol>
+  <li>One problem has one page. When a problem appears in two competitions, for example in the IMO Shortlist and in the IMO, the page shows the two appearances.</li>
+  <li>The statement of a problem comes from a human source. The order of preference is: the official text, an official translation, a curated collection, a community post, a dataset. A model never writes a statement.</li>
+  <li>Each text shows its source, its origin and its licence zone.</li>
+  <li>Official and human solutions come first. AI solutions come after them, with the model, the date and the grade.</li>
+  <li>olymmath does not go around the bot protection of any site. When a site does not allow copies, olymmath shows a link.</li>
+</ol>
+<h2>Licence zones</h2>
+<dl class="facts">
+  <div><dt>Z1, open licence</dt><dd>The full text is on olymmath, under its licence, with credit to the author.</dd></div>
+  <div><dt>Z2, quoted with source</dt><dd>The statement and the facts are on olymmath, with the source and a link. A solution shows its author, a short excerpt and a link.</dd></div>
+  <div><dt>Z3, link only</dt><dd>olymmath shows the facts and a link to the source.</dd></div>
+</dl>
+<h2>Licences of olymmath</h2>
+<p>The metadata of olymmath is under CC0 1.0. The solutions of contributors are under CC BY-SA 4.0. The code is under the Apache License 2.0. A third-party text keeps its own licence. Each page tells you which licence applies.</p>
+<h2>Remove a text</h2>
+<p>Are you the holder of the rights of a text on olymmath? Open an issue in the <a href="https://github.com/tamnd/olymmath/issues">content repository</a>, and we remove the text or change it to a link in 7 days.</p>
+<h2>The project</h2>
+<p>The content is in <a href="https://github.com/tamnd/olymmath">tamnd/olymmath</a>. The toolchain is in <a href="https://github.com/tamnd/olymmath-agent">tamnd/olymmath-agent</a>. The specification is in the <code>spec</code> directory of the toolchain.</p>
+</div>
+{{template "bottom" .}}{{end}}
+
+{{define "sources.html"}}{{template "top" .}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Sources</span></nav>
+<div class="prose">
+<h1>Sources</h1>
+<p class="lede">Each statement on olymmath comes from one of these sources. The list grows with each release.</p>
+</div>
+<div class="table-wrap">
+<table class="years">
+  <thead><tr><th scope="col">Competition</th><th scope="col">Source</th><th scope="col">Problems</th></tr></thead>
+  <tbody>
+  {{range .Site.Corpus.Competitions}}
+    <tr><th scope="row"><a href="{{link (printf "c/%s/" .Code)}}">{{.Short}}</a></th><td>{{if .URL}}<a href="{{.URL}}" rel="noopener">{{.Organizer}}</a>{{else}}{{.Organizer}}{{end}}</td><td>{{$n := 0}}{{range .Editions}}{{$n = len .Problems | add $n}}{{end}}{{$n}}</td></tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{template "bottom" .}}{{end}}
+
+{{define "search.html"}}{{template "top" .}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Search</span></nav>
+<h1>Search</h1>
+<form class="search-box" action="{{link "search/"}}" method="get" role="search" data-search>
+  <label class="sr" for="q">Search the problems</label>
+  <input id="q" name="q" type="search" placeholder="Words, a formula or a locator such as imo/2024/p1" autocomplete="off" autofocus>
+  <button type="submit">Search</button>
+</form>
+<p class="muted" id="search-status" aria-live="polite">Type words to search the statements.</p>
+<ol class="results" id="results" data-index="{{link "search.json"}}"></ol>
+<noscript><p>The search needs JavaScript. Use the <a href="{{link "c/"}}">list of competitions</a>.</p></noscript>
+{{template "bottom" .}}{{end}}
+
+{{define "404.html"}}{{template "top" .}}
+<div class="prose center">
+<p class="eyebrow">Error 404</p>
+<h1>This page is not on olymmath</h1>
+<p class="lede">The page moved or does not exist yet.</p>
+<p><a class="button" href="{{link ""}}">Go to the home page</a> <a class="button ghost" href="{{link "search/"}}">Search</a></p>
+</div>
+{{template "bottom" .}}{{end}}

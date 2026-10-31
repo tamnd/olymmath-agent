@@ -1,0 +1,26 @@
+{{define "competition.html"}}{{template "top" .}}{{with .Data}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><a href="{{link "c/"}}">Competitions</a><span>{{.Short}}</span></nav>
+<h1>{{.Name}}</h1>
+<p class="lede">{{.Description}}</p>
+<dl class="facts">
+  {{if .Organizer}}<div><dt>Organizer</dt><dd>{{.Organizer}}</dd></div>{{end}}
+  {{if .FirstYear}}<div><dt>First held</dt><dd>{{.FirstYear}}</dd></div>{{end}}
+  {{if .URL}}<div><dt>Official site</dt><dd><a href="{{.URL}}" rel="noopener">{{.URL}}</a></dd></div>{{end}}
+</dl>
+<h2>Papers</h2>
+<div class="table-wrap">
+<table class="years">
+  <thead><tr><th scope="col">Year</th><th scope="col">Place</th><th scope="col">Problems</th></tr></thead>
+  <tbody>
+  {{$c := .}}
+  {{range .Editions}}
+    <tr>
+      <th scope="row"><a href="{{link (printf "%s/%d/" $c.Code .Year)}}">{{.Year}}</a></th>
+      <td>{{.Place}}{{if .Country}}, {{.Country}}{{end}}</td>
+      <td><ol class="cells">{{range .Problems}}<li><a href="{{link .Locator}}" title="{{$c.Short}} {{.Year}} Problem {{.Number}}">{{.Number}}</a></li>{{end}}</ol></td>
+    </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}{{template "bottom" .}}{{end}}

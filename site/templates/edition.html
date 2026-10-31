@@ -1,0 +1,32 @@
+{{define "edition.html"}}{{template "top" .}}{{with .Data}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><a href="{{link "c/"}}">Competitions</a><a href="{{link (printf "c/%s/" .Competition.Code)}}">{{.Competition.Short}}</a><span>{{.Year}}</span></nav>
+<header class="page-head">
+  <h1>{{.Title}}</h1>
+  <p class="lede">{{if .Number}}The {{ordinal .Number}} {{.Competition.Name}}{{else}}{{.Competition.Name}} {{.Year}}{{end}}{{if .Place}}, {{.Place}}{{if .Country}}, {{.Country}}{{end}}{{end}}{{if .Dates}}, {{.Dates}}{{end}}.</p>
+  <p class="actions">{{if .URL}}<a class="button" href="{{.URL}}" rel="noopener">Official paper</a>{{end}}<button class="button ghost" type="button" data-print>Print the paper</button></p>
+</header>
+{{range .Papers}}
+<section class="paper">
+  <div class="paper-head"><h2>{{.Name}}</h2><p>{{if .Date}}{{date .Date}}{{end}}{{if .Time}} · {{.Time}}{{end}}</p></div>
+  {{range .Problems}}
+  <article class="card statement-card" id="{{.Position}}">
+    <p class="card-kicker"><a href="{{.Link}}">Problem {{.Number}}</a></p>
+    {{template "chips" .}}
+    <div class="statement">{{.Statement}}</div>
+    <p class="card-foot"><a href="{{.Link}}">Answer, solutions and source</a></p>
+  </article>
+  {{end}}
+</section>
+{{end}}
+{{if .Other}}
+<section class="paper">
+  <div class="paper-head"><h2>Other problems</h2></div>
+  {{range .Other}}
+  <article class="card statement-card" id="{{.Position}}">
+    <p class="card-kicker"><a href="{{.Link}}">Problem {{.Number}}</a></p>
+    <div class="statement">{{.Statement}}</div>
+  </article>
+  {{end}}
+</section>
+{{end}}
+{{end}}{{template "bottom" .}}{{end}}

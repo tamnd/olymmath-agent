@@ -1,0 +1,14 @@
+{{define "competitions.html"}}{{template "top" .}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Competitions</span></nav>
+<h1>Competitions</h1>
+<p class="lede">The olympiads on olymmath. More competitions come with each release.</p>
+<div class="grid">
+{{range .Data}}
+  <a class="card tile" href="{{link (printf "c/%s/" .Code)}}">
+    <span class="tile-kicker">{{.Level}}</span>
+    <span class="tile-title">{{.Name}}</span>
+    <span class="tile-meta">Since {{.FirstYear}} · {{len .Editions}} papers on olymmath</span>
+  </a>
+{{end}}
+</div>
+{{template "bottom" .}}{{end}}
