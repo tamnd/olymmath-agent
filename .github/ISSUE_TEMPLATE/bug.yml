@@ -1,0 +1,22 @@
+name: Bug
+description: The om binary or the site does not work as the specification says.
+labels: ["type: fix"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: Give the command or the URL, and the output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expect
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of om version, or the date of the page.

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Error in a problem or a solution
+    url: https://github.com/tamnd/olymmath/issues/new/choose
+    about: Report an error in the content in the content repository.
