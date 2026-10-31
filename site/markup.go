@@ -91,6 +91,7 @@ func NewMarkup(macros map[string]string) (*Markup, error) {
 
 // HTML renders src. Each error is a formula that KaTeX cannot parse.
 func (m *Markup) HTML(src string) (string, []error) {
+	src, figures := splitFigures(src)
 	text, spans := splitMath(src)
 	var buf bytes.Buffer
 	if err := md.Convert([]byte(text), &buf); err != nil {
@@ -107,13 +108,21 @@ func (m *Markup) HTML(src string) (string, []error) {
 		}
 		out = strings.ReplaceAll(out, "@@MATH"+strconv.Itoa(i)+"@@", rendered)
 	}
-	// A display formula alone in a paragraph does not need the paragraph.
+	for i, code := range figures {
+		fig, err := m.figure(code)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("figure %d is not drawn: %w", i+1, err))
+		}
+		token := "@@ASY" + strconv.Itoa(i) + "@@"
+		out = strings.ReplaceAll(out, "<p>"+token+"</p>", fig)
+		out = strings.ReplaceAll(out, token, fig)
+	}
 	return out, errs
 }
 
 // Plain returns the text of src for search and for descriptions: the formulas keep their TeX source, and the Markdown marks go.
 func Plain(src string) string {
-	text, spans := splitMath(src)
+	text, spans := splitMath(asyBlock.ReplaceAllString(src, " "))
 	r := strings.NewReplacer("*", "", "_", " ", "`", "", "#", "", "\n", " ")
 	text = r.Replace(text)
 	for i := len(spans) - 1; i >= 0; i-- {

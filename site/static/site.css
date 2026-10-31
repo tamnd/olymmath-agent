@@ -161,6 +161,11 @@ main { flex: 1 0 auto; width: 100%; padding-bottom: 5rem; }
 .statement .katex { font-size: 1.02em; }
 .statement .katex-display { margin: 0.8rem 0; overflow-x: auto; overflow-y: hidden; padding: 0.2rem 0; }
 .math-error { color: #b42318; }
+figure.asy { position: relative; max-width: 100%; margin: 1rem 0; container-type: inline-size; background: #fff; color: #000; border-radius: 4px; }
+figure.asy > svg { display: block; width: 100%; height: auto; }
+figure.asy > span { position: absolute; white-space: nowrap; line-height: 1; }
+figure.asy .katex { font-size: 1em; }
+pre.asy-source { max-height: 16rem; overflow: auto; font-size: 0.8rem; }
 
 .chips { list-style: none; display: flex; flex-wrap: wrap; gap: 2px; padding: 0; margin: 0 0 1.25rem; font-family: var(--sans); }
 .chips li { font-size: 0.74rem; font-weight: 500; padding: 0.2rem 0.6rem; background: var(--surface-2); color: var(--ink-2); }
