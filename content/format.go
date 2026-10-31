@@ -11,7 +11,7 @@ import (
 
 // keyOrder gives the order of the keys of each kind of front matter, and of the records inside it. A key that is not in the list goes after the known keys, in its old order. The loader reports such a key.
 var keyOrder = map[string][]string{
-	"problem":    {"tag", "kind", "appearances", "title", "type", "topics", "answer", "authors", "canonical", "statements", "xref", "links"},
+	"problem":    {"tag", "kind", "appearances", "title", "type", "topics", "answer", "authors", "canonical", "statements", "xref", "links", "status"},
 	"solution":   {"tag", "kind", "problem", "origin", "author", "source", "url", "capture", "zone", "lang", "method", "complete", "answer_claimed", "run", "translated_by"},
 	"appearance": {"at", "primary", "note"},
 	"statement":  {"id", "lang", "source", "name", "url", "page", "capture", "origin", "zone", "kind", "diff_from"},

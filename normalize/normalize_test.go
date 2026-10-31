@@ -59,3 +59,30 @@ func TestGuard(t *testing.T) {
 		t.Errorf("a rewrite passed the guard: %+v", c)
 	}
 }
+
+func TestCutTail(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"Compute the number of ways to place the weights on the pans. Answer. The number is $(2n-1)!!$.", "Compute the number of ways to place the weights on the pans."},
+		{"Prove that the right pan is never heavier than the left pan. ## C2 Suppose that 1000 students stand in a circle.", "Prove that the right pan is never heavier than the left pan."},
+		{"Answer: find all $n$ such that the sum is a square number for each prime.", "Answer: find all $n$ such that the sum is a square number for each prime."},
+	}
+	for _, c := range cases {
+		if got := CutTail(c.in); got != c.want {
+			t.Errorf("CutTail(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestStripCountry(t *testing.T) {
+	cases := map[string]string{
+		"BEL Let $ABC$ be a triangle.":                  "Let $ABC$ be a triangle.",
+		"RUS Variant 1. A grasshopper jumps.":           "A grasshopper jumps.",
+		"Let $ABC$ be a triangle.":                      "Let $ABC$ be a triangle.",
+		"ABC is a word with three letters in it today.": "ABC is a word with three letters in it today.",
+	}
+	for in, want := range cases {
+		if got := StripCountry(in); got != want {
+			t.Errorf("StripCountry(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

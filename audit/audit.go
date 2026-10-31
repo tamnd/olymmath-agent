@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/tamnd/olymmath-agent/content"
+	"github.com/tamnd/olymmath-agent/review"
 	"github.com/tamnd/olymmath-agent/site"
 )
 
@@ -34,6 +35,8 @@ type Context struct {
 	Markup   *site.Markup
 	findings content.Findings
 	rule     *Rule
+	revs     map[string]*review.Review
+	revErrs  []error
 }
 
 func (c *Context) add(p, format string, args ...any) {
@@ -54,6 +57,9 @@ var Rules = []*Rule{
 	{ID: "S06", Level: content.Warning, Summary: "two statements of a problem differ in a number or an operator", check: s06},
 	{ID: "S07", Level: content.Error, Summary: "a statement in zone Z3 has no text in the published tree", check: s07},
 	{ID: "S08", Level: content.Warning, Summary: "each figure in a text has a file", check: s08},
+	{ID: "D01", Level: content.Error, Summary: "no two problems have canonical texts with signal T at or above 0.95, unless a variant_of edge or a review says that they are two problems", check: d01},
+	{ID: "D02", Level: content.Warning, Summary: "each pair in the review queue has a review", check: d02},
+	{ID: "D03", Level: content.Error, Summary: "each merge has two strict signals or a review that accepts it", check: d03},
 	{ID: "L01", Level: content.Error, Summary: "each solution points to a problem", Loader: true},
 	{ID: "L02", Level: content.Error, Summary: "each AI solution has a complete run block", check: l02},
 	{ID: "L03", Level: content.Error, Summary: "no AI solution says that a person wrote it", check: l03},
@@ -198,6 +204,9 @@ func s01(c *Context) {
 			c.add(p.Path, "the canonical statement %q is not in the list of statements", p.Canonical.Statement)
 		case !slices.Contains(content.Rules, p.Canonical.Rule):
 			c.add(p.Path, "the canonical rule %q is not one of %s", p.Canonical.Rule, strings.Join(content.Rules, ", "))
+		}
+		if st := p.Status.Statement; st != "" && !slices.Contains(content.Statuses, st) {
+			c.add(p.Path, "the statement status %q is not one of %s", st, strings.Join(content.Statuses, ", "))
 		}
 	}
 }
