@@ -146,16 +146,16 @@ func (a *Aliases) Code(labels []string) string {
 // Len is the number of keys.
 func (a *Aliases) Len() int { return len(a.m) }
 
-var posRE = regexp.MustCompile(`^(?:problem|prob|p|q|#)?\s*([a-z]?)\s*([0-9]{1,2})$`)
+var posRE = regexp.MustCompile(`^(?:problem|prob|p|q|#)?\s*([a-z]?)\s*([0-9]{1,4})$`)
 
-// Position makes a position from a problem label of a dataset: "3", "P3" and "Problem 3" give "p3", and "A1" and "A-1" give "a1". It returns "" for a label it cannot read.
+// Position makes a position from a problem label of a dataset: "3", "P3" and "Problem 3" give "p3", and "A1" and "A-1" give "a1". A number of three or four digits needs a letter, for example the KöMaL sign B3802, because a long number alone is often a year. It returns "" for a label it cannot read.
 func Position(label string) string {
 	m := posRE.FindStringSubmatch(strings.NewReplacer("-", "", "_", "", ".", "").Replace(strings.ToLower(strings.TrimSpace(label))))
 	if m == nil {
 		return ""
 	}
 	n, _ := strconv.Atoi(m[2])
-	if n == 0 {
+	if n == 0 || (m[1] == "" && len(m[2]) > 2) {
 		return ""
 	}
 	if m[1] != "" {

@@ -21,7 +21,7 @@ const MinWords = 10
 
 var (
 	letterRE   = regexp.MustCompile(`(?i)(?:^|[\s\d])(ii|i|a|b)\s*$`)
-	positionRE = regexp.MustCompile(`^[a-z][0-9]{1,2}$`)
+	positionRE = regexp.MustCompile(`^[a-z][0-9]{1,4}$`)
 	// titleRE matches a text that names a problem instead of stating it.
 	// refRE matches a short text with no formula that names the source of a problem, for example "Tuymaada 2002 day 1 problem 1. Author : A. Golovanov." or "Kvant M1467 (Sol: 3/1995) IMO 1994 P1 IMO Shortlist 1994 A2".
 	refRE   = regexp.MustCompile(`(?i)\b(19|20)[0-9]{2}\b.*\b(problem|shortlist|olympiad|tst|authors?|grade|round|day|kvant)\b|\b(problem|shortlist|olympiad|tst|authors?|grade|round|day|kvant)\b.*\b(19|20)[0-9]{2}\b`)

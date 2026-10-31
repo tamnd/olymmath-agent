@@ -38,7 +38,7 @@ var (
 	codeRE     = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
 	editionRE  = regexp.MustCompile(`^[0-9]{4}([a-z]|-[a-z0-9]+)?$`)
 	paperRE    = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
-	positionRE = regexp.MustCompile(`^[a-z]{0,3}[0-9]{1,3}[a-z]?$`)
+	positionRE = regexp.MustCompile(`^[a-z]{0,3}[0-9]{1,4}[a-z]?$`)
 )
 
 // Locator names a competition, an edition or an appearance.

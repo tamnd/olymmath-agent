@@ -35,6 +35,7 @@ type Lane struct {
 var Lanes = map[string]Lane{
 	"kedlaya-putnam": {Label: "Putnam", Docs: Putnam, Parse: ParsePutnam},
 	"kalva":          {Docs: Kalva, Parse: ParseKalva},
+	"komal":          {Docs: Komal, Parse: ParseKomal},
 }
 
 // PutnamFirst is the first year of the Putnam archive.
