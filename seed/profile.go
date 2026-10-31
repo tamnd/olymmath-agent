@@ -213,7 +213,29 @@ var Profiles = map[string]Profile{
 			}, r.Get("problem") != ""
 		},
 	},
+	"hf-amc12-full": {
+		Columns: []string{"problem_id", "question", "answer"},
+		Map: func(r Record) (Row, bool) {
+			m := amcIDRE.FindStringSubmatch(r.Get("problem_id"))
+			if m == nil || r.Get("question") == "" {
+				return Row{}, false
+			}
+			y, _ := strconv.Atoi(m[1])
+			paper := m[2]
+			// The AMC 12 had one paper in 2000 and 2001. The dataset gives it the letter A.
+			if y < 2002 {
+				paper = ""
+			}
+			return Row{
+				ID: r.Get("problem_id"), Labels: labels("AMC 12"+paper, "AMC 12"), Year: y, Number: m[3], Lang: "en",
+				Statement: r.Get("question"), Answer: r.Get("answer"),
+			}, true
+		},
+	},
 }
+
+// amcIDRE reads an id of the AMC 12 set, such as 2019A-P15: the year, the paper and the problem.
+var amcIDRE = regexp.MustCompile(`^(\d{4})([AB])-P?(\d{1,2})$`)
 
 // The columns that Generic looks for, in order.
 var (
