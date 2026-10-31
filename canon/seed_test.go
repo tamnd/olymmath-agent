@@ -30,3 +30,27 @@ func TestSeedsLocate(t *testing.T) {
 		t.Errorf("candidates %v, located %d, skipped %v", got, s.Located, s.Skipped)
 	}
 }
+
+func TestIsRef(t *testing.T) {
+	refs := []string{
+		"Kvant M1467 (Sol: 3/1995) IMO 1994 P1 IMO Shortlist 1994 A2",
+		"Tuymaada 2002 day 1 problem 1. Author : A. Golovanov.",
+		"2013 All Russian Olympiad Final Round grade 10 Day 2 P:6",
+		"St. Petersburg Olympiad 2015 2nd Round Grade 9 also known as Yellowstone Permutation",
+	}
+	for _, s := range refs {
+		if !isRef(s) {
+			t.Errorf("isRef(%q) = false", s)
+		}
+	}
+	texts := []string{
+		"Prove that there exists a triangle which can be cut into 2005 congruent triangles.",
+		"Is it possible to find 2005 different positive square numbers such that their sum is also a square number?",
+		"On day 1 of 2020, prove that $n$ is odd.",
+	}
+	for _, s := range texts {
+		if isRef(s) {
+			t.Errorf("isRef(%q) = true", s)
+		}
+	}
+}
