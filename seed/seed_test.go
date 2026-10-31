@@ -192,6 +192,13 @@ func TestProfiles(t *testing.T) {
 	if _, ok := Profiles["hf-numinamath-1-5"].Map(Record{"synthetic": {"false"}, "problem": {"x"}, "source": {"cn_k12"}}); ok {
 		t.Error("a textbook row was kept")
 	}
+	row, _ = Profiles["hf-ai-mo-aops"].Map(Record{"metadata.path": {"Contest Collections/2022 Contests/2022 3rd Memorial &quot;A&quot;/1.json"}, "problem": {"x"}})
+	if row.Labels[0] != `3rd Memorial "A"` {
+		t.Errorf("label %q", row.Labels[0])
+	}
+	if p := Generic([]string{"problem_statement", "reasoning", "label"}); len(p.Columns) != 2 {
+		t.Errorf("generic columns %v", p.Columns)
+	}
 	row, ok = Profiles["hf-mathnet"].Map(Record{"problem_markdown": {"Problem:\nShow it."}, "competition": {"IRL_ABooklet_2023"}, "country": {"Ireland"}})
 	if !ok || row.Statement != "Show it." || row.Year != 2023 {
 		t.Errorf("mathnet row %+v", row)
