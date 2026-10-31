@@ -115,3 +115,42 @@ func TestTrace(t *testing.T) {
 		t.Error("the point O of an old paper was counted as a number")
 	}
 }
+
+func TestSplitBooklet(t *testing.T) {
+	head := "Shortlisted problems                    %d\n"
+	var b strings.Builder
+	for pg := 1; pg <= 6; pg++ {
+		b.WriteString(strings.Replace(head, "%d", strings.Repeat("1", pg), 1))
+		switch pg {
+		case 1:
+			b.WriteString("Problems\nAlgebra\nA1. Let n be a positive integer.\n 1 1\nProve that n > 0.\n(Ukraine)\n")
+		case 2:
+			b.WriteString("A2\n   A2\n   Find all reals x.\n")
+		case 3:
+			b.WriteString("Solutions\nA1. Let n be a positive integer. Prove that n > 0.\nSolution. Easy.\n")
+		case 4:
+			b.WriteString("G 3  CZE  (Czech Republic)\nLet ABC be a triangle.\nAnswer: none.\n")
+		}
+		b.WriteString("\n17\n\f")
+	}
+	segs := SplitBooklet(b.String())
+	want := map[string]string{"a1": "Let n be a positive integer. 1 1 Prove that n > 0.", "a2": "Find all reals x.", "g3": "Let ABC be a triangle."}
+	if len(segs) != len(want) {
+		t.Fatalf("%+v", segs)
+	}
+	for _, s := range segs {
+		if want[s.Position] != s.Text {
+			t.Errorf("%s: %q", s.Position, s.Text)
+		}
+	}
+	if segs[0].Page != 1 || segs[2].Page != 4 {
+		t.Errorf("pages %d %d", segs[0].Page, segs[2].Page)
+	}
+}
+
+func TestShortlist(t *testing.T) {
+	ps := Shortlist(2000, 2007)
+	if len(ps) != 2 || ps[0].Edition != "isl/2006" || !ps[1].Booklet || ps[1].URL != "https://www.imo-official.org/assets/documents/problems/2007/IMO2007SL.pdf" {
+		t.Errorf("%+v", ps)
+	}
+}

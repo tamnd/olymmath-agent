@@ -27,6 +27,16 @@ type Paper struct {
 	URL     string
 	Lang    string
 	Name    string
+	// Booklet is true for a shortlist booklet, whose text SplitBooklet cuts.
+	Booklet bool
+}
+
+// Segments cuts the text of the paper into problems.
+func (p Paper) Segments(text string) []Segment {
+	if p.Booklet {
+		return SplitBooklet(text)
+	}
+	return Split(text)
 }
 
 // Segment is the text of one problem in a paper.
