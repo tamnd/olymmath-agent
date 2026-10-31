@@ -100,3 +100,29 @@
 </div>
 {{end}}
 {{end}}{{template "bottom" .}}{{end}}
+
+{{define "topics.html"}}{{template "top" .}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Topics</span></nav>
+<div class="prose">
+<h1>Topics</h1>
+<p class="lede">Olympiad problems have four usual topics. A problem can have more than one topic, and many problems have no topic yet.</p>
+<p>The topics of the shortlist problems come from the letter of their position: A3 of the IMO Shortlist is algebra.</p>
+</div>
+<ul class="topics">
+{{range .Data}}<li><a class="card chip-{{.Code}}" href="{{.Link}}"><span class="topic-name">{{.Name}}</span> <span class="muted">{{.Count}} problems</span></a></li>
+{{end}}</ul>
+{{template "bottom" .}}{{end}}
+
+{{define "topic.html"}}{{template "top" .}}{{with .Data}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><a href="{{link "t/"}}">Topics</a><span>{{.Name}}</span></nav>
+<div class="prose">
+<h1>{{.Name}}</h1>
+<p class="lede">{{.Count}} problems have the topic {{lower .Name}}.</p>
+</div>
+{{range .Groups}}
+<h2>{{if .Competition}}<a href="{{link (printf "c/%s/" .Competition.Code)}}">{{.Competition.Name}}</a>{{else}}Other problems{{end}}</h2>
+<ul class="topic-list">
+{{range .Problems}}<li><a href="{{.Link}}">{{.Title}}</a></li>
+{{end}}</ul>
+{{end}}
+{{end}}{{template "bottom" .}}{{end}}

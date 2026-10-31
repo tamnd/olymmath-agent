@@ -25,8 +25,10 @@ type Competition struct {
 	FirstYear int               `yaml:"first_year"`
 	LastYear  int               `yaml:"last_year"`
 	// Gaps are the years with no edition between the first year and the last year, for example 1980 for the IMO.
-	Gaps              []int    `yaml:"gaps"`
-	EditionForm       string   `yaml:"edition_form"`
+	Gaps        []int  `yaml:"gaps"`
+	EditionForm string `yaml:"edition_form"`
+	// TopicPositions is true when the letter of a position is the topic of the problem, as in the IMO Shortlist: a3 is algebra.
+	TopicPositions    bool     `yaml:"topic_positions"`
 	Layout            []Layout `yaml:"layout"`
 	PerYear           int      `yaml:"per_year"`
 	OfficialSolutions *bool    `yaml:"official_solutions"`
@@ -465,6 +467,18 @@ var Topics = map[string]string{
 	"C": "Combinatorics",
 	"G": "Geometry",
 	"N": "Number theory",
+}
+
+// PositionTopic gives the topic of the position of an appearance in c, for example A for isl/2009/a3. It gives "" when c has no topic positions.
+func PositionTopic(c *Competition, position string) string {
+	if c == nil || !c.TopicPositions || position == "" {
+		return ""
+	}
+	t := strings.ToUpper(position[:1])
+	if _, ok := Topics[t]; !ok {
+		return ""
+	}
+	return t
 }
 
 // TopicRoot returns the root of a topic, for example N for N.diophantine.pell.

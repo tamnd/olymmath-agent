@@ -118,3 +118,41 @@ func order(m *yaml.Node, kind string) {
 		}
 	}
 }
+
+// SetTopics sets the topics of a problem file.
+func SetTopics(b []byte, topics []string) ([]byte, error) {
+	front, body, err := splitFront(b)
+	if err != nil {
+		return nil, err
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(front, &doc); err != nil {
+		return nil, fmt.Errorf("YAML: %w", err)
+	}
+	if len(doc.Content) != 1 || doc.Content[0].Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("the front matter is not a mapping")
+	}
+	list := &yaml.Node{Kind: yaml.SequenceNode, Style: yaml.FlowStyle}
+	for _, t := range topics {
+		list.Content = append(list.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: t})
+	}
+	top := doc.Content[0]
+	if v := value(top, "topics"); v != nil {
+		*v = *list
+	} else {
+		top.Content = append(top.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "topics"}, list)
+	}
+	var buf bytes.Buffer
+	buf.WriteString("---\n")
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(top); err != nil {
+		return nil, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, err
+	}
+	buf.WriteString("---\n")
+	buf.WriteString(body)
+	return Format(buf.Bytes())
+}

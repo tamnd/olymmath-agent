@@ -131,6 +131,14 @@ om solutions -content olymmath mathse
 
 Mathematics Stack Exchange is CC BY-SA 4.0, so olymmath can copy an answer when it names the author and links to the post. For `mathse`, the command searches the API for questions that name IMO, ISL, Putnam, USAMO or USAJMO and a year in the title. It keeps a question only when the problem of that edition occurs in the question. Then it takes at most 3 answers of each question: the accepted answer and the answers with a score of 3 or more. An answer must have at least 60 words. The command does not take an answer that speaks to the user ("you", "your"), a hint, a comment, or a copy of a text from another site. These solutions have the text of the answer and are not marked complete, because nobody has checked them yet. The API without a key gives 300 requests a day, so one run reads at most 10 pages for each search word.
 
+### Set the topics
+
+```sh
+om topics -content olymmath
+```
+
+A shortlist gives the topic of a problem by the letter of its position: A3 of the IMO Shortlist is algebra, C is combinatorics, G is geometry and N is number theory. A competition with `topic_positions: true` in the register has such positions. The `om topics` command sets the topic of each problem that has no topic and appears at such a position. It does not change a topic that is there already. Use `-dry` to see the changes first.
+
 ## Layout
 
 | Path | What it has |
