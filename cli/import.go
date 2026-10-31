@@ -181,14 +181,15 @@ func runImport(env Env, args []string) int {
 		}
 	}
 	if !*dry {
-		// The items of om anchor stay, because an import does not make them.
+		// The items of om anchor stay, because an import does not make them. The items of the competitions that this import did not read also stay.
 		old, err := review.Queue(*root)
 		if err != nil {
 			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
 			return ExitFailure
 		}
 		for _, it := range old {
-			if it.Kind == "official" {
+			comp, _, _ := strings.Cut(it.At, "/")
+			if it.Kind == "official" || (len(s.Comps) > 0 && !slices.Contains(s.Comps, comp)) {
 				items = append(items, it)
 			}
 		}
