@@ -224,6 +224,14 @@ func TestProfiles(t *testing.T) {
 	if row.Number != "7" || row.Labels[0] != "AIME I" {
 		t.Errorf("aime row %+v", row)
 	}
+	row, ok = Profiles["hf-amc12-full"].Map(Record{"problem_id": {"2019A-P15"}, "question": {"x"}, "answer": {"D"}})
+	if !ok || row.Year != 2019 || row.Number != "15" || row.Labels[0] != "AMC 12A" || row.Answer != "D" {
+		t.Errorf("amc12 row %+v", row)
+	}
+	row, _ = Profiles["hf-amc12-full"].Map(Record{"problem_id": {"2001A-P3"}, "question": {"x"}})
+	if row.Labels[0] != "AMC 12" || row.Number != "3" {
+		t.Errorf("amc12 2001 row %+v", row)
+	}
 	row, ok = Profiles["hf-mathnet"].Map(Record{"problem_markdown": {"Problem:\nShow it."}, "competition": {"IRL_ABooklet_2023"}, "country": {"Ireland"}})
 	if !ok || row.Statement != "Show it." || row.Year != 2023 {
 		t.Errorf("mathnet row %+v", row)
