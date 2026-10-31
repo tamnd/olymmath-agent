@@ -181,3 +181,12 @@ func TestSolutionPages(t *testing.T) {
 		t.Errorf("%v", got)
 	}
 }
+
+func TestSameNumbers(t *testing.T) {
+	if !SameNumbers("a point M 6= O and 2 lines", "a point $M \\neq O$ and $2$ lines ![](https://x.org/7.png)") {
+		t.Error("the sign 6= or a URL counted as a number")
+	}
+	if d := NumberDiff("greater than 26", "greater than $23$"); len(d) != 2 || d[0] != "paper:26" || d[1] != "text:23" {
+		t.Errorf("%v", d)
+	}
+}

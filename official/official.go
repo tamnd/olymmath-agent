@@ -256,20 +256,45 @@ func Order(a, b string) float64 {
 var numberRE = regexp.MustCompile(`[0-9]+`)
 
 // numbers gives the set of numbers of a text, sorted.
+// urlRE matches a URL, for example the address of a figure. Its digits are not numbers of the text.
+var urlRE = regexp.MustCompile(`https?://[^\s)\]]+`)
+
+// notEqual is the text that the text layer of many old papers gives for the sign ≠.
+var notEqual = strings.NewReplacer("6=", "≠")
+
 func numbers(s string) []string {
-	out := numberRE.FindAllString(s, -1)
+	out := numberRE.FindAllString(urlRE.ReplaceAllString(s, " "), -1)
 	slices.Sort(out)
 	return slices.Compact(out)
 }
 
-// Trace tells if text is a transcription of the text of a paper: the order signal is at least TraceLeast and the two texts have the same set of numbers. The old papers set the point O so that the text layer gives 0, so a 0 that only the paper has is not counted.
-func Trace(paper, text string) bool {
-	if Order(paper, text) < TraceLeast {
-		return false
-	}
-	np, nt := numbers(paper), numbers(text)
+// SameNumbers tells if a text and the text of a paper have the same set of numbers. A 0 that only the paper has is not counted, see Trace, and the text 6= of the paper is the sign ≠.
+func SameNumbers(paper, text string) bool {
+	np, nt := numbers(notEqual.Replace(paper)), numbers(text)
 	if !slices.Contains(nt, "0") {
 		np = slices.DeleteFunc(np, func(n string) bool { return n == "0" })
 	}
 	return slices.Equal(np, nt)
+}
+
+// NumberDiff gives the numbers that only one of the two texts has. A number of the paper has the prefix "paper:", and a number of the text has the prefix "text:".
+func NumberDiff(paper, text string) []string {
+	np, nt := numbers(notEqual.Replace(paper)), numbers(text)
+	var out []string
+	for _, n := range np {
+		if !slices.Contains(nt, n) && (n != "0" || slices.Contains(nt, "0")) {
+			out = append(out, "paper:"+n)
+		}
+	}
+	for _, n := range nt {
+		if !slices.Contains(np, n) {
+			out = append(out, "text:"+n)
+		}
+	}
+	return out
+}
+
+// Trace tells if text is a transcription of the text of a paper: the order signal is at least TraceLeast and the two texts have the same set of numbers. The old papers set the point O so that the text layer gives 0, so a 0 that only the paper has is not counted.
+func Trace(paper, text string) bool {
+	return Order(paper, text) >= TraceLeast && SameNumbers(paper, text)
 }
