@@ -235,8 +235,21 @@ func s03(c *Context) {
 			if !slices.Contains(content.Origins, s.Origin) {
 				c.add(p.Path, "the statement %s has the origin %q, not one of %s", s.ID, s.Origin, strings.Join(content.Origins, ", "))
 			}
+			if s.Traced != "" && !tracedOK(p, s) {
+				c.add(p.Path, "the statement %s is traced to %s, which is not an official statement of class H1 of the problem", s.ID, s.Traced)
+			}
 		}
 	}
+}
+
+// tracedOK tells if a traced statement names another statement of the problem that is official and of class H1.
+func tracedOK(p *content.Problem, s content.Statement) bool {
+	for _, o := range p.Statements {
+		if o.ID == s.Traced {
+			return o.ID != s.ID && o.Kind == "official" && o.Origin == "H1"
+		}
+	}
+	return false
 }
 
 func s04(c *Context) {
@@ -252,7 +265,7 @@ func s04(c *Context) {
 
 func s05(c *Context) {
 	for _, p := range c.Corpus.All() {
-		if s := p.CanonicalStatement(); s != nil && s.Origin == "D" {
+		if s := p.CanonicalStatement(); s != nil && p.Class(s) == "D" {
 			c.add(p.Path, "the canonical statement %s comes from a dataset; find the original text", s.ID)
 		}
 	}

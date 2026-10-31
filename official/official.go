@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -135,6 +136,15 @@ func clean(s string) string {
 // Words gives the words of a text for the word signal: each run of three or more letters, in lower case. A TeX command, such as \frac, is not a word.
 func Words(s string) map[string]bool {
 	out := map[string]bool{}
+	for _, w := range wordList(s) {
+		out[w] = true
+	}
+	return out
+}
+
+// wordList gives the words of a text in their order.
+func wordList(s string) []string {
+	var out []string
 	rs := []rune(strings.ToLower(s))
 	for i := 0; i < len(rs); {
 		if rs[i] == '\\' {
@@ -153,7 +163,7 @@ func Words(s string) map[string]bool {
 			j++
 		}
 		if j-i >= 3 {
-			out[string(rs[i:j])] = true
+			out = append(out, string(rs[i:j]))
 		}
 		i = j
 	}
@@ -205,4 +215,51 @@ func (ps Papers) Locate(edition, text string) string {
 		return ""
 	}
 	return pos
+}
+
+// TraceLeast is the lowest order signal at which a transcription is traced to the text of a paper.
+const TraceLeast = 0.9
+
+// Order gives the order signal of two texts: twice the length of the longest common sequence of their words, over the number of words of both. Unlike the word signal, it counts each word as often as it occurs and in its place.
+func Order(a, b string) float64 {
+	wa, wb := wordList(a), wordList(b)
+	if len(wa) == 0 || len(wb) == 0 {
+		return 0
+	}
+	d := make([]int, len(wb)+1)
+	for i := range wa {
+		prev := 0
+		for j := range wb {
+			up := d[j+1]
+			switch {
+			case wa[i] == wb[j]:
+				d[j+1] = prev + 1
+			case d[j] > d[j+1]:
+				d[j+1] = d[j]
+			}
+			prev = up
+		}
+	}
+	return 2 * float64(d[len(wb)]) / float64(len(wa)+len(wb))
+}
+
+var numberRE = regexp.MustCompile(`[0-9]+`)
+
+// numbers gives the set of numbers of a text, sorted.
+func numbers(s string) []string {
+	out := numberRE.FindAllString(s, -1)
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// Trace tells if text is a transcription of the text of a paper: the order signal is at least TraceLeast and the two texts have the same set of numbers. The old papers set the point O so that the text layer gives 0, so a 0 that only the paper has is not counted.
+func Trace(paper, text string) bool {
+	if Order(paper, text) < TraceLeast {
+		return false
+	}
+	np, nt := numbers(paper), numbers(text)
+	if !slices.Contains(nt, "0") {
+		np = slices.DeleteFunc(np, func(n string) bool { return n == "0" })
+	}
+	return slices.Equal(np, nt)
 }

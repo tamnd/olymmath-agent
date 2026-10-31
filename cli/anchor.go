@@ -57,7 +57,7 @@ func runAnchor(env Env, args []string) int {
 	owners := official.Owners(corpus)
 	var items []canon.Item
 	done := map[string]bool{}
-	var links, have, missing int
+	var links, have, missing, traced int
 	code := ExitOK
 	for _, p := range official.IMO(*from, *to) {
 		segs, err := paper(ctx, fc, src.ID, p)
@@ -68,7 +68,8 @@ func runAnchor(env Env, args []string) int {
 		}
 		done[p.Edition] = true
 		r := official.Anchor(owners, src.ID, p, segs)
-		fmt.Fprintf(env.Stdout, "%s: %d segments, %d links, %d review items, %d linked before, %d with no problem\n", p.Edition, len(segs), len(r.Links), len(r.Items), r.Have, len(r.Missing))
+		fmt.Fprintf(env.Stdout, "%s: %d segments, %d links, %d review items, %d linked before, %d traced, %d with no problem\n", p.Edition, len(segs), len(r.Links), len(r.Items), r.Have, len(r.Traced), len(r.Missing))
+		traced += len(r.Traced)
 		links += len(r.Links)
 		have += r.Have
 		missing += len(r.Missing)
@@ -76,10 +77,30 @@ func runAnchor(env Env, args []string) int {
 		if *dry {
 			continue
 		}
+		// paperID holds the id of the statement that links each problem to the paper.
+		paperID := map[*content.Problem]string{}
 		for _, l := range r.Links {
 			c := &canon.Candidate{Source: src.ID, Origin: src.Origin, Zone: src.Zone.Statement, Lang: p.Lang, Name: p.Name, URL: p.URL}
-			if err := addLink(*root, l.Problem, canon.AddLink(l.Problem, c, l.Segment.Page)); err != nil {
+			a := canon.AddLink(l.Problem, c, l.Segment.Page)
+			if err := addLink(*root, l.Problem, a); err != nil {
 				fmt.Fprintf(env.Stderr, "om anchor: %s: %v\n", l.Problem.Path, err)
+				return ExitFailure
+			}
+			paperID[l.Problem] = a.ID(c)
+		}
+		_, rule := canon.Rank(&canon.Candidate{Origin: src.Origin, Lang: p.Lang}, original(corpus.Competition("imo")))
+		for _, t := range r.Traced {
+			id := paperID[t.Problem]
+			for _, s := range t.Problem.Statements {
+				if s.Source == src.ID {
+					id = s.ID
+				}
+			}
+			if id == "" {
+				continue
+			}
+			if err := trace(*root, t.Problem, t.Statement, id, rule); err != nil {
+				fmt.Fprintf(env.Stderr, "om anchor: %s: %v\n", t.Problem.Path, err)
 				return ExitFailure
 			}
 		}
@@ -96,7 +117,7 @@ func runAnchor(env Env, args []string) int {
 			return ExitFailure
 		}
 	}
-	fmt.Fprintf(env.Stdout, "%d papers. %d new links, %d linked before, %d review items, %d segments with no problem.\n", len(done), links, have, len(items), missing)
+	fmt.Fprintf(env.Stdout, "%d papers. %d new links, %d linked before, %d traced, %d review items, %d segments with no problem.\n", len(done), links, have, traced, len(items), missing)
 	return code
 }
 
@@ -129,6 +150,19 @@ func addLink(root string, p *content.Problem, a canon.Additions) error {
 		return err
 	}
 	if b, err = canon.Apply(b, a); err != nil {
+		return err
+	}
+	return os.WriteFile(full, b, 0o644) // #nosec G306 G703 -- content files are public.
+}
+
+// trace marks the statement id of a problem as traced to the official statement official, and makes it canonical.
+func trace(root string, p *content.Problem, id, official, rule string) error {
+	full := filepath.Join(root, filepath.FromSlash(p.Path))
+	b, err := os.ReadFile(full) // #nosec G304 -- the path is inside the content root.
+	if err != nil {
+		return err
+	}
+	if b, err = canon.Trace(b, id, official, rule); err != nil {
 		return err
 	}
 	return os.WriteFile(full, b, 0o644) // #nosec G306 G703 -- content files are public.

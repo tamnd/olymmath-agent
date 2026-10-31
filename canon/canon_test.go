@@ -113,3 +113,20 @@ func TestAnswer(t *testing.T) {
 		}
 	}
 }
+
+func TestTrace(t *testing.T) {
+	file := "---\ntag: 0123456789\nkind: problem\nappearances:\n  - at: imo/2024/p1\n    primary: true\ncanonical:\n  statement: S1\n  rule: derived\nstatements:\n  - id: S1\n    lang: en\n    source: a\n    origin: D\n    zone: Z2\n    kind: transcription\n  - id: S2\n    lang: en\n    source: b\n    origin: D\n    zone: Z2\n    kind: transcription\n  - id: S3\n    lang: en\n    source: imo-official\n    origin: H1\n    zone: Z2\n    kind: official\nstatus:\n  statement: captured\n---\nText one.\n\n<!-- S2 -->\nText two.\n"
+	b, err := Trace([]byte(file), "S2", "S3", "official-translation")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	for _, want := range []string{"statement: S2\n  rule: official-translation", "    kind: transcription\n    traced: S3\n", "statement: sourced", "---\nText two.\n\n<!-- S1 -->\nText one.\n"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("no %q in\n%s", want, got)
+		}
+	}
+	if _, err := Trace([]byte(file), "S3", "S1", "x"); err == nil {
+		t.Error("a statement with no text was traced")
+	}
+}

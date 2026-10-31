@@ -1,6 +1,7 @@
 package official
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/tamnd/olymmath-agent/content"
@@ -95,5 +96,22 @@ func TestLocate(t *testing.T) {
 	twice := Papers{"usamo/2001": {{Position: "p1", Text: text}, {Position: "p1", Text: text}, {Position: "p2", Text: "Find all real numbers with a property."}}}
 	if got := twice.Locate("usamo/2001", text); got != "p1" {
 		t.Errorf("locate with two copies: %q", got)
+	}
+}
+
+func TestTrace(t *testing.T) {
+	paper := "Let n be a positive integer. A Japanese triangle consists of 1 + 2 + ... + n circles arranged in an equilateral triangular shape."
+	same := "Let $n$ be a positive integer. A *Japanese triangle* consists of $1 + 2 + \\dots + n$ circles arranged in an equilateral triangular shape."
+	if !Trace(paper, same) {
+		t.Errorf("a transcription was not traced (order %.3f)", Order(paper, same))
+	}
+	if Trace(paper, strings.Replace(same, "1 + 2", "1 + 3", 1)) {
+		t.Error("a changed number was traced")
+	}
+	if Trace(paper, "Let $n$ be a positive integer. Find all $1 + 2 + \\dots + n$ shapes.") {
+		t.Error("a different text was traced")
+	}
+	if !Trace("Points A, B and O lie on a circle with centre O 0 1 2.", "Points $A$, $B$ and $O$ lie on a circle with centre $O$ 1 2.") {
+		t.Error("the point O of an old paper was counted as a number")
 	}
 }
