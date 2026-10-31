@@ -115,6 +115,12 @@ om solutions -content olymmath imo-official
 
 The ISL booklets on imo-official.org have the official solutions, from 2006. The solution part of a booklet repeats each problem and then gives its solution. For `imo-official`, the command finds the page where each solution starts and writes a link to that page of the booklet. These solutions are in zone Z2, but olymmath copies no excerpt.
 
+```sh
+om solutions -content olymmath mathse
+```
+
+Mathematics Stack Exchange is CC BY-SA 4.0, so olymmath can copy an answer when it names the author and links to the post. For `mathse`, the command searches the API for questions that name IMO, ISL, Putnam, USAMO or USAJMO and a year in the title. It keeps a question only when the problem of that edition occurs in the question. Then it takes at most 3 answers of each question: the accepted answer and the answers with a score of 3 or more. An answer must have at least 60 words. The command does not take an answer that speaks to the user ("you", "your"), a hint, a comment, or a copy of a text from another site. These solutions have the text of the answer and are not marked complete, because nobody has checked them yet. The API without a key gives 300 requests a day, so one run reads at most 10 pages for each search word.
+
 ## Layout
 
 | Path | What it has |

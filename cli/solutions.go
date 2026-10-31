@@ -8,6 +8,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -20,7 +21,7 @@ import (
 )
 
 func init() {
-	register(command{"solutions", "link the human solutions of a curated archive to their problems (om solutions kedlaya-putnam, om solutions imo-official)", runSolutions})
+	register(command{"solutions", "link the human solutions of a curated archive to their problems (om solutions kedlaya-putnam, imo-official or mathse)", runSolutions})
 }
 
 // linkedSolution is the front matter of a solution that is a link only (zone Z3).
@@ -38,6 +39,8 @@ type linkedSolution struct {
 	Zone     string `yaml:"zone"`
 	Lang     string `yaml:"lang"`
 	Complete bool   `yaml:"complete"`
+	// Body is the text of a solution in zone Z1. A link has no text.
+	Body string `yaml:"-"`
 }
 
 func runSolutions(env Env, args []string) int {
@@ -51,8 +54,8 @@ func runSolutions(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || pos[0] != "kedlaya-putnam" && pos[0] != "imo-official" {
-		fmt.Fprintln(env.Stderr, "usage: om solutions [-from YEAR] [-to YEAR] [-dry] kedlaya-putnam|imo-official")
+	if len(pos) != 1 || !slices.Contains([]string{"kedlaya-putnam", "imo-official", "mathse"}, pos[0]) {
+		fmt.Fprintln(env.Stderr, "usage: om solutions [-from YEAR] [-to YEAR] [-dry] kedlaya-putnam|imo-official|mathse")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -79,7 +82,12 @@ func runSolutions(env Env, args []string) int {
 	fc := fetch.New(st)
 	fc.Agent = fmt.Sprintf("olymmath/%s (+https://olymmath.tamnd.com/about/)", env.Version)
 	ctx := context.Background()
-	links, err := solutionLinks(ctx, fc, pos[0], *from, *to, env.Stderr)
+	var links []solutionLink
+	if pos[0] == "mathse" {
+		links, err = mathseLinks(ctx, fc, corpus, env.Stderr)
+	} else {
+		links, err = solutionLinks(ctx, fc, pos[0], *from, *to, env.Stderr)
+	}
 	code := ExitOK
 	if err != nil {
 		code = ExitFailure
@@ -91,7 +99,7 @@ func runSolutions(env Env, args []string) int {
 			missing++
 			continue
 		}
-		if hasSolution(p, pos[0]) {
+		if hasSolution(p, pos[0], l.sol.URL) {
 			have++
 			continue
 		}
@@ -182,9 +190,10 @@ func captureText(ctx context.Context, fc *fetch.Client, hash string) (string, er
 	return official.Text(ctx, b)
 }
 
-func hasSolution(p *content.Problem, source string) bool {
+// hasSolution tells if a problem has a solution from the source with the URL. A source can give a problem more than one solution, each with its own URL.
+func hasSolution(p *content.Problem, source, url string) bool {
 	for _, s := range p.Solutions {
-		if s.Source == source {
+		if s.Source == source && s.URL == url {
 			return true
 		}
 	}
@@ -209,10 +218,17 @@ func writeLinked(corpus *content.Corpus, root string, p *content.Problem, s link
 	if err := os.MkdirAll(filepath.Dir(file), 0o750); err != nil {
 		return err
 	}
-	if err := os.WriteFile(file, []byte("---\n"+front.String()+"---\n"), 0o644); err != nil { // #nosec G306 -- a public content file.
+	if err := os.WriteFile(file, []byte("---\n"+front.String()+"---\n"+body(s.Body)), 0o644); err != nil { // #nosec G306 -- a public content file.
 		return err
 	}
 	corpus.Tags[s.Tag] = "solution"
-	p.Solutions = append(p.Solutions, &content.Solution{Tag: s.Tag, Source: s.Source})
+	p.Solutions = append(p.Solutions, &content.Solution{Tag: s.Tag, Source: s.Source, URL: s.URL})
 	return addTag(root, s.Tag, "solution")
+}
+
+func body(text string) string {
+	if text == "" {
+		return ""
+	}
+	return text + "\n"
 }
