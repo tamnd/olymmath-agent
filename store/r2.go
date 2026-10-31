@@ -66,7 +66,7 @@ func (r *R2) do(req *http.Request) (*http.Response, error) {
 	if resp.StatusCode/100 == 2 {
 		return resp, nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var body struct {
 		Errors []struct {
 			Code    int    `json:"code"`

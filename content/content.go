@@ -4,7 +4,6 @@
 package content
 
 import (
-	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -439,7 +438,3 @@ func in(list []string, s string) bool {
 
 // Valid reports whether s is in the list. It is for the rules of the audit.
 func Valid(list []string, s string) bool { return in(list, s) }
-
-func errorf(path, format string, args ...any) Finding {
-	return Finding{Path: path, Level: Error, Message: fmt.Sprintf(format, args...)}
-}

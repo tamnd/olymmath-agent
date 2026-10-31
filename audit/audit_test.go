@@ -76,7 +76,6 @@ func TestValidHasNoFindings(t *testing.T) {
 	}
 }
 
-const p1 = "problems/imo/2024/p1.md"
 const p2 = "problems/imo/2024/p2.md"
 const sol = "solutions/imo/2024/p1/006SZE6NAS.md"
 

@@ -103,7 +103,7 @@ func (c *Client) get(ctx context.Context, u string, out any) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 		return "", fmt.Errorf("%s: %s: %w", u, resp.Status, ErrGated)
 	}

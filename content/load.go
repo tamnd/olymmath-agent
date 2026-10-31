@@ -162,7 +162,7 @@ func (l *loader) registers() {
 	l.tsv("registers/redirects.tsv", 2, func(f []string) { l.corpus.Redirects[f[0]] = f[1] })
 }
 
-func (l *loader) tsv(rel string, min int, row func([]string)) {
+func (l *loader) tsv(rel string, minCols int, row func([]string)) {
 	if !l.exists(rel) {
 		return
 	}
@@ -179,8 +179,8 @@ func (l *loader) tsv(rel string, min int, row func([]string)) {
 			continue
 		}
 		f := strings.Split(line, "\t")
-		if len(f) < min {
-			l.add(rel, "", "line %d has %d fields, want %d or more, separated by tabs", n, len(f), min)
+		if len(f) < minCols {
+			l.add(rel, "", "line %d has %d fields, want %d or more, separated by tabs", n, len(f), minCols)
 			continue
 		}
 		row(f)
