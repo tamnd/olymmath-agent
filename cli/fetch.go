@@ -20,7 +20,7 @@ func runFetch(env Env, args []string) int {
 	root := fs.String("content", ".", "the root of the content repository")
 	dir, remote := storeFlags(fs)
 	localMax := fs.Int64("local-max", 64, "the largest file in MB that goes to the local disk; a larger file goes to R2 with -r2, or else stays a reference")
-	remoteMax := fs.Int64("remote-max", 95, "the largest file in MB that goes to R2; a larger file stays a reference to its pinned URL")
+	remoteMax := fs.Int64("remote-max", 500, "the largest file in MB that goes to R2; a larger file stays a reference to its pinned URL")
 	maxFiles := fs.Int("max-files", 100, "the largest number of data files to get one by one; a dataset with more files uses the Parquet form of the hub")
 	wave := fs.Int("wave", -1, "harvest each source of this wave that the tool can harvest")
 	pos, err := parseMixed(fs, args)

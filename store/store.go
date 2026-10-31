@@ -38,6 +38,9 @@ type Capture struct {
 // ErrNotFound is the error when the store does not have the bytes of a hash.
 var ErrNotFound = errors.New("not in the store")
 
+// ErrTooLarge is the error when the remote store refuses a body because of its size.
+var ErrTooLarge = errors.New("too large for the remote store")
+
 // Remote is a place that keeps the bytes away from the local disk, for example the R2 bucket.
 type Remote interface {
 	Put(ctx context.Context, key string, r io.Reader, size int64) error

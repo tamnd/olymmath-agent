@@ -82,6 +82,9 @@ func (r *R2) do(req *http.Request) (*http.Response, error) {
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("R2 %s: %w", req.URL.Path, ErrNotFound)
 	}
+	if resp.StatusCode == http.StatusRequestEntityTooLarge {
+		return nil, fmt.Errorf("R2 %s %s: %w", req.Method, req.URL.Path, ErrTooLarge)
+	}
 	return nil, fmt.Errorf("R2 %s %s: %s", req.Method, req.URL.Path, msg)
 }
 
