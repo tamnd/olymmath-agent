@@ -14,6 +14,8 @@ func TestText(t *testing.T) {
 		"Find $\\displaystyle\\sum x$.":    "Find $ \\sum x$.",
 		"Prove it. [hide=Answer]42[/hide]": "Prove it.",
 		"Café":                            "Café",
+		`$x \mbox {if} y$`:                 `$x \text{if} y$`,
+		`$\overarc{AB}$`:                   `$\overparen{AB}$`,
 	}
 	for in, want := range cases {
 		if got := Text(in); got != want {
