@@ -10,7 +10,7 @@ import (
 )
 
 // Version names the normalization rules. Change it when a rule changes.
-const Version = "norm/3"
+const Version = "norm/4"
 
 var punct = strings.NewReplacer(
 	"‘", "'", "’", "'", "‚", "'", "‛", "'",
@@ -23,10 +23,14 @@ var punct = strings.NewReplacer(
 // aops replaces the old AoPS macros \plus{}, \minus{} and \equal{} with their signs. KaTeX does not know these macros.
 var aops = strings.NewReplacer(`\plus{}`, "+", `\minus{}`, "-", `\equal{}`, "=")
 
+// macros replaces \overarc, which KaTeX does not know, with \overparen, which draws the same arc. mboxRE does the same for \mbox and \text.
+var macros = strings.NewReplacer(`\overarc`, `\overparen`)
+
 var (
 	displayRE = regexp.MustCompile(`(?s)\\\[(.*?)\\\]`)
 	inlineRE  = regexp.MustCompile(`(?s)\\\((.*?)\\\)`)
 	noOpRE    = regexp.MustCompile(`\\(displaystyle|textstyle|;|,|!|quad|qquad)(?:\s|\b|$)`)
+	mboxRE    = regexp.MustCompile(`\\mbox\s*\{`)
 	hideRE    = regexp.MustCompile(`(?is)\[hide(?:=[^\]]*)?\].*?\[/hide\]`)
 	spaceRE   = regexp.MustCompile(`[ ]+`)
 	blankRE   = regexp.MustCompile(`\n\s*\n+`)
@@ -34,11 +38,13 @@ var (
 	markerRE = regexp.MustCompile(`(?i)^\s*(?:\*\*)?(?:problem|prob\.?|p|#)?\s*([a-z]?\s*[0-9]{1,2})\s*(?:[.):]|\s-)(?:\*\*)?\s+`)
 )
 
-// Text normalizes a statement: Unicode NFC, a fixed set of quotes and dashes, the signs for the old AoPS macros \plus{}, \minus{} and \equal{}, `\[...\]` to `$$...$$`, `\(...\)` to `$...$`, no spacing commands that have no meaning, no `[hide]` blocks, one space between words and one blank line between paragraphs.
+// Text normalizes a statement: Unicode NFC, a fixed set of quotes and dashes, the signs for the old AoPS macros \plus{}, \minus{} and \equal{}, \text for \mbox and \overparen for \overarc, `\[...\]` to `$$...$$`, `\(...\)` to `$...$`, no spacing commands that have no meaning, no `[hide]` blocks, one space between words and one blank line between paragraphs.
 func Text(s string) string {
 	s = norm.NFC.String(s)
 	s = punct.Replace(s)
 	s = aops.Replace(s)
+	s = macros.Replace(s)
+	s = mboxRE.ReplaceAllString(s, `\text{`)
 	s = displayRE.ReplaceAllString(s, "$$$$$1$$$$")
 	s = inlineRE.ReplaceAllString(s, "$$$1$$")
 	s = noOpRE.ReplaceAllString(s, " ")
