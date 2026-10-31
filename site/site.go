@@ -75,6 +75,8 @@ type builder struct {
 	stats  Stats
 	pages  []string // the URL paths for the sitemap
 	asset  string   // the version suffix of the assets, for cache busting
+	// moved maps the path of each redirect page to its target, for redirects.json.
+	moved map[string]string
 	// similar gives the similar problems of each problem.
 	similar map[*content.Problem][]*content.Problem
 }
@@ -130,6 +132,7 @@ func (b *builder) all() error {
 		b.topics,
 		b.facets,
 		b.searchIndex,
+		b.redirectsJSON,
 		b.machine,
 	}
 	for _, step := range steps {
@@ -725,6 +728,18 @@ func (b *builder) problem(v *problemView) error {
 	return nil
 }
 
+// redirectsJSON writes redirects.json: the path of each redirect page and its target. A host with a Worker answers these paths with a real redirect, and does not need the pages.
+func (b *builder) redirectsJSON() error {
+	if b.moved == nil {
+		b.moved = map[string]string{}
+	}
+	data, err := json.Marshal(b.moved)
+	if err != nil {
+		return err
+	}
+	return b.write("redirects.json", data)
+}
+
 // redirects writes a page for each old locator in registers/redirects.tsv and for each old tag in registers/aliases.tsv. A withdrawn tag, with the target "-", gets no page.
 func (b *builder) redirects() error {
 	tags := make([]string, 0, len(b.corpus.Aliases))
@@ -762,6 +777,10 @@ func (b *builder) redirect(from, to string) error {
 	if err := b.write(file, []byte(page)); err != nil {
 		return err
 	}
+	if b.moved == nil {
+		b.moved = map[string]string{}
+	}
+	b.moved[from] = local
 	b.stats.Redirects++
 	return nil
 }
