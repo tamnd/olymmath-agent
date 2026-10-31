@@ -89,6 +89,13 @@ func (s *Store) blob(hash string) string {
 	return filepath.Join(s.Dir, "blobs", hash[:2], hash[2:4], hash)
 }
 
+// LocalPath returns the path of the blob of hash on the local disk, and false when the blob is not there.
+func (s *Store) LocalPath(hash string) (string, bool) {
+	p := s.blob(hash)
+	_, err := os.Stat(p)
+	return p, err == nil
+}
+
 // HasLocal tells if the bytes of hash are on the local disk.
 func (s *Store) HasLocal(hash string) bool {
 	_, err := os.Stat(s.blob(hash))
