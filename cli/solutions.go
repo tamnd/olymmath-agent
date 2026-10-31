@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -15,10 +16,11 @@ import (
 	"github.com/tamnd/olymmath-agent/archive"
 	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/fetch"
+	"github.com/tamnd/olymmath-agent/official"
 )
 
 func init() {
-	register(command{"solutions", "link the human solutions of a curated archive to their problems (om solutions kedlaya-putnam)", runSolutions})
+	register(command{"solutions", "link the human solutions of a curated archive to their problems (om solutions kedlaya-putnam, om solutions imo-official)", runSolutions})
 }
 
 // linkedSolution is the front matter of a solution that is a link only (zone Z3).
@@ -49,8 +51,8 @@ func runSolutions(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || pos[0] != "kedlaya-putnam" {
-		fmt.Fprintln(env.Stderr, "usage: om solutions [-from YEAR] [-to YEAR] [-dry] kedlaya-putnam")
+	if len(pos) != 1 || pos[0] != "kedlaya-putnam" && pos[0] != "imo-official" {
+		fmt.Fprintln(env.Stderr, "usage: om solutions [-from YEAR] [-to YEAR] [-dry] kedlaya-putnam|imo-official")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -77,38 +79,107 @@ func runSolutions(env Env, args []string) int {
 	fc := fetch.New(st)
 	fc.Agent = fmt.Sprintf("olymmath/%s (+https://olymmath.tamnd.com/about/)", env.Version)
 	ctx := context.Background()
+	links, err := solutionLinks(ctx, fc, pos[0], *from, *to, env.Stderr)
 	code := ExitOK
+	if err != nil {
+		code = ExitFailure
+	}
 	var linked, have, missing int
-	for _, d := range archive.PutnamSolutions(*from, *to) {
-		tex, hash, err := getCapture(ctx, fc, pos[0], d.URL)
-		if err != nil {
-			fmt.Fprintf(env.Stderr, "om solutions: %d: %v\n", d.Year, err)
-			code = ExitFailure
+	for _, l := range links {
+		p := byAt[l.at]
+		if p == nil {
+			missing++
 			continue
 		}
-		authors := archive.Authors(tex)
-		for _, label := range archive.Labels(tex) {
-			p := byAt[fmt.Sprintf("putnam/%d/%s", d.Year, strings.ToLower(label))]
-			if p == nil {
-				missing++
-				continue
-			}
-			if hasSolution(p, pos[0]) {
-				have++
-				continue
-			}
-			linked++
-			if *dry {
-				continue
-			}
-			if err := writeLinked(corpus, *root, p, src, hash, archive.SolutionLink(d.Year), authors); err != nil {
-				fmt.Fprintf(env.Stderr, "om solutions: %s: %v\n", p.Path, err)
-				return ExitFailure
-			}
+		if hasSolution(p, pos[0]) {
+			have++
+			continue
+		}
+		linked++
+		if *dry {
+			continue
+		}
+		l.sol.Source, l.sol.Zone = src.ID, src.Zone.Solution
+		if l.sol.Author.Display == "" {
+			l.sol.Author.Display = src.Name
+		}
+		if err := writeLinked(corpus, *root, p, l.sol); err != nil {
+			fmt.Fprintf(env.Stderr, "om solutions: %s: %v\n", p.Path, err)
+			return ExitFailure
 		}
 	}
 	fmt.Fprintf(env.Stdout, "%d solutions linked, %d already linked, %d with no problem.\n", linked, have, missing)
 	return code
+}
+
+// solutionLink is a solution that a source gives for the problem at a locator.
+type solutionLink struct {
+	at  string
+	sol linkedSolution
+}
+
+// solutionLinks reads the solution files of a source and gives a link for each solution. It returns an error when a file could not be read, with the links of the other files.
+func solutionLinks(ctx context.Context, fc *fetch.Client, source string, from, to int, stderr io.Writer) ([]solutionLink, error) {
+	var out []solutionLink
+	var failed error
+	switch source {
+	case "kedlaya-putnam":
+		for _, d := range archive.PutnamSolutions(from, to) {
+			tex, hash, err := getCapture(ctx, fc, source, d.URL)
+			if err != nil {
+				fmt.Fprintf(stderr, "om solutions: %d: %v\n", d.Year, err)
+				failed = err
+				continue
+			}
+			authors := archive.Authors(tex)
+			for _, label := range archive.Labels(tex) {
+				l := solutionLink{at: fmt.Sprintf("putnam/%d/%s", d.Year, strings.ToLower(label))}
+				l.sol = linkedSolution{Origin: "human", URL: archive.SolutionLink(d.Year), Capture: hash, Lang: "en", Complete: true}
+				l.sol.Author.Display = authors
+				out = append(out, l)
+			}
+		}
+	case "imo-official":
+		for _, p := range official.Shortlist(max(from, official.ShortlistFirst), to) {
+			res, err := fc.Get(ctx, source, p.URL, fetch.Options{})
+			if err != nil {
+				fmt.Fprintf(stderr, "om solutions: %s: %v\n", p.Edition, err)
+				failed = err
+				continue
+			}
+			text, err := captureText(ctx, fc, res.Capture.Hash)
+			if err != nil {
+				fmt.Fprintf(stderr, "om solutions: %s: %v\n", p.Edition, err)
+				continue
+			}
+			pages := official.SolutionPages(text)
+			for _, seg := range p.Segments(text) {
+				page, ok := pages[seg.Position]
+				if !ok {
+					continue
+				}
+				l := solutionLink{at: p.Edition + "/" + seg.Position}
+				l.sol = linkedSolution{Origin: "official", URL: fmt.Sprintf("%s#page=%d", p.URL, page), Capture: res.Capture.Hash, Lang: "en", Complete: true}
+				l.sol.Author.Display = "the IMO Problem Selection Committee"
+				out = append(out, l)
+			}
+		}
+	}
+	return out, failed
+}
+
+// captureText gives the text of the PDF of a capture.
+func captureText(ctx context.Context, fc *fetch.Client, hash string) (string, error) {
+	rc, err := fc.Store.Get(ctx, hash)
+	if err != nil {
+		return "", err
+	}
+	b, err := io.ReadAll(rc)
+	_ = rc.Close()
+	if err != nil {
+		return "", err
+	}
+	return official.Text(ctx, b)
 }
 
 func hasSolution(p *content.Problem, source string) bool {
@@ -120,17 +191,13 @@ func hasSolution(p *content.Problem, source string) bool {
 	return false
 }
 
-// writeLinked writes a solution that is a link to the solutions of a curated archive. A solution in zone Z3 has no text.
-func writeLinked(corpus *content.Corpus, root string, p *content.Problem, src *content.SourceRecord, capture, url, authors string) error {
+// writeLinked writes a solution that is a link to the solutions of a source. A solution in zone Z3 has no text, and olymmath does not copy an excerpt of a solution in zone Z2 either.
+func writeLinked(corpus *content.Corpus, root string, p *content.Problem, s linkedSolution) error {
 	tags, err := mintTags(corpus, 1)
 	if err != nil {
 		return err
 	}
-	s := linkedSolution{Tag: tags[0], Kind: "solution", Problem: p.Tag, Origin: "human", Source: src.ID, URL: url, Capture: capture, Zone: src.Zone.Solution, Lang: "en", Complete: true}
-	s.Author.Display = authors
-	if s.Author.Display == "" {
-		s.Author.Display = src.Name
-	}
+	s.Tag, s.Kind, s.Problem = tags[0], "solution", p.Tag
 	var front bytes.Buffer
 	enc := yaml.NewEncoder(&front)
 	enc.SetIndent(2)
@@ -146,6 +213,6 @@ func writeLinked(corpus *content.Corpus, root string, p *content.Problem, src *c
 		return err
 	}
 	corpus.Tags[s.Tag] = "solution"
-	p.Solutions = append(p.Solutions, &content.Solution{Tag: s.Tag, Source: src.ID})
+	p.Solutions = append(p.Solutions, &content.Solution{Tag: s.Tag, Source: s.Source})
 	return addTag(root, s.Tag, "solution")
 }
