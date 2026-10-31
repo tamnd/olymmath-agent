@@ -172,6 +172,23 @@ func TestFacets(t *testing.T) {
 	}
 }
 
+func TestCopies(t *testing.T) {
+	out := build(t, "/")
+	j := read(t, out, "imo/2024/p1.json")
+	for _, want := range []string{`"locator": "imo/2024/p1"`, `"url": "https://example.org/imo/2024/p1"`, `"band": 6`, `"solutions": [`} {
+		if !strings.Contains(j, want) {
+			t.Errorf("imo/2024/p1.json has no %q", want)
+		}
+	}
+	md := read(t, out, "imo/2024/p1.md")
+	if !strings.HasPrefix(md, "# IMO 2024 Problem 1\n\nLocator: imo/2024/p1") || !strings.Contains(md, "## Solutions") {
+		t.Errorf("imo/2024/p1.md: %.300s", md)
+	}
+	if !strings.Contains(read(t, out, "llms.txt"), "/imo/2024/p1.md") {
+		t.Error("llms.txt does not tell about the copies")
+	}
+}
+
 func TestCountryName(t *testing.T) {
 	if countryName("VN") != "Vietnam" || countryName("ZZ") != "ZZ" {
 		t.Error("countryName is wrong")

@@ -713,6 +713,9 @@ func (b *builder) problem(v *problemView) error {
 	}); err != nil {
 		return err
 	}
+	if err := b.copies(v, p); err != nil {
+		return err
+	}
 	b.stats.Problems++
 	for _, a := range v.Appearances {
 		if !a.Primary && v.Edition != nil {
@@ -999,7 +1002,7 @@ func (b *builder) machine() error {
 	for _, c := range b.corpus.Competitions {
 		fmt.Fprintf(&llms, "- [%s](%s/c/%s/): %s\n", c.Name, b.opts.URL, c.Code, c.Description)
 	}
-	fmt.Fprintf(&llms, "\n## Data\n\n- [Search index](%s/search.json): each problem with its locator and its text.\n", b.opts.URL)
+	fmt.Fprintf(&llms, "\n## Data\n\n- [Search index](%s/search.json): each problem with its locator and its text.\n- Each problem page has a Markdown copy and a JSON copy at the same path with .md and .json, for example [%s/imo/2024/p1.md](%s/imo/2024/p1.md).\n", b.opts.URL, b.opts.URL, b.opts.URL)
 	if err := b.write("llms.txt", []byte(llms.String())); err != nil {
 		return err
 	}

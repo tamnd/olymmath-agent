@@ -20,6 +20,8 @@ type fakeR2 struct {
 	objects map[string]string
 	types   map[string]string
 	puts    int
+	// fail is a key that the fake refuses to write.
+	fail string
 }
 
 func (f *fakeR2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -32,6 +34,10 @@ func (f *fakeR2) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := strings.TrimPrefix(r.URL.Path, "/accounts/acc/r2/buckets/site/objects/")
 	switch r.Method {
 	case http.MethodPut:
+		if key == f.fail {
+			http.Error(w, "no", http.StatusForbidden)
+			return
+		}
 		b, _ := io.ReadAll(r.Body)
 		f.objects[key] = string(b)
 		f.types[key] = r.Header.Get("Content-Type")
@@ -63,7 +69,7 @@ func TestSync(t *testing.T) {
 	f := &fakeR2{objects: map[string]string{}, types: map[string]string{}}
 	srv := httptest.NewServer(f)
 	defer srv.Close()
-	r := &R2{Account: "acc", Bucket: "site", Token: "token", Base: srv.URL}
+	r := &R2{Account: "acc", Bucket: "site", Token: "token", Base: srv.URL, Rate: -1}
 	dir := t.TempDir()
 	write(t, dir, "nz/2020/p1.html", "one")
 	write(t, dir, "nz/2020/p2.md", "two")
@@ -97,6 +103,9 @@ func TestSplit(t *testing.T) {
 	write(t, dir, "p/ABC.html", "moved")
 	write(t, dir, "isl/2024/n1.html", "moved")
 	write(t, dir, "imo/2024/p1.html", "imo")
+	write(t, dir, "imo/2024/p1.md", "imo")
+	write(t, dir, "imo/2024/index.json", "{}")
+	write(t, dir, "p/XYZ.json", "{}")
 	write(t, dir, "nz/index.html", "nz")
 	write(t, dir, "nz/2020/index.html", "edition")
 	write(t, dir, "nz/2020/p1.html", "problem")
@@ -108,15 +117,15 @@ func TestSplit(t *testing.T) {
 	}}
 	tiers := Tiers{Groups: []string{"international"}, Countries: []string{"US"}}
 	deleted, moved, err := Split(dir, out, corpus, tiers)
-	if err != nil || deleted != 2 || moved != 2 {
+	if err != nil || deleted != 2 || moved != 4 {
 		t.Fatalf("%d %d %v", deleted, moved, err)
 	}
-	for _, rel := range []string{"imo/2024/p1.html", "nz/index.html", "nz/2020/index.html"} {
+	for _, rel := range []string{"imo/2024/p1.html", "imo/2024/index.json", "nz/index.html", "nz/2020/index.html"} {
 		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
 			t.Errorf("%s: %v", rel, err)
 		}
 	}
-	for _, rel := range []string{"nz/2020/p1.html", "nz/2020/p1.json"} {
+	for _, rel := range []string{"nz/2020/p1.html", "nz/2020/p1.json", "imo/2024/p1.md", "p/XYZ.json"} {
 		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
 			t.Errorf("%s did not move: %v", rel, err)
 		}
@@ -133,5 +142,27 @@ func TestLoadTiers(t *testing.T) {
 	write(t, dir, "bad.yaml", "group: [x]\n")
 	if _, err := LoadTiers(filepath.Join(dir, "bad.yaml")); err == nil {
 		t.Error("an unknown key was accepted")
+	}
+}
+
+func TestSyncResume(t *testing.T) {
+	f := &fakeR2{objects: map[string]string{}, types: map[string]string{}, fail: "b.html"}
+	srv := httptest.NewServer(f)
+	defer srv.Close()
+	r := &R2{Account: "acc", Bucket: "site", Token: "token", Base: srv.URL, Rate: -1}
+	dir := t.TempDir()
+	for _, n := range []string{"a.html", "b.html", "c.html"} {
+		if err := os.WriteFile(filepath.Join(dir, n), []byte(n), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ctx := context.Background()
+	if _, err := Sync(ctx, r, dir, 1); err == nil {
+		t.Fatal("no error for a refused put")
+	}
+	f.fail = ""
+	res, err := Sync(ctx, r, dir, 1)
+	if err != nil || res.Put != 1 {
+		t.Errorf("second sync put %d files, error %v; want 1", res.Put, err)
 	}
 }
