@@ -1,0 +1,12 @@
+year: 2024
+number: 65
+place: Bath
+country: United Kingdom
+dates: 11 to 22 July 2024
+url: https://www.imo-official.org/year_info.aspx?year=2024
+language: English
+papers:
+  - name: Day 1
+    date: 2024-07-16
+    time: 4 hours and 30 minutes
+    problems: [p1, p2]
