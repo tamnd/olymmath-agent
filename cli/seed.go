@@ -2,13 +2,18 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"time"
 
+	"github.com/tamnd/olymmath-agent/archive"
 	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/coverage"
+	"github.com/tamnd/olymmath-agent/fetch"
 	"github.com/tamnd/olymmath-agent/seed"
 )
 
@@ -51,10 +56,26 @@ func runSeed(env Env, args []string) int {
 			}
 		}
 	}
-	r := &seed.Runner{Store: st, Agent: fmt.Sprintf("olymmath/%s (+https://olymmath.tamnd.com/about/)", env.Version), Token: os.Getenv("HF_TOKEN"), Limit: *limit, Log: env.Stderr}
+	agent := fmt.Sprintf("olymmath/%s (+https://olymmath.tamnd.com/about/)", env.Version)
+	r := &seed.Runner{Store: st, Agent: agent, Token: os.Getenv("HF_TOKEN"), Limit: *limit, Log: env.Stderr}
 	code := ExitOK
 	for _, id := range ids {
 		start := time.Now()
+		if lane, ok := archive.Lanes[id]; ok {
+			fc := fetch.New(st)
+			fc.Agent = agent
+			if src := corpus.Source(id); src != nil && src.CrawlDelay > 0 {
+				fc.Delay = time.Duration(src.CrawlDelay) * time.Second
+			}
+			n, skipped, err := seedArchive(context.Background(), fc, *out, id, lane, env.Stderr)
+			if err != nil {
+				fmt.Fprintf(env.Stderr, "om seed: %s: %v\n", id, err)
+				code = ExitFailure
+				continue
+			}
+			fmt.Fprintf(env.Stdout, "%s: %d rows kept, %d problems with no Markdown form, %s\n", id, n, skipped, time.Since(start).Round(time.Second))
+			continue
+		}
 		s, err := r.Write(context.Background(), *out, id)
 		if err != nil {
 			fmt.Fprintf(env.Stderr, "om seed: %s: %v\n", id, err)
@@ -64,6 +85,44 @@ func runSeed(env Env, args []string) int {
 		fmt.Fprintf(env.Stdout, "%s: %d files, %d rows read, %d rows kept, %d MB over the network, %s\n", id, s.Files, s.Read, s.Kept, s.Fetched>>20, time.Since(start).Round(time.Second))
 	}
 	return code
+}
+
+// seedArchive gets the files of an archive into the store and writes one seed row for each problem that has a Markdown form.
+func seedArchive(ctx context.Context, fc *fetch.Client, dir, source string, lane archive.Lane, log io.Writer) (kept, skipped int, err error) {
+	err = seed.WriteFile(dir, source, func(w io.Writer) error {
+		enc := json.NewEncoder(w)
+		enc.SetEscapeHTML(false)
+		for _, d := range lane.Docs(0, time.Now().Year()) {
+			res, err := fc.Get(ctx, source, d.URL, fetch.Options{})
+			if err != nil {
+				fmt.Fprintf(log, "%s: %s: %v\n", source, d.URL, err)
+				continue
+			}
+			rc, err := fc.Store.Get(ctx, res.Capture.Hash)
+			if err != nil {
+				return err
+			}
+			b, err := io.ReadAll(rc)
+			_ = rc.Close()
+			if err != nil {
+				return err
+			}
+			for i, p := range lane.Parse(string(b)) {
+				if p.Err != nil {
+					fmt.Fprintf(log, "%s: %d %s: %v\n", source, d.Year, p.Number, p.Err)
+					skipped++
+					continue
+				}
+				row := seed.Row{Source: source, File: path.Base(d.URL), Row: i, Labels: []string{lane.Label}, Year: d.Year, Number: p.Number, Lang: "en", Statement: p.Text, Ref: d.URL}
+				if err := enc.Encode(row); err != nil {
+					return err
+				}
+				kept++
+			}
+		}
+		return nil
+	})
+	return kept, skipped, err
 }
 
 func runCoverage(env Env, args []string) int {

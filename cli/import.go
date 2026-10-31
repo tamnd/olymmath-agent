@@ -33,6 +33,7 @@ func runImport(env Env, args []string) int {
 	dry := fs.Bool("dry", false, "print the plan and write no file")
 	anchor := fs.Bool("anchor", false, "give a position to each IMO row with no number from the official papers in the raw store, and to each other row with no number from the texts of zone Z3")
 	dir2, remote := storeFlags(fs)
+	promote := fs.Bool("promote", false, "make a candidate of class H1 or H2 the canonical statement of an existing problem when it ranks above the canonical statement and its text agrees with it")
 	maxDoubt := fs.Float64("max-doubt", canon.MaxDoubt, "skip a competition whose review doubts per appearance are above this share")
 	if _, err := parseMixed(fs, args); err != nil {
 		return ExitUsage
@@ -120,14 +121,15 @@ func runImport(env Env, args []string) int {
 			owner[a.At] = p
 		}
 	}
-	var created, updated, merged int
+	var created, updated, merged, promoted int
 	var mergeRows []string
 	var newRecs []*canon.Record
 	for _, r := range recs {
 		if p := owner[r.Primary.At]; p != nil {
 			comp := corpus.Competition(strings.SplitN(r.Primary.At, "/", 2)[0])
 			add := canon.Add(p, r, original(comp))
-			if add.Better != nil {
+			up := add.Better != nil && *promote && canon.Agrees(add.Better, p)
+			if add.Better != nil && !up {
 				items = append(items, canon.Item{ID: "better-" + p.Tag, Kind: "canonical", At: r.Primary.At, Source: add.Better.Source, Ref: add.Better.Ref, Text: p.Statement, Other: add.Better.Text})
 			}
 			if len(add.Statements) == 0 {
@@ -141,6 +143,11 @@ func runImport(env Env, args []string) int {
 			b, err := os.ReadFile(full) // #nosec G304 -- the path is inside the content root.
 			if err == nil {
 				b, err = canon.Apply(b, add)
+			}
+			if err == nil && up {
+				_, rule := canon.Rank(add.Better, original(comp))
+				b, err = canon.Promote(b, p.Canonical.Statement, add.ID(add.Better), add.Better.Text, rule)
+				promoted++
 			}
 			if err == nil {
 				err = os.WriteFile(full, b, 0o644) // #nosec G306 G703 -- content files are public.
@@ -226,7 +233,7 @@ func runImport(env Env, args []string) int {
 	if *anchor {
 		fmt.Fprintf(env.Stdout, "%d rows got a position from an official paper or from a text of zone Z3.\n", s.Located)
 	}
-	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, len(items), strings.Join(reasons, ", "))
+	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d promoted statements, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, promoted, len(items), strings.Join(reasons, ", "))
 	return ExitOK
 }
 

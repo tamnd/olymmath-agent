@@ -146,6 +146,24 @@ func Add(p *content.Problem, r *Record, original string) Additions {
 	return a
 }
 
+// ID gives the id of the statement of the source of c in a, or "".
+func (a Additions) ID(c *Candidate) string {
+	for _, s := range a.Statements {
+		if s.Source == c.Source {
+			return s.ID
+		}
+	}
+	return ""
+}
+
+// Agrees tells if the text of c is the problem p: the signal T of the two texts is at least match.Doubt, and the answers do not disagree.
+func Agrees(c *Candidate, p *content.Problem) bool {
+	if p.Statement == "" || c.Text == "" {
+		return false
+	}
+	return match.Jaccard(c.Shingles(), match.Shingles(p.Statement)) >= match.Doubt && match.Answers(c.Answer, p.Answer) != match.AnswerMismatch
+}
+
 // AddLink gives the addition of one link with no text to an existing problem, for example a link to the page of an official paper where the problem is.
 func AddLink(p *content.Problem, c *Candidate, page int) Additions {
 	s := statementOf(fmt.Sprintf("S%d", len(p.Statements)+1), c)
@@ -195,5 +213,52 @@ func Apply(file []byte, a Additions) ([]byte, error) {
 	}
 	buf.WriteString("---\n")
 	buf.WriteString(body)
+	return content.Format(buf.Bytes())
+}
+
+// Promote makes the statement id the canonical statement of an existing problem file, with text as its text. It is for a candidate of class H1 or H2 that ranks above the canonical statement old and whose text agrees with it. The statement id must be in the front matter with no text, for example as a link that Apply added. The text of old stays in the body under its own marker.
+func Promote(file []byte, old, id, text, rule string) ([]byte, error) {
+	front, body, err := content.SplitFront(file)
+	if err != nil {
+		return nil, err
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(front, &doc); err != nil {
+		return nil, err
+	}
+	field := func(n *yaml.Node, key string) *yaml.Node {
+		for i := 0; n != nil && i+1 < len(n.Content); i += 2 {
+			if n.Content[i].Value == key {
+				return n.Content[i+1]
+			}
+		}
+		return nil
+	}
+	m := doc.Content[0]
+	canonical, status := field(m, "canonical"), field(m, "status")
+	if field(canonical, "statement") == nil || field(canonical, "rule") == nil || field(status, "statement") == nil {
+		return nil, fmt.Errorf("the problem has no canonical statement, rule or status")
+	}
+	if field(canonical, "statement").Value != old || old == id {
+		return nil, fmt.Errorf("the canonical statement is %s, not %s", field(canonical, "statement").Value, old)
+	}
+	if strings.Contains(body, "<!-- "+id+" -->") {
+		return nil, fmt.Errorf("the statement %s has a text already", id)
+	}
+	field(canonical, "statement").Value = id
+	field(canonical, "rule").Value = rule
+	field(status, "statement").Value = "sourced"
+	var buf bytes.Buffer
+	buf.WriteString("---\n")
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(&doc); err != nil {
+		return nil, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, err
+	}
+	buf.WriteString("---\n")
+	buf.WriteString(text + "\n\n<!-- " + old + " -->\n" + strings.TrimLeft(body, "\n"))
 	return content.Format(buf.Bytes())
 }

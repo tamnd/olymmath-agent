@@ -137,17 +137,28 @@ func File(dir, source string) string { return filepath.Join(dir, source+".jsonl.
 
 // Write runs source and writes its rows to File(dir, source). It writes to a temporary file first, so a failed run keeps the old file.
 func (r *Runner) Write(ctx context.Context, dir, source string) (Stats, error) {
+	var st Stats
+	err := WriteFile(dir, source, func(w io.Writer) error {
+		var err error
+		st, err = r.Run(ctx, source, w)
+		return err
+	})
+	return st, err
+}
+
+// WriteFile writes the seed rows that fn writes to w to File(dir, source), compressed. It writes to a temporary file first, so a failed run keeps the old file.
+func WriteFile(dir, source string, fn func(w io.Writer) error) error {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
-		return Stats{}, err
+		return err
 	}
 	tmp, err := os.CreateTemp(dir, source+"-*.tmp")
 	if err != nil {
-		return Stats{}, err
+		return err
 	}
 	defer func() { _ = os.Remove(tmp.Name()) }()
 	bw := bufio.NewWriterSize(tmp, 1<<20)
 	gz := gzip.NewWriter(bw)
-	st, err := r.Run(ctx, source, gz)
+	err = fn(gz)
 	if err == nil {
 		err = gz.Close()
 	}
@@ -158,9 +169,9 @@ func (r *Runner) Write(ctx context.Context, dir, source string) (Stats, error) {
 		err = cerr
 	}
 	if err != nil {
-		return st, err
+		return err
 	}
-	return st, os.Rename(tmp.Name(), File(dir, source))
+	return os.Rename(tmp.Name(), File(dir, source))
 }
 
 // Read calls fn for each seed row in the file of source in dir.
