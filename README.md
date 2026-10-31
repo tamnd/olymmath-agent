@@ -42,6 +42,21 @@ Open `build/site/index.html` in a browser, or serve the directory with any stati
 
 Use `om help` to see all the commands.
 
+## Edit the content
+
+To add a problem, a solution or a tag, use these commands:
+
+```sh
+om new problem imo/2025/p1 -source imo-official -url https://www.imo-official.org/problems.aspx -content olymmath
+om new problem -loose -content olymmath
+om new solution imo/2025/p1 -origin human -content olymmath
+om tag new -n 3
+om fmt -content olymmath
+om audit -content olymmath
+```
+
+The `om new` command makes a file with the correct front matter and adds the new tag to `registers/tags.tsv`. The command does not write over a file. The `om fmt` command puts the front matter keys in the standard order. Use `om fmt -check` in CI to find files that are not formatted. The `om audit` command runs all the rules. Use `om audit -list` to see the rules.
+
 ## Layout
 
 | Path | What it has |

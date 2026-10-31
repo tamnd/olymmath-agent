@@ -325,9 +325,9 @@ func l02(c *Context) {
 				c.add(s.Path, "the %s solution has no run block", s.Origin)
 				continue
 			}
-			for name, v := range map[string]string{"model": s.Run.Model, "prompt": s.Run.Prompt, "date": s.Run.Date, "run_id": s.Run.RunID, "transcript": s.Run.Transcript} {
-				if v == "" {
-					c.add(s.Path, "the run block has no %s", name)
+			for _, f := range [][2]string{{"model", s.Run.Model}, {"prompt", s.Run.Prompt}, {"date", s.Run.Date}, {"run_id", s.Run.RunID}, {"transcript", s.Run.Transcript}} {
+				if f[1] == "" {
+					c.add(s.Path, "the run block has no %s", f[0])
 				}
 			}
 		}
