@@ -158,7 +158,7 @@ func (s *Seeds) Add(r seed.Row) {
 	c := &Candidate{
 		Source: r.Source, Origin: src.Origin, Zone: src.Zone.Statement, Lang: lang,
 		Name: src.Name, URL: url, Ref: r.File + "#" + strconv.Itoa(r.Row),
-		Text: text, Answer: strings.TrimSpace(r.Answer), Key: key,
+		Text: text, Answer: Answer(r.Answer), Key: key,
 	}
 	s.pending = append(s.pending, pendingRow{c: c, comp: comp, year: r.Year, letter: letter, pos: pos})
 }
@@ -207,6 +207,18 @@ func validPosition(c *content.Competition, pos string) bool {
 		return slices.Contains(all, pos)
 	}
 	return positionRE.MatchString(pos)
+}
+
+// placeholders are answer values that some datasets give to a problem with no answer.
+var placeholders = []string{"", "proof", "not found", "none", "n/a", "na", "null", "-", "see solution", "no answer"}
+
+// Answer cleans the answer of a seed row. A placeholder, such as "proof" for a proof problem, gives "".
+func Answer(s string) string {
+	s = strings.TrimSpace(s)
+	if slices.Contains(placeholders, strings.ToLower(strings.Trim(s, ".$ "))) {
+		return ""
+	}
+	return s
 }
 
 // TypeOf gives the problem type from the competition and the answer, or "" when it is not known.

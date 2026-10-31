@@ -1,5 +1,5 @@
 {{define "problem.html"}}{{template "top" .}}{{with .Data}}
-{{if .Edition}}<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><a href="{{link "c/"}}">Competitions</a><a href="{{link (printf "c/%s/" .Competition)}}">{{.Edition.Competition.Short}}</a><a href="{{link (printf "%s/" .Edition.Locator)}}">{{.Edition.ID}}</a><span>{{if .Number}}Problem {{.Number}}{{else}}{{.Position}}{{end}}</span></nav>{{else}}<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Problems with no known competition</span></nav>{{end}}
+{{if .Edition}}<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><a href="{{link "c/"}}">Competitions</a><a href="{{link (printf "c/%s/" .Competition)}}">{{.Edition.Competition.Short}}</a><a href="{{link (printf "%s/" .Edition.Locator)}}">{{.Edition.ID}}</a><span>{{.Label}}</span></nav>{{else}}<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Problems with no known competition</span></nav>{{end}}
 <article class="problem"{{with .Prev}} data-prev="{{.Link}}"{{end}}{{with .Next}} data-next="{{.Link}}"{{end}}>
   <header class="page-head">
     <h1>{{.Title}}</h1>
@@ -8,6 +8,7 @@
   <div class="card statement-card">
     <div class="statement">{{.Statement}}</div>
     <p class="source"><span class="badge badge-{{.Source.Origin}}">{{origin .Source.Origin}}</span> <a href="{{.Source.URL}}" rel="noopener">{{.Source.Name}}</a>{{if .Source.Page}}, page {{.Source.Page}}{{end}}. {{zone .Source.Zone}}.</p>
+    {{with .Also}}<p class="source">Also {{range $i, $a := .}}{{if $i}}, {{end}}<a href="{{$a.Link}}">{{$a.Title}}</a>{{end}}.</p>{{end}}
   </div>
 
   {{if .Answer}}
@@ -34,8 +35,8 @@
   </section>
 
   <nav class="pager" aria-label="Problems of this paper">
-    {{with .Prev}}<a class="pager-prev" href="{{.Link}}" rel="prev"><span>Previous</span>Problem {{.Number}}</a>{{else}}<span></span>{{end}}
-    {{with .Next}}<a class="pager-next" href="{{.Link}}" rel="next"><span>Next</span>Problem {{.Number}}</a>{{end}}
+    {{with .Prev}}<a class="pager-prev" href="{{.Link}}" rel="prev"><span>Previous</span>{{.Label}}</a>{{else}}<span></span>{{end}}
+    {{with .Next}}<a class="pager-next" href="{{.Link}}" rel="next"><span>Next</span>{{.Label}}</a>{{end}}
   </nav>
   <p class="meta-line">{{if .Edition}}Locator <code>{{.Locator}}</code> · {{end}}Tag <code>{{.Tag}}</code> · <a href="{{$.Site.Repo}}/blob/main/{{.Path}}">Edit this page on GitHub</a>{{if .Edition}} · Keys: <kbd>j</kbd> next, <kbd>k</kbd> previous{{end}}</p>
 </article>

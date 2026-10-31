@@ -377,6 +377,14 @@ func (l *loader) link() {
 		if !found {
 			l.add(p.Path, "T03", "the edition %s has no file in editions/", a.Locator.EditionOf())
 		}
+		for _, o := range p.Appearances {
+			if o.Primary {
+				continue
+			}
+			if e := l.corpus.edition(o.Locator.Comp, o.Locator.Edition); e != nil {
+				e.Also = append(e.Also, p)
+			}
+		}
 	}
 	for _, c := range l.corpus.Competitions {
 		for _, e := range c.Editions {

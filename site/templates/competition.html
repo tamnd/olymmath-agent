@@ -17,7 +17,7 @@
     <tr>
       <th scope="row"><a href="{{link (printf "%s/" .Locator)}}">{{.Year}}</a></th>
       <td>{{.Place}}{{if .Country}}, {{.Country}}{{end}}</td>
-      <td><ol class="cells">{{range .Problems}}<li><a href="{{link .Locator}}" title="{{$c.Short}} {{.Year}} Problem {{.Number}}">{{.Number}}</a></li>{{end}}</ol></td>
+      <td><ol class="cells">{{range .Problems}}<li><a href="{{link .Locator}}" title="{{$c.Short}} {{.Year}} {{poslabel .Position}}">{{poscell .Position}}</a></li>{{end}}</ol></td>
     </tr>
   {{end}}
   </tbody>

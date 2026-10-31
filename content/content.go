@@ -89,6 +89,8 @@ type Edition struct {
 	Path        string       `yaml:"-"`
 	Competition *Competition `yaml:"-"`
 	Problems    []*Problem   `yaml:"-"`
+	// Also are the problems whose primary appearance is in another edition and that also appear in this edition.
+	Also []*Problem `yaml:"-"`
 }
 
 // Locator returns the locator of the edition, for example imo/2024.
@@ -448,3 +450,27 @@ func in(list []string, s string) bool {
 
 // Valid reports whether s is in the list. It is for the rules of the audit.
 func Valid(list []string, s string) bool { return in(list, s) }
+
+// edition returns the edition of a competition with the id, or nil.
+func (c *Corpus) edition(code, id string) *Edition {
+	comp := c.byCode[code]
+	if comp == nil {
+		return nil
+	}
+	for _, e := range comp.Editions {
+		if e.ID == id {
+			return e
+		}
+	}
+	return nil
+}
+
+// PositionIn returns the position of the appearance of the problem in an edition, or "" when the problem does not appear in the edition.
+func (p *Problem) PositionIn(e *Edition) string {
+	for _, a := range p.Appearances {
+		if a.Locator.Comp == e.Competition.Code && a.Locator.Edition == e.ID {
+			return a.Locator.Position
+		}
+	}
+	return ""
+}
