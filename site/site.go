@@ -159,6 +159,8 @@ func (b *builder) funcs() template.FuncMap {
 		"add":       func(a, b int) int { return a + b },
 		"origin":    originName,
 		"zone":      zoneName,
+		"country":   countryName,
+		"problems":  competitionProblems,
 		"solorigin": solutionOrigin,
 	}
 }
@@ -397,13 +399,98 @@ func (b *builder) home() error {
 	})
 }
 
+// competitionProblems returns the number of problems of a competition on olymmath.
+func competitionProblems(c *content.Competition) int {
+	n := 0
+	for _, e := range c.Editions {
+		n += len(e.Problems)
+	}
+	return n
+}
+
+type countryView struct {
+	Name string
+	Rows []*content.Competition
+}
+
+type groupView struct {
+	ID, Title string
+	Count     int
+	Countries []countryView
+}
+
+type competitionsView struct {
+	Total, WithProblems int
+	Groups              []groupView
+}
+
+var groupTitles = map[string]string{
+	"international": "International",
+	"undergraduate": "Undergraduate",
+	"usa":           "United States",
+	"national":      "National olympiads",
+	"journal":       "Journals",
+}
+
+// competitionsData puts the competitions in the groups of the register. The national group is split by country. In each list, the competitions with problems come first, and then the order of the register.
+func (b *builder) competitionsData() competitionsView {
+	v := competitionsView{Total: len(b.corpus.Competitions)}
+	byGroup := map[string][]*content.Competition{}
+	for _, c := range b.corpus.Competitions {
+		byGroup[c.Group] = append(byGroup[c.Group], c)
+		if competitionProblems(c) > 0 {
+			v.WithProblems++
+		}
+	}
+	groups := append([]string{}, content.Groups...)
+	for g := range byGroup {
+		if _, ok := groupTitles[g]; !ok {
+			groups = append(groups, g)
+		}
+	}
+	for _, g := range groups {
+		cs := byGroup[g]
+		if len(cs) == 0 {
+			continue
+		}
+		sort.SliceStable(cs, func(i, j int) bool { return competitionProblems(cs[i]) > 0 && competitionProblems(cs[j]) == 0 })
+		title := groupTitles[g]
+		if title == "" {
+			title = g
+		}
+		gv := groupView{ID: g, Title: title, Count: len(cs)}
+		if g != "national" {
+			gv.Countries = []countryView{{Rows: cs}}
+		} else {
+			byCountry := map[string][]*content.Competition{}
+			for _, c := range cs {
+				name := countryName(c.Country)
+				if c.Country == "" {
+					name = "Several countries"
+				}
+				byCountry[name] = append(byCountry[name], c)
+			}
+			names := make([]string, 0, len(byCountry))
+			for n := range byCountry {
+				names = append(names, n)
+			}
+			sort.Strings(names)
+			for _, n := range names {
+				gv.Countries = append(gv.Countries, countryView{Name: n, Rows: byCountry[n]})
+			}
+		}
+		v.Groups = append(v.Groups, gv)
+	}
+	return v
+}
+
 func (b *builder) competitions() error {
 	if err := b.render("competitions.html", page{
 		Title:       "Competitions",
-		Description: "All the mathematical olympiads on olymmath.",
+		Description: "All the mathematical olympiads in the register of olymmath, by group and by country.",
 		Path:        "/c/",
 		Section:     "competitions",
-		Data:        b.corpus.Competitions,
+		Data:        b.competitionsData(),
 	}); err != nil {
 		return err
 	}
