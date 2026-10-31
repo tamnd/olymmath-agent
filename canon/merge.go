@@ -54,11 +54,17 @@ func MergeFiles(into, from []byte) ([]byte, error) {
 	}
 	ids := map[string]string{}
 	if fs := child(fm, "statements"); fs != nil {
+		n := len(list.Content)
+		for i, s := range fs.Content {
+			ids[scalar(s, "id")] = "S" + strconv.Itoa(n+i+1)
+		}
 		for _, s := range fs.Content {
-			id := "S" + strconv.Itoa(len(list.Content)+1)
-			ids[scalar(s, "id")] = id
 			s = without(s, "")
-			set(s, "id", id, yaml.Node{})
+			set(s, "id", ids[scalar(s, "id")], yaml.Node{})
+			// A statement of from that is traced to another statement of from keeps its trace under the new id.
+			if t := scalar(s, "traced"); ids[t] != "" {
+				set(s, "traced", ids[t], yaml.Node{})
+			}
 			list.Content = append(list.Content, s)
 		}
 	}
