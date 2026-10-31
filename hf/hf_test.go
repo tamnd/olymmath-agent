@@ -152,3 +152,36 @@ func TestDataFiles(t *testing.T) {
 		t.Errorf("got %+v", fs)
 	}
 }
+
+type putCounter struct{ puts int }
+
+func (p *putCounter) Put(_ context.Context, _ string, r io.Reader, _ int64) error {
+	p.puts++
+	_, err := io.Copy(io.Discard, r)
+	return err
+}
+func (p *putCounter) Get(context.Context, string) (io.ReadCloser, error) {
+	return nil, store.ErrNotFound
+}
+func (p *putCounter) Delete(context.Context, string) error { return nil }
+
+func TestHarvestRemoteMax(t *testing.T) {
+	srv := hub(t)
+	defer srv.Close()
+	old := Base
+	Base = srv.URL
+	defer func() { Base = old }()
+	rem := &putCounter{}
+	st, _ := store.Open(t.TempDir(), rem)
+	fc := fetch.New(st)
+	fc.Delay = 0
+	// The large file is bigger than the remote limit, so it stays a reference and nothing goes to the remote.
+	h := &Harvest{Hub: &Client{}, Fetch: fc, LocalMax: 1024, RemoteMax: 1024}
+	m, _, err := h.Run(context.Background(), "hf-set", "org/set")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := m.Files[1]; f.Where != "ref" || f.SHA256 != sum(big) || rem.puts != 0 {
+		t.Errorf("large file %+v, %d puts", f, rem.puts)
+	}
+}

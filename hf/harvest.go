@@ -18,6 +18,8 @@ type Harvest struct {
 	Fetch *fetch.Client
 	// LocalMax is the largest file that goes to the local disk. A larger file goes to the remote store when the store has one, or else stays a reference.
 	LocalMax int64
+	// RemoteMax is the largest file that goes to the remote store. The R2 REST API takes a body of at most 100 MB, thus a larger file stays a reference. Zero means no limit.
+	RemoteMax int64
 	// MaxFiles is the largest number of data files that the harvest gets one by one. A dataset with more files uses the Parquet form of the hub. When MaxFiles is 0, the harvest always gets the files of the dataset.
 	MaxFiles int
 	// Log gets one line for each file. It can be nil.
@@ -75,7 +77,7 @@ func (h *Harvest) file(ctx context.Context, source, id, rev string, f File, lice
 	mf := ManifestFile{Path: f.Path, Size: f.Size, SHA256: f.SHA256(), URL: u}
 	st := h.Fetch.Store
 	remote := f.Size > h.LocalMax && h.LocalMax > 0
-	if remote && (st.Remote == nil || mf.SHA256 == "") {
+	if remote && (st.Remote == nil || mf.SHA256 == "" || (h.RemoteMax > 0 && f.Size > h.RemoteMax)) {
 		mf.Where = "ref"
 		return mf, nil
 	}
