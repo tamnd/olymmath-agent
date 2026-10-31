@@ -35,6 +35,14 @@
     {{end}}
   </section>
 
+  {{with .Similar}}
+  <section class="block">
+    <h2>Similar problems</h2>
+    <p class="muted">These problems have the most words in common with this statement.</p>
+    <ul class="similar">{{range .}}<li><a href="{{.Link}}">{{.Title}}</a></li>{{end}}</ul>
+  </section>
+  {{end}}
+
   <nav class="pager" aria-label="Problems of this paper">
     {{with .Prev}}<a class="pager-prev" href="{{.Link}}" rel="prev"><span>Previous</span>{{.Label}}</a>{{else}}<span></span>{{end}}
     {{with .Next}}<a class="pager-next" href="{{.Link}}" rel="next"><span>Next</span>{{.Label}}</a>{{end}}
