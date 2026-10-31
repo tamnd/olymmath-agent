@@ -45,6 +45,7 @@ statements:
     origin: D
     zone: Z2
     kind: transcription
+    traced: S2
   - id: S2
     lang: en
     source: hf-c
@@ -74,6 +75,9 @@ func TestMergeFiles(t *testing.T) {
 	// The text of S2 of from is the canonical text, so it stays a link with no text.
 	if strings.Contains(s, "<!-- S3 -->") {
 		t.Errorf("the same text came in twice:\n%s", s)
+	}
+	if !strings.Contains(s, "source: hf-b\n    origin: D\n    zone: Z2\n    kind: transcription\n    traced: S3\n") {
+		t.Errorf("the trace of S1 of from does not name the new id S3:\n%s", s)
 	}
 	if !strings.Contains(s, "topics: [A, N]") {
 		t.Errorf("the topics did not join:\n%s", s)
