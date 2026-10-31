@@ -66,4 +66,4 @@
 </html>
 {{end}}
 
-{{define "chips"}}<ul class="chips">{{if .Paper}}<li>{{.Paper.Name}}</li>{{end}}{{range .Topics}}<li class="chip-topic chip-{{root .}}"><a href="{{topicLink .}}">{{topic .}}</a></li>{{end}}{{if eq .Type "proof"}}<li>Proof</li>{{else if eq .Type "answer"}}<li>Answer</li>{{end}}</ul>{{end}}
+{{define "chips"}}<ul class="chips">{{if .Paper}}<li>{{.Paper.Name}}</li>{{end}}{{range .Topics}}<li class="chip-topic chip-{{root .}}"><a href="{{topicLink .}}">{{topic .}}</a></li>{{end}}{{with .Band}}<li class="chip-band" title="Difficulty band {{.}} of 10, from the position of the problem in its paper"><a href="{{link "about/#difficulty"}}">Difficulty <span aria-hidden="true">{{dots .}}</span> band {{.}}</a></li>{{end}}{{if eq .Type "proof"}}<li>Proof</li>{{else if eq .Type "answer"}}<li>Answer</li>{{end}}</ul>{{end}}

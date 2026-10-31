@@ -146,6 +146,19 @@ func TestTopics(t *testing.T) {
 	}
 }
 
+func TestBand(t *testing.T) {
+	out := build(t, "/")
+	if p1 := read(t, out, "imo/2024/p1.html"); !strings.Contains(p1, "●●●○○</span> band 6") {
+		t.Error("imo/2024/p1.html has no difficulty band")
+	}
+	if !strings.Contains(read(t, out, "search.json"), `"d":6`) {
+		t.Error("the search index has no band")
+	}
+	if dots(9) != "●●●●●" || dots(5) != "●●●○○" {
+		t.Error("dots is wrong")
+	}
+}
+
 func TestCountryName(t *testing.T) {
 	if countryName("VN") != "Vietnam" || countryName("ZZ") != "ZZ" {
 		t.Error("countryName is wrong")

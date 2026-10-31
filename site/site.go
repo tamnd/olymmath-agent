@@ -148,6 +148,7 @@ func (b *builder) funcs() template.FuncMap {
 		"topic":     topicName,
 		"root":      content.TopicRoot,
 		"topicLink": func(t string) string { return b.link(topicPath(t)) },
+		"dots":      dots,
 		"year":      func() int { return b.opts.Date.Year() },
 		"short": func(s string) string {
 			if len(s) > 7 {
@@ -202,6 +203,12 @@ func originName(o string) string {
 		return "Dataset text"
 	}
 	return "Unknown origin"
+}
+
+// dots shows a difficulty band as five dots: band 6 of 10 is three full dots.
+func dots(band int) string {
+	full := (band + 1) / 2
+	return strings.Repeat("●", full) + strings.Repeat("○", 5-full)
 }
 
 // topicName returns the name of a topic. A subtopic such as A.inequality shows as "Algebra: inequality".
@@ -890,6 +897,7 @@ type searchEntry struct {
 	Year     int      `json:"y"`
 	Comp     string   `json:"c"`
 	Topics   []string `json:"g,omitempty"`
+	Band     int      `json:"d,omitempty"`
 	Locator  string   `json:"l"`
 }
 
@@ -904,6 +912,7 @@ func (b *builder) searchIndex() error {
 			Year:     p.Year,
 			Comp:     p.Competition,
 			Topics:   p.Topics,
+			Band:     p.Band(),
 			Locator:  p.Locator(),
 		})
 	}
