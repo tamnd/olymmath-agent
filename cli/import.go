@@ -34,6 +34,7 @@ func runImport(env Env, args []string) int {
 	dry := fs.Bool("dry", false, "print the plan and write no file")
 	anchor := fs.Bool("anchor", false, "give a position to each IMO row with no number from the official papers in the raw store, and to each other row with no number from the texts of zone Z3")
 	dir2, remote := storeFlags(fs)
+	doubts := fs.Bool("doubts", false, "print each doubt with its source and the source of the canonical candidate, to show why a competition is skipped")
 	promote := fs.Bool("promote", false, "make a candidate of class H1 or H2 the canonical statement of an existing problem when it ranks above the canonical statement and its text agrees with it")
 	maxDoubt := fs.Float64("max-doubt", canon.MaxDoubt, "skip a competition whose review doubts per appearance are above this share")
 	if _, err := parseMixed(fs, args); err != nil {
@@ -120,6 +121,14 @@ func runImport(env Env, args []string) int {
 		comp := corpus.Competition(strings.SplitN(at, "/", 2)[0])
 		if ch, ok := canon.Choose(at, cands[at], original(comp)); ok {
 			choices = append(choices, ch)
+		}
+	}
+	choices = canon.Confirm(choices)
+	if *doubts {
+		for _, ch := range choices {
+			for _, d := range ch.Doubts {
+				fmt.Fprintf(env.Stdout, "doubt %s: %s %s against %s %s, T %.2f, E %.2f\n", ch.At, ch.Best.Source, ch.Best.Ref, d.C.Source, d.C.Ref, d.T, d.E)
+			}
 		}
 	}
 	choices, gated := canon.Gate(choices, *maxDoubt)

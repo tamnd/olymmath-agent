@@ -130,3 +130,24 @@ func TestTrace(t *testing.T) {
 		t.Error("a statement with no text was traced")
 	}
 }
+
+func TestConfirm(t *testing.T) {
+	p1 := "The incircle of triangle ABC touches BC, CA, AB at K, L, M. The line through A parallel to LK meets MK at P. Show that PQ bisects AB."
+	p1b := "The in-circle of triangle ABC touches the sides BC, CA and AB in K, L and M respectively. The line through A and parallel to LK meets MK in P. Prove that the line PQ bisects the side AB."
+	p2 := "Find all functions f from the reals to the reals with f(x+y) = f(x) f(y) for all reals x and y."
+	best1 := &Candidate{Source: "a", Text: p1}
+	best2 := &Candidate{Source: "a", Text: p2}
+	para := &Candidate{Source: "b", Text: p1b}
+	wrong := &Candidate{Source: "c", Text: p2 + " Prove it."}
+	choices := Confirm([]Choice{
+		{At: "x/2000/p1", Best: best1, Doubts: []Doubt{{C: para}, {C: wrong}}},
+		{At: "x/2000/p2", Best: best2},
+	})
+	ch := choices[0]
+	if len(ch.Kept) != 1 || ch.Kept[0] != para {
+		t.Errorf("kept %v, want the paraphrase", ch.Kept)
+	}
+	if len(ch.Doubts) != 1 || ch.Doubts[0].C != wrong {
+		t.Errorf("doubts %v, want the text of p2", ch.Doubts)
+	}
+}
