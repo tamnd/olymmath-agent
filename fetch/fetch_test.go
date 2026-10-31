@@ -69,7 +69,7 @@ func TestGet(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/robots.txt":
-			io.WriteString(w, "User-agent: *\nDisallow: /no\n")
+			_, _ = io.WriteString(w, "User-agent: *\nDisallow: /no\n")
 		case "/page":
 			hits.Add(1)
 			if r.Header.Get("User-Agent") != Agent {
@@ -80,14 +80,14 @@ func TestGet(t *testing.T) {
 				return
 			}
 			w.Header().Set("ETag", `"v1"`)
-			io.WriteString(w, "page body")
+			_, _ = io.WriteString(w, "page body")
 		case "/flaky":
 			if fails.Add(1) <= 2 {
 				w.Header().Set("Retry-After", "1")
 				w.WriteHeader(http.StatusServiceUnavailable)
 				return
 			}
-			io.WriteString(w, "ok")
+			_, _ = io.WriteString(w, "ok")
 		case "/gone":
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -139,7 +139,7 @@ func TestRetriesEnd(t *testing.T) {
 }
 
 func TestForbiddenRobots(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer srv.Close()

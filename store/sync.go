@@ -47,11 +47,11 @@ func (s *Store) Sync(ctx context.Context, log io.Writer) (SyncStats, error) {
 	if err != nil {
 		return st, err
 	}
-	sf, err := os.OpenFile(filepath.Join(s.Dir, syncedFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o640)
+	sf, err := os.OpenFile(filepath.Join(s.Dir, syncedFile), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return st, err
 	}
-	defer sf.Close()
+	defer func() { _ = sf.Close() }()
 	names, err := s.indexNames()
 	if err != nil {
 		return st, err
@@ -83,7 +83,7 @@ func (s *Store) Sync(ctx context.Context, log io.Writer) (SyncStats, error) {
 		}
 	}
 	for _, name := range names {
-		b, err := os.ReadFile(filepath.Join(s.Dir, "index", name))
+		b, err := os.ReadFile(filepath.Join(s.Dir, "index", name)) // #nosec G304 -- the path is inside the store directory.
 		if err != nil {
 			return st, err
 		}
@@ -135,7 +135,7 @@ func (s *Store) Restore(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	b, err := io.ReadAll(rc)
-	rc.Close()
+	_ = rc.Close()
 	if err != nil {
 		return 0, err
 	}
@@ -149,7 +149,7 @@ func (s *Store) Restore(ctx context.Context) (int, error) {
 			return n, err
 		}
 		data, err := io.ReadAll(rc)
-		rc.Close()
+		_ = rc.Close()
 		if err != nil {
 			return n, err
 		}
@@ -157,7 +157,7 @@ func (s *Store) Restore(ctx context.Context) (int, error) {
 		if fi, err := os.Stat(p); err == nil && fi.Size() >= int64(len(data)) {
 			continue
 		}
-		if err := os.WriteFile(p, data, 0o640); err != nil {
+		if err := os.WriteFile(p, data, 0o600); err != nil {
 			return n, err
 		}
 		n++
@@ -181,11 +181,11 @@ func (s *Store) indexNames() ([]string, error) {
 
 // readIndex reads the index file name. The first capture gives the source.
 func (s *Store) readIndex(name string) ([]Capture, error) {
-	f, err := os.Open(filepath.Join(s.Dir, "index", name))
+	f, err := os.Open(filepath.Join(s.Dir, "index", name)) // #nosec G304 -- the path is inside the store directory.
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var c Capture
 	if err := json.NewDecoder(f).Decode(&c); err != nil {
 		return nil, nil
@@ -202,7 +202,7 @@ func (s *Store) synced() (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	sc := bufio.NewScanner(f)
 	for sc.Scan() {
 		out[strings.TrimSpace(sc.Text())] = true

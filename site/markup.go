@@ -25,27 +25,27 @@ func splitMath(src string) (string, []mathSpan) {
 	var spans []mathSpan
 	i := 0
 	for i < len(src) {
-		open, close, display := "", "", false
+		open, closer, display := "", "", false
 		switch {
 		case strings.HasPrefix(src[i:], `\$`):
 			out.WriteString(`\$`)
 			i += 2
 			continue
 		case strings.HasPrefix(src[i:], "$$"):
-			open, close, display = "$$", "$$", true
+			open, closer, display = "$$", "$$", true
 		case strings.HasPrefix(src[i:], `\[`):
-			open, close, display = `\[`, `\]`, true
+			open, closer, display = `\[`, `\]`, true
 		case strings.HasPrefix(src[i:], `\(`):
-			open, close = `\(`, `\)`
+			open, closer = `\(`, `\)`
 		case src[i] == '$':
-			open, close = "$", "$"
+			open, closer = "$", "$"
 		}
 		if open == "" {
 			out.WriteByte(src[i])
 			i++
 			continue
 		}
-		end := indexClose(src[i+len(open):], close)
+		end := indexClose(src[i+len(open):], closer)
 		if end < 0 {
 			out.WriteString(open)
 			i += len(open)
@@ -54,19 +54,19 @@ func splitMath(src string) (string, []mathSpan) {
 		tex := strings.TrimSpace(src[i+len(open) : i+len(open)+end])
 		fmt.Fprintf(&out, "@@MATH%d@@", len(spans))
 		spans = append(spans, mathSpan{tex: tex, display: display})
-		i += len(open) + end + len(close)
+		i += len(open) + end + len(closer)
 	}
 	return out.String(), spans
 }
 
 // indexClose finds the closing delimiter, and skips a delimiter after a backslash.
-func indexClose(s, close string) int {
-	for j := 0; j+len(close) <= len(s); j++ {
-		if s[j] == '\\' && close == "$" {
+func indexClose(s, closer string) int {
+	for j := 0; j+len(closer) <= len(s); j++ {
+		if s[j] == '\\' && closer == "$" {
 			j++
 			continue
 		}
-		if strings.HasPrefix(s[j:], close) {
+		if strings.HasPrefix(s[j:], closer) {
 			return j
 		}
 	}

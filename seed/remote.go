@@ -34,6 +34,7 @@ func NewRanged(ctx context.Context, url string, size int64) *Ranged {
 	return &Ranged{URL: url, Size: size, Client: http.DefaultClient, Block: 8 << 20, Keep: 16, Ctx: ctx}
 }
 
+// ReadAt reads len(p) bytes at off. It gets the blocks that it does not have with HTTP range requests and keeps the newest blocks in the cache.
 func (r *Ranged) ReadAt(p []byte, off int64) (int, error) {
 	if off >= r.Size {
 		return 0, io.EOF
@@ -103,12 +104,12 @@ func (r *Ranged) get(start, end int64) ([]byte, error) {
 		resp, err := r.Client.Do(req)
 		if err == nil && resp.StatusCode == http.StatusPartialContent {
 			b, err := io.ReadAll(resp.Body)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if err == nil && int64(len(b)) == end-start+1 {
 				return b, nil
 			}
 		} else if err == nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < 500 {
 				return nil, fmt.Errorf("GET %s range %d-%d: %s", r.URL, start, end, resp.Status)
 			}
@@ -122,7 +123,7 @@ func (r *Ranged) get(start, end int64) ([]byte, error) {
 			}
 			return nil, err
 		}
-		d := wait + time.Duration(rand.Int64N(int64(wait/2)+1))
+		d := wait + time.Duration(rand.Int64N(int64(wait/2)+1)) // #nosec G404 -- the jitter of a retry needs no strong random numbers.
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()

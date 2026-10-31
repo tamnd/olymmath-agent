@@ -166,7 +166,7 @@ func (t *parquetTable) Each(cols []string, fn func(int, Record) error) error {
 func readChunk(cc parquet.ColumnChunk, n int) ([][]string, error) {
 	out := make([][]string, 0, n)
 	pages := cc.Pages()
-	defer pages.Close()
+	defer func() { _ = pages.Close() }()
 	buf := make([]parquet.Value, 512)
 	for {
 		p, err := pages.ReadPage()

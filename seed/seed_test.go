@@ -177,7 +177,7 @@ func TestCSV(t *testing.T) {
 	}
 	p := Generic(tb.Columns())
 	var row Row
-	if err := tb.Each(p.Columns, func(i int, r Record) error { row, _ = p.Map(r); return nil }); err != nil {
+	if err := tb.Each(p.Columns, func(_ int, r Record) error { row, _ = p.Map(r); return nil }); err != nil {
 		t.Fatal(err)
 	}
 	if row.Statement != "What is 1+1?" || row.Year != 2020 {
@@ -232,7 +232,7 @@ func TestReadWrite(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	gz.Close()
+	_ = gz.Close()
 	if err := os.WriteFile(filepath.Join(dir, "s.jsonl.gz"), buf.Bytes(), 0o600); err != nil {
 		t.Fatal(err)
 	}

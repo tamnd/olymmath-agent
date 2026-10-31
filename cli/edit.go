@@ -40,7 +40,7 @@ func runFmt(env Env, args []string) int {
 			if d.IsDir() || !strings.HasSuffix(p, ".md") || d.Name() == "README.md" {
 				return nil
 			}
-			b, err := os.ReadFile(p) // #nosec G304 -- the path is inside the content root.
+			b, err := os.ReadFile(p) // #nosec G304 G122 -- the path is inside the content root.
 			if err != nil {
 				return err
 			}
@@ -58,7 +58,7 @@ func runFmt(env Env, args []string) int {
 			if *check {
 				return nil
 			}
-			return os.WriteFile(p, out, 0o644) // #nosec G306 -- content files are public.
+			return os.WriteFile(p, out, 0o644) // #nosec G306 G122 G703 -- content files are public.
 		})
 		if err != nil {
 			fmt.Fprintf(env.Stderr, "om fmt: %v\n", err)
@@ -228,7 +228,7 @@ func runNew(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om new: %v\n", err)
 		return ExitFailure
 	}
-	if err := os.WriteFile(full, []byte(text), 0o644); err != nil { // #nosec G306 -- content files are public.
+	if err := os.WriteFile(full, []byte(text), 0o644); err != nil { // #nosec G306 G122 G703 -- content files are public.
 		fmt.Fprintf(env.Stderr, "om new: %v\n", err)
 		return ExitFailure
 	}
@@ -329,7 +329,7 @@ func newEdition(root string, corpus *content.Corpus, at string) (string, error) 
 	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil { // #nosec G301 -- content directories are public.
 		return "", err
 	}
-	return rel, os.WriteFile(full, []byte(b.String()), 0o644) // #nosec G306 -- content files are public.
+	return rel, os.WriteFile(full, []byte(b.String()), 0o644) // #nosec G306 G122 G703 -- content files are public.
 }
 
 func newSolution(corpus *content.Corpus, t, ref, origin, source, url string) (string, string, error) {

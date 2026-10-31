@@ -62,7 +62,7 @@ func read(t *testing.T, s *Store, hash string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 	b, _ := io.ReadAll(rc)
 	return string(b)
 }
@@ -141,21 +141,21 @@ func TestR2(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer tok" {
 			w.WriteHeader(http.StatusForbidden)
-			io.WriteString(w, `{"success":false,"errors":[{"code":10000,"message":"Authentication error"}]}`)
+			_, _ = io.WriteString(w, `{"success":false,"errors":[{"code":10000,"message":"Authentication error"}]}`)
 			return
 		}
 		switch r.Method {
 		case http.MethodPut:
 			b, _ := io.ReadAll(r.Body)
 			objs[r.URL.Path] = string(b)
-			io.WriteString(w, `{"success":true}`)
+			_, _ = io.WriteString(w, `{"success":true}`)
 		case http.MethodGet:
 			b, ok := objs[r.URL.Path]
 			if !ok {
 				w.WriteHeader(http.StatusNotFound)
 				return
 			}
-			io.WriteString(w, b)
+			_, _ = io.WriteString(w, b)
 		case http.MethodDelete:
 			delete(objs, r.URL.Path)
 		}
@@ -174,7 +174,7 @@ func TestR2(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := io.ReadAll(rc)
-	rc.Close()
+	_ = rc.Close()
 	if string(b) != "data" {
 		t.Fatalf("got %q", b)
 	}
@@ -251,7 +251,7 @@ func TestSyncRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := io.ReadAll(rc)
-	rc.Close()
+	_ = rc.Close()
 	if string(b) != "alpha" {
 		t.Errorf("bytes %q", b)
 	}

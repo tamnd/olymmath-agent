@@ -102,11 +102,11 @@ func (r *Runner) Run(ctx context.Context, source string, w io.Writer) (Stats, er
 func (r *Runner) open(ctx context.Context, f hf.ManifestFile) (io.ReaderAt, func(), *Ranged, error) {
 	if f.SHA256 != "" {
 		if p, ok := r.Store.LocalPath(f.SHA256); ok {
-			fh, err := os.Open(p)
+			fh, err := os.Open(p) // #nosec G304 -- the path is a blob of the store.
 			if err != nil {
 				return nil, nil, nil, err
 			}
-			return fh, func() { fh.Close() }, nil, nil
+			return fh, func() { _ = fh.Close() }, nil, nil
 		}
 	}
 	if f.URL == "" {
@@ -144,7 +144,7 @@ func (r *Runner) Write(ctx context.Context, dir, source string) (Stats, error) {
 	if err != nil {
 		return Stats{}, err
 	}
-	defer os.Remove(tmp.Name())
+	defer func() { _ = os.Remove(tmp.Name()) }()
 	bw := bufio.NewWriterSize(tmp, 1<<20)
 	gz := gzip.NewWriter(bw)
 	st, err := r.Run(ctx, source, gz)
@@ -169,7 +169,7 @@ func Read(dir, source string, fn func(Row) error) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	gz, err := gzip.NewReader(bufio.NewReaderSize(f, 1<<20))
 	if err != nil {
 		return err

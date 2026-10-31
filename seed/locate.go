@@ -98,14 +98,14 @@ func LoadAliases(root string, corpus *content.Corpus) (*Aliases, error) {
 			a.add(l, c.Code)
 		}
 	}
-	f, err := os.Open(root + "/" + AliasFile)
+	f, err := os.Open(root + "/" + AliasFile) // #nosec G304 -- the path is inside the content root.
 	if os.IsNotExist(err) {
 		return a, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	sc := bufio.NewScanner(f)
 	for n := 1; sc.Scan(); n++ {
 		line := sc.Text()

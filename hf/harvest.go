@@ -117,7 +117,7 @@ func LatestManifest(ctx context.Context, st *store.Store, source string) (*Manif
 		}
 		var m Manifest
 		err = json.NewDecoder(rc).Decode(&m)
-		rc.Close()
+		_ = rc.Close()
 		if err != nil {
 			return nil, err
 		}

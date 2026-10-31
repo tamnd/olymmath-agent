@@ -102,7 +102,7 @@ func runStore(env Env, args []string) int {
 		if err != nil {
 			return fail(err)
 		}
-		defer f.Close()
+		defer func() { _ = f.Close() }()
 		c, err := s.Put(f, store.Capture{Source: *source, URL: *url, Licence: *licence})
 		if err != nil {
 			return fail(err)
@@ -118,7 +118,7 @@ func runStore(env Env, args []string) int {
 		if err != nil {
 			return fail(err)
 		}
-		defer rc.Close()
+		defer func() { _ = rc.Close() }()
 		if _, err := io.Copy(env.Stdout, rc); err != nil {
 			return fail(err)
 		}

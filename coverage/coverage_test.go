@@ -55,8 +55,12 @@ func TestAliases(t *testing.T) {
 		}
 	}
 	root := t.TempDir()
-	os.MkdirAll(filepath.Join(root, "registers"), 0o750)
-	os.WriteFile(filepath.Join(root, seed.AliasFile), []byte("Some Olympiad\tnope\n"), 0o600)
+	if err := os.MkdirAll(filepath.Join(root, "registers"), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, seed.AliasFile), []byte("Some Olympiad\tnope\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := seed.LoadAliases(root, c); err == nil || !strings.Contains(err.Error(), "not in the competition register") {
 		t.Errorf("an unknown code gave %v", err)
 	}

@@ -92,7 +92,7 @@ func (c *Client) rules(ctx context.Context, u *url.URL) (*robots, error) {
 		r = &robots{}
 	}
 	if resp != nil {
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	}
 	c.mu.Lock()
 	if c.robots == nil {
@@ -186,11 +186,11 @@ func (c *Client) Get(ctx context.Context, source, u string, opt Options) (Result
 		if err == nil {
 			switch {
 			case resp.StatusCode == http.StatusNotModified && have:
-				resp.Body.Close()
+				_ = resp.Body.Close()
 				return Result{Capture: prev}, nil
 			case resp.StatusCode/100 == 2:
 				res, err := c.save(ctx, resp, source, u, opt)
-				resp.Body.Close()
+				_ = resp.Body.Close()
 				return res, err
 			case resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode/100 == 5:
 				retry = true
@@ -199,13 +199,13 @@ func (c *Client) Get(ctx context.Context, source, u string, opt Options) (Result
 			default:
 				err = fmt.Errorf("%s: %s", u, resp.Status)
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 		if !retry || attempt >= c.Retries {
 			return Result{}, err
 		}
 		if wait == 0 {
-			wait = backoff + rand.N(backoff/2)
+			wait = backoff + rand.N(backoff/2) // #nosec G404 -- the jitter of a retry needs no strong random numbers.
 			backoff *= 2
 		}
 		if c.MaxWait > 0 {

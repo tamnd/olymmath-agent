@@ -34,24 +34,24 @@ func hub(t *testing.T) *httptest.Server {
 		case "/api/datasets/old/name":
 			http.Redirect(w, r, "/api/datasets/org/set", http.StatusTemporaryRedirect)
 		case "/api/datasets/org/set":
-			io.WriteString(w, `{"id":"org/set","sha":"abc123","lastModified":"2026-01-02T03:04:05.000Z","cardData":{"license":"mit"}}`)
+			_, _ = io.WriteString(w, `{"id":"org/set","sha":"abc123","lastModified":"2026-01-02T03:04:05.000Z","cardData":{"license":"mit"}}`)
 		case "/api/datasets/org/set/tree/abc123":
 			if r.URL.Query().Get("cursor") == "" {
 				w.Header().Set("Link", fmt.Sprintf(`<%s/api/datasets/org/set/tree/abc123?recursive=true&cursor=2>; rel="next"`, srv.URL))
-				io.WriteString(w, `[{"type":"file","path":"README.md","size":10},{"type":"directory","path":"data"},{"type":"file","path":"data/a.jsonl","size":16}]`)
+				_, _ = io.WriteString(w, `[{"type":"file","path":"README.md","size":10},{"type":"directory","path":"data"},{"type":"file","path":"data/a.jsonl","size":16}]`)
 				return
 			}
 			fmt.Fprintf(w, `[{"type":"file","path":"data/b.parquet","size":4096,"lfs":{"oid":%q,"size":4096}},{"type":"file","path":"data/c.parquet","size":4096}]`, sum(big))
 		case "/datasets/org/set/resolve/abc123/data/a.jsonl":
-			io.WriteString(w, small)
+			_, _ = io.WriteString(w, small)
 		case "/datasets/org/set/resolve/abc123/data/b.parquet":
-			io.WriteString(w, big)
+			_, _ = io.WriteString(w, big)
 		case "/api/datasets/org/set/revision/refs%2Fconvert%2Fparquet":
-			io.WriteString(w, `{"id":"org/set","sha":"pq1"}`)
+			_, _ = io.WriteString(w, `{"id":"org/set","sha":"pq1"}`)
 		case "/api/datasets/org/set/tree/pq1":
-			io.WriteString(w, `[{"type":"file","path":"default/train/0000.parquet","size":16}]`)
+			_, _ = io.WriteString(w, `[{"type":"file","path":"default/train/0000.parquet","size":16}]`)
 		case "/datasets/org/set/resolve/pq1/default/train/0000.parquet":
-			io.WriteString(w, small)
+			_, _ = io.WriteString(w, small)
 		case "/api/datasets/gated/set":
 			w.WriteHeader(http.StatusUnauthorized)
 		default:

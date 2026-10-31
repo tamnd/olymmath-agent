@@ -111,7 +111,7 @@ func (s *Store) Put(r io.Reader, c Capture) (Capture, error) {
 	if err != nil {
 		return c, err
 	}
-	defer os.Remove(tmp.Name())
+	defer func() { _ = os.Remove(tmp.Name()) }()
 	h := sha256.New()
 	n, err := io.Copy(io.MultiWriter(tmp, h), r)
 	if cerr := tmp.Close(); err == nil {
@@ -200,7 +200,7 @@ func (s *Store) Push(ctx context.Context, hash string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", hash, ErrNotFound)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	st, err := f.Stat()
 	if err != nil {
 		return err
@@ -235,12 +235,12 @@ func (s *Store) add(c Capture) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	f, err := os.OpenFile(filepath.Join(s.Dir, "index", indexName(c.Source)), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o640)
+	f, err := os.OpenFile(filepath.Join(s.Dir, "index", indexName(c.Source)), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
 	}
 	if _, err := f.Write(append(b, '\n')); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	return f.Close()
@@ -255,7 +255,7 @@ func (s *Store) Captures(source string) ([]Capture, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	var out []Capture
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<24)
@@ -300,7 +300,7 @@ func (s *Store) Sources() ([]string, error) {
 		}
 		var c Capture
 		err = json.NewDecoder(f).Decode(&c)
-		f.Close()
+		_ = f.Close()
 		if err == nil && c.Source != "" {
 			out = append(out, c.Source)
 		}
@@ -325,7 +325,7 @@ func (s *Store) SetCursor(source, cursor string) error {
 	}
 	name := filepath.Join(dir, strings.TrimSuffix(indexName(source), ".jsonl"))
 	tmp := name + ".tmp"
-	if err := os.WriteFile(tmp, []byte(cursor+"\n"), 0o640); err != nil {
+	if err := os.WriteFile(tmp, []byte(cursor+"\n"), 0o600); err != nil {
 		return err
 	}
 	return os.Rename(tmp, name)
