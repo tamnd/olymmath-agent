@@ -20,6 +20,11 @@ func TestLoadValid(t *testing.T) {
 	if len(e.Problems) != 2 || e.Problems[0].Position != "p1" {
 		t.Fatalf("problems: %+v", e.Problems)
 	}
+	for _, p := range e.Problems {
+		if p.Source.Origin == "H1" && p.Official != nil {
+			t.Errorf("%s: an official canonical text has an extra official link %+v", p.Locator(), p.Official)
+		}
+	}
 	p := e.Problems[0]
 	if p.Locator() != "imo/2024/p1" || p.Number() != 1 || p.Paper == nil || p.Paper.Name != "Day 1" {
 		t.Fatalf("problem: %+v", p)

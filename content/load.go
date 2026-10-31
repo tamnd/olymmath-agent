@@ -290,6 +290,15 @@ func (l *loader) problem(rel string) {
 	if s := p.CanonicalStatement(); s != nil {
 		p.Statement = s.Text
 		p.Source = l.source(s)
+		if s.Kind != "official" {
+			for i := range p.Statements {
+				if o := &p.Statements[i]; o.Kind == "official" && o.URL != "" {
+					src := l.source(o)
+					p.Official = &src
+					break
+				}
+			}
+		}
 	}
 	l.corpus.byTag[p.Tag] = p
 	l.corpus.all = append(l.corpus.all, p)

@@ -210,7 +210,9 @@ type Problem struct {
 	Year        int    `yaml:"-"`
 	Position    string `yaml:"-"`
 	// Source is the source of the canonical statement.
-	Source    Source      `yaml:"-"`
+	Source Source `yaml:"-"`
+	// Official is the source of the first official statement when the canonical statement is not official, for example a link to the page of an official paper. It is nil when there is no such statement.
+	Official  *Source     `yaml:"-"`
 	Edition   *Edition    `yaml:"-"`
 	Paper     *Paper      `yaml:"-"`
 	Solutions []*Solution `yaml:"-"`
