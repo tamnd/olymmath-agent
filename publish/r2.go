@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"mime"
 	"net/http"
 	"net/url"
@@ -16,6 +17,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,6 +32,33 @@ type R2 struct {
 	// Base is the URL of the API. It is the Cloudflare API when it is empty.
 	Base string
 	HTTP *http.Client
+	// Rate is the most requests each second. The Cloudflare API takes 1200 requests in 5 minutes for each user, so the rate is 3.5 when it is 0. A negative rate has no limit.
+	Rate float64
+
+	once sync.Once
+	tick <-chan time.Time
+}
+
+// pace waits for the next request slot.
+func (r *R2) pace(ctx context.Context) error {
+	r.once.Do(func() {
+		rate := r.Rate
+		if rate == 0 {
+			rate = 3.5
+		}
+		if rate > 0 {
+			r.tick = time.NewTicker(time.Duration(float64(time.Second) / rate)).C
+		}
+	})
+	if r.tick == nil {
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-r.tick:
+		return nil
+	}
 }
 
 func (r *R2) url(key string) string {
@@ -44,7 +73,7 @@ func (r *R2) url(key string) string {
 	return base + "/accounts/" + url.PathEscape(r.Account) + "/r2/buckets/" + url.PathEscape(r.Bucket) + "/objects/" + strings.Join(parts, "/")
 }
 
-// do sends a request, and tries again after a pause when the API answers 429 or a 5xx code.
+// do sends a request, and tries again after a pause when the API answers 429 or a 5xx code. The pause doubles each time up to a minute, and it is longer when the API asks for it with Retry-After.
 func (r *R2) do(ctx context.Context, method, key string, body []byte, ctype string) (*http.Response, error) {
 	hc := r.HTTP
 	if hc == nil {
@@ -52,6 +81,9 @@ func (r *R2) do(ctx context.Context, method, key string, body []byte, ctype stri
 	}
 	wait := time.Second
 	for try := 0; ; try++ {
+		if err := r.pace(ctx); err != nil {
+			return nil, err
+		}
 		req, err := http.NewRequestWithContext(ctx, method, r.url(key), bytes.NewReader(body))
 		if err != nil {
 			return nil, err
@@ -64,21 +96,25 @@ func (r *R2) do(ctx context.Context, method, key string, body []byte, ctype stri
 		if err == nil && resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < 500 {
 			return resp, nil
 		}
-		if try == 5 {
+		if try == 8 {
 			if err != nil {
 				return nil, err
 			}
 			return resp, nil
 		}
+		pause := wait
 		if err == nil {
+			if n, e := strconv.Atoi(resp.Header.Get("Retry-After")); e == nil && time.Duration(n)*time.Second > pause {
+				pause = time.Duration(n) * time.Second
+			}
 			_ = resp.Body.Close()
 		}
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
-		case <-time.After(wait):
+		case <-time.After(pause):
 		}
-		wait *= 2
+		wait = min(2*wait, time.Minute)
 	}
 }
 
@@ -145,7 +181,10 @@ type SyncResult struct {
 	Files, Put, Deleted int
 }
 
-// Sync makes the bucket hold the files of dir. It compares the hash of each file with the manifest of the last sync, uploads only the new and changed files, deletes the objects of the files that are gone, and then writes the new manifest. workers requests run at the same time.
+// SavePoint is the number of changes after which Sync writes the manifest.
+const SavePoint = 500
+
+// Sync makes the bucket hold the files of dir. It compares the hash of each file with the manifest of the last sync, uploads only the new and changed files, deletes the objects of the files that are gone, and then writes the new manifest. workers requests run at the same time. Sync also writes the manifest after each SavePoint changes and when a request fails, so a new run does not send again the files that are already in the bucket.
 func Sync(ctx context.Context, r *R2, dir string, workers int) (SyncResult, error) {
 	var res SyncResult
 	files := map[string]string{}
@@ -194,6 +233,18 @@ func Sync(ctx context.Context, r *R2, dir string, workers int) (SyncResult, erro
 		key    string
 		delete bool
 	}
+	// done is the manifest of the objects that the bucket holds now.
+	done := maps.Clone(old)
+	if done == nil {
+		done = map[string]string{}
+	}
+	save := func() error {
+		b, err := json.Marshal(done)
+		if err != nil {
+			return err
+		}
+		return r.Put(ctx, ManifestKey, b, "application/json")
+	}
 	jobs := make(chan job)
 	var mu sync.Mutex
 	var first error
@@ -219,10 +270,19 @@ func Sync(ctx context.Context, r *R2, dir string, workers int) (SyncResult, erro
 					first = err
 				case err == nil && j.delete:
 					res.Deleted++
+					delete(done, j.key)
 				case err == nil:
 					res.Put++
+					done[j.key] = files[j.key]
+				}
+				var snap []byte
+				if err == nil && (res.Put+res.Deleted)%SavePoint == 0 {
+					snap, _ = json.Marshal(done)
 				}
 				mu.Unlock()
+				if snap != nil {
+					_ = r.Put(ctx, ManifestKey, snap, "application/json")
+				}
 			}
 		}()
 	}
@@ -235,11 +295,9 @@ func Sync(ctx context.Context, r *R2, dir string, workers int) (SyncResult, erro
 	close(jobs)
 	wg.Wait()
 	if first != nil {
+		_ = save()
 		return res, first
 	}
-	b, err := json.Marshal(files)
-	if err != nil {
-		return res, err
-	}
-	return res, r.Put(ctx, ManifestKey, b, "application/json")
+	done = files
+	return res, save()
 }

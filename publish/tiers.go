@@ -44,7 +44,7 @@ func (t Tiers) First(c *content.Competition) bool {
 	return slices.Contains(t.Groups, c.Group) || (c.Country != "" && slices.Contains(t.Countries, c.Country)) || slices.Contains(t.Codes, c.Code)
 }
 
-// Split takes out of the site directory dir the files that are not static assets. It deletes each redirect page of redirects.json, because the Worker answers these paths. It moves each file of a competition that is not in tier 1 to out, except the index pages, at the same relative path. It gives the number of deleted and moved files.
+// Split takes out of the site directory dir the files that are not static assets. It deletes each redirect page of redirects.json, because the Worker answers these paths. It moves to out, at the same relative path, each file of a competition that is not in tier 1 and each machine copy of a problem page. The index pages stay. It gives the number of deleted and moved files.
 func Split(dir, out string, corpus *content.Corpus, t Tiers) (deleted, moved int, err error) {
 	b, err := os.ReadFile(filepath.Join(dir, "redirects.json")) // #nosec G304 -- the path is inside the site directory.
 	if err != nil {
@@ -62,19 +62,15 @@ func Split(dir, out string, corpus *content.Corpus, t Tiers) (deleted, moved int
 			return deleted, moved, err
 		}
 	}
-	for _, c := range corpus.Competitions {
-		if t.First(c) {
-			continue
-		}
-		root := filepath.Join(dir, c.Code)
-		err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+	move := func(sub string, all bool) error {
+		err := filepath.WalkDir(filepath.Join(dir, sub), func(p string, d fs.DirEntry, err error) error {
 			if err != nil {
 				if os.IsNotExist(err) {
 					return filepath.SkipDir
 				}
 				return err
 			}
-			if d.IsDir() || strings.HasPrefix(d.Name(), "index.") {
+			if d.IsDir() || strings.HasPrefix(d.Name(), "index.") || (!all && !Copy(d.Name())) {
 				return nil
 			}
 			rel, err := filepath.Rel(dir, p)
@@ -91,11 +87,22 @@ func Split(dir, out string, corpus *content.Corpus, t Tiers) (deleted, moved int
 			moved++
 			return nil
 		})
-		if err != nil {
+		return err
+	}
+	for _, c := range corpus.Competitions {
+		if err := move(c.Code, !t.First(c)); err != nil {
 			return deleted, moved, err
 		}
 	}
+	if err := move("p", false); err != nil {
+		return deleted, moved, err
+	}
 	return deleted, moved, nil
+}
+
+// Copy tells if a file is a machine copy of a page: a .md or a .json file.
+func Copy(name string) bool {
+	return strings.HasSuffix(name, ".md") || strings.HasSuffix(name, ".json")
 }
 
 // Key gives the R2 key of a file at the relative path rel: the slash form of the path.
