@@ -64,4 +64,4 @@
 </html>
 {{end}}
 
-{{define "chips"}}<ul class="chips">{{if .Paper}}<li>{{.Paper.Name}}</li>{{end}}{{range .Topics}}<li class="chip-topic chip-{{.}}">{{topic .}}</li>{{end}}{{if eq .Type "proof"}}<li>Proof</li>{{else if eq .Type "answer"}}<li>Answer</li>{{end}}</ul>{{end}}
+{{define "chips"}}<ul class="chips">{{if .Paper}}<li>{{.Paper.Name}}</li>{{end}}{{range .Topics}}<li class="chip-topic chip-{{root .}}">{{topic .}}</li>{{end}}{{if eq .Type "proof"}}<li>Proof</li>{{else if eq .Type "answer"}}<li>Answer</li>{{end}}</ul>{{end}}

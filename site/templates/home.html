@@ -30,7 +30,7 @@
   <div class="block-head"><h2>Latest papers</h2><a href="{{link "c/"}}">All competitions</a></div>
   <div class="grid">
   {{range .Latest}}
-    <a class="card tile" href="{{link (printf "%s/%d/" .Competition.Code .Year)}}">
+    <a class="card tile" href="{{link (printf "%s/" .Locator)}}">
       <span class="tile-kicker">{{.Competition.Short}}</span>
       <span class="tile-title">{{.Competition.Short}} {{.Year}}</span>
       <span class="tile-meta">{{.Place}}{{if .Country}}, {{.Country}}{{end}}</span>

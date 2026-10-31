@@ -15,7 +15,7 @@
   {{$c := .}}
   {{range .Editions}}
     <tr>
-      <th scope="row"><a href="{{link (printf "%s/%d/" $c.Code .Year)}}">{{.Year}}</a></th>
+      <th scope="row"><a href="{{link (printf "%s/" .Locator)}}">{{.Year}}</a></th>
       <td>{{.Place}}{{if .Country}}, {{.Country}}{{end}}</td>
       <td><ol class="cells">{{range .Problems}}<li><a href="{{link .Locator}}" title="{{$c.Short}} {{.Year}} Problem {{.Number}}">{{.Number}}</a></li>{{end}}</ol></td>
     </tr>

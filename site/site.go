@@ -8,6 +8,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"html"
 	"html/template"
 	"io/fs"
 	"os"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/katex"
+	"github.com/tamnd/olymmath-agent/tag"
 )
 
 //go:embed templates/*.html
@@ -40,10 +42,11 @@ type Options struct {
 
 // Stats are the counts that a build reports.
 type Stats struct {
-	Pages    int
-	Files    int
-	Problems int
-	Errors   []error
+	Pages     int
+	Files     int
+	Problems  int
+	Redirects int
+	Errors    []error
 }
 
 // Build writes the site of corpus to opts.Out. The directory is replaced.
@@ -114,6 +117,7 @@ func (b *builder) all() error {
 		b.competitions,
 		b.editions,
 		b.problems,
+		b.redirects,
 		b.static,
 		b.searchIndex,
 		b.machine,
@@ -135,7 +139,8 @@ func (b *builder) funcs() template.FuncMap {
 	return template.FuncMap{
 		"link":  b.link,
 		"asset": func(p string) string { return b.link("assets/"+p) + "?v=" + b.asset },
-		"topic": func(t string) string { return content.Topics[t] },
+		"topic": topicName,
+		"root":  content.TopicRoot,
 		"year":  func() int { return b.opts.Date.Year() },
 		"short": func(s string) string {
 			if len(s) > 7 {
@@ -150,10 +155,11 @@ func (b *builder) funcs() template.FuncMap {
 			}
 			return t.Format("2 January 2006")
 		},
-		"ordinal": ordinal,
-		"add":     func(a, b int) int { return a + b },
-		"origin":  originName,
-		"zone":    zoneName,
+		"ordinal":   ordinal,
+		"add":       func(a, b int) int { return a + b },
+		"origin":    originName,
+		"zone":      zoneName,
+		"solorigin": solutionOrigin,
 	}
 }
 
@@ -184,6 +190,29 @@ func originName(o string) string {
 		return "Dataset text"
 	}
 	return "Unknown origin"
+}
+
+// topicName returns the name of a topic. A subtopic such as A.inequality shows as "Algebra: inequality".
+func topicName(t string) string {
+	root, sub, ok := strings.Cut(t, ".")
+	if !ok {
+		return content.Topics[root]
+	}
+	return content.Topics[root] + ": " + strings.ReplaceAll(sub, "-", " ")
+}
+
+func solutionOrigin(o string) string {
+	switch o {
+	case "official":
+		return "Official solution"
+	case "human":
+		return "Human solution"
+	case "human+ai":
+		return "Human solution with AI help"
+	case "ai":
+		return "AI solution"
+	}
+	return "Solution"
 }
 
 func zoneName(z string) string {
@@ -292,19 +321,50 @@ type problemView struct {
 	Answer    template.HTML
 	Prev      *problemView
 	Next      *problemView
+	Solutions []solutionView
+}
+
+// solutionView is a solution with its rendered body.
+type solutionView struct {
+	*content.Solution
+	Body template.HTML
 }
 
 func (b *builder) view(p *content.Problem) *problemView {
 	v := &problemView{
 		Problem:   p,
-		Title:     fmt.Sprintf("%s %d Problem %d", p.Edition.Competition.Short, p.Year, p.Number()),
-		Link:      b.link(p.Locator()),
+		Title:     problemTitle(p),
+		Link:      b.link(problemPath(p)),
 		Statement: b.html(p.Statement, p.Path),
 	}
 	if p.Answer != "" {
 		v.Answer = b.html(p.Answer, p.Path)
 	}
+	for _, s := range p.Solutions {
+		v.Solutions = append(v.Solutions, solutionView{Solution: s, Body: b.html(s.Body, s.Path)})
+	}
 	return v
+}
+
+// problemTitle returns the title of a problem, for example "IMO 2024 Problem 1".
+func problemTitle(p *content.Problem) string {
+	switch {
+	case p.Edition == nil && p.Title != "":
+		return p.Title
+	case p.Edition == nil:
+		return "Problem " + tag.Display(p.Tag)
+	case p.Number() == 0:
+		return fmt.Sprintf("%s %s %s", p.Edition.Competition.Short, p.Edition.ID, p.Position)
+	}
+	return fmt.Sprintf("%s %s Problem %d", p.Edition.Competition.Short, p.Edition.ID, p.Number())
+}
+
+// problemPath returns the URL path of the page of a problem. A loose problem has its page at /p/<tag>.
+func problemPath(p *content.Problem) string {
+	if p.Edition == nil {
+		return "/p/" + p.Tag
+	}
+	return "/" + p.Locator()
 }
 
 type homeData struct {
@@ -376,7 +436,7 @@ type editionView struct {
 func (b *builder) editions() error {
 	for _, c := range b.corpus.Competitions {
 		for _, e := range c.Editions {
-			ev := editionView{Edition: e, Title: fmt.Sprintf("%s %d", c.Short, e.Year)}
+			ev := editionView{Edition: e, Title: c.Short + " " + e.ID}
 			byPos := map[string]*problemView{}
 			for _, p := range e.Problems {
 				byPos[p.Position] = b.view(p)
@@ -400,7 +460,7 @@ func (b *builder) editions() error {
 			if err := b.render("edition.html", page{
 				Title:       ev.Title,
 				Description: fmt.Sprintf("The problems of %s %d.", c.Name, e.Year),
-				Path:        fmt.Sprintf("/%s/%d/", c.Code, e.Year),
+				Path:        "/" + e.Locator() + "/",
 				Section:     "competitions",
 				Data:        ev,
 			}); err != nil {
@@ -425,19 +485,65 @@ func (b *builder) problems() error {
 				if i+1 < len(views) {
 					v.Next = views[i+1]
 				}
-				if err := b.render("problem.html", page{
-					Title:       v.Title,
-					Description: truncate(Plain(v.Problem.Statement), 180),
-					Path:        "/" + v.Locator(),
-					Section:     "competitions",
-					Data:        v,
-				}); err != nil {
+				if err := b.problem(v); err != nil {
 					return err
 				}
-				b.stats.Problems++
 			}
 		}
 	}
+	for _, p := range b.corpus.Loose {
+		if err := b.problem(b.view(p)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (b *builder) problem(v *problemView) error {
+	p := problemPath(v.Problem)
+	if err := b.render("problem.html", page{
+		Title:       v.Title,
+		Description: truncate(Plain(v.Problem.Statement), 180),
+		Path:        p,
+		Section:     "competitions",
+		Data:        v,
+	}); err != nil {
+		return err
+	}
+	b.stats.Problems++
+	if v.Edition != nil {
+		// The tag URL of a problem with a locator goes to the locator URL.
+		return b.redirect("/p/"+v.Tag, p)
+	}
+	return nil
+}
+
+// redirects writes a page for each old locator in registers/redirects.tsv.
+func (b *builder) redirects() error {
+	olds := make([]string, 0, len(b.corpus.Redirects))
+	for old := range b.corpus.Redirects {
+		olds = append(olds, old)
+	}
+	sort.Strings(olds)
+	for _, old := range olds {
+		if err := b.redirect("/"+old, "/"+b.corpus.Redirects[old]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// redirect writes a small page that sends the reader from one path to another. A static host has no server rules, so the page uses a meta refresh and a canonical link.
+func (b *builder) redirect(from, to string) error {
+	target := b.opts.URL + "/" + strings.TrimPrefix(to, "/")
+	local := b.link(to)
+	page := fmt.Sprintf("<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><title>Moved</title><link rel=\"canonical\" href=\"%s\"><meta name=\"robots\" content=\"noindex\"><meta http-equiv=\"refresh\" content=\"0; url=%s\"></head><body><p>This page moved to <a href=\"%s\">%s</a>.</p></body></html>\n",
+		html.EscapeString(target), html.EscapeString(local), html.EscapeString(local), html.EscapeString(target))
+	file := strings.TrimPrefix(from, "/") + ".html"
+	if err := b.write(file, []byte(page)); err != nil {
+		return err
+	}
+	b.stats.Redirects++
 	return nil
 }
 
@@ -477,10 +583,10 @@ type searchEntry struct {
 
 func (b *builder) searchIndex() error {
 	var entries []searchEntry
-	for _, p := range b.corpus.Problems() {
+	for _, p := range append(b.corpus.Problems(), b.corpus.Loose...) {
 		entries = append(entries, searchEntry{
-			Title:   fmt.Sprintf("%s %d Problem %d", p.Edition.Competition.Short, p.Year, p.Number()),
-			Link:    b.link(p.Locator()),
+			Title:   problemTitle(p),
+			Link:    b.link(problemPath(p)),
 			Text:    Plain(p.Statement),
 			Year:    p.Year,
 			Comp:    p.Competition,
