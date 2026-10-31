@@ -32,6 +32,99 @@
     if (to) location.href = to;
   });
 
+  // The filter of the competition list hides each row that does not contain the text, and each group that has no row left.
+  var filter = document.querySelector("[data-filter]");
+  if (filter) {
+    filter.addEventListener("input", function () {
+      var q = filter.value.trim().toLowerCase();
+      var shown = 0;
+      document.querySelectorAll("[data-row]").forEach(function (row) {
+        var hit = row.getAttribute("data-text").toLowerCase().indexOf(q) >= 0;
+        row.hidden = !hit;
+        if (hit) shown++;
+      });
+      document.querySelectorAll("[data-group]").forEach(function (g) {
+        g.hidden = !g.querySelector("[data-row]:not([hidden])");
+      });
+      document.querySelector("[data-empty]").hidden = shown > 0;
+    });
+  }
+  // The faceted list reads search.json and keeps the problems that pass each filter of the form. The filters are in the URL, so a list can be shared.
+  var facets = document.querySelector("[data-facets]");
+  if (facets) {
+    var rows = document.getElementById("facet-rows");
+    var more = document.getElementById("facet-more");
+    var fstatus = document.getElementById("facet-status");
+    var country = {};
+    facets.querySelectorAll("select[name=c] option").forEach(function (o) { country[o.value] = o.getAttribute("data-country"); });
+    var all = [], hits = [], shown = 0;
+    var names = { A: "Algebra", C: "Combinatorics", G: "Geometry", N: "Number theory" };
+    var esc = function (s) {
+      return String(s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; });
+    };
+    var show = function (n) {
+      var frag = document.createDocumentFragment();
+      hits.slice(shown, shown + n).forEach(function (e) {
+        var tr = document.createElement("tr");
+        var topics = (e.g || []).map(function (t) { return names[t.split(".")[0]] || t; }).filter(function (t, i, a) { return a.indexOf(t) === i; }).join(", ");
+        var band = e.d ? "●●●●●".slice(0, Math.ceil(e.d / 2)) + "○○○○○".slice(0, 5 - Math.ceil(e.d / 2)) + " " + e.d : "";
+        tr.innerHTML = '<th scope="row"><a href="' + esc(e.u) + '">' + esc(e.t) + "</a></th><td>" + esc(topics) + "</td><td>" + band + "</td>";
+        frag.appendChild(tr);
+      });
+      rows.appendChild(frag);
+      shown = Math.min(shown + n, hits.length);
+      more.hidden = shown >= hits.length;
+    };
+    var apply = function () {
+      var f = new FormData(facets), v = {};
+      f.forEach(function (val, key) { if (val) v[key] = val; });
+      var url = new URL(location.href);
+      url.search = new URLSearchParams(v).toString();
+      history.replaceState(null, "", url);
+      var num = function (k) { return v[k] ? parseInt(v[k], 10) : null; };
+      var y0 = num("y0"), y1 = num("y1"), d0 = num("d0"), d1 = num("d1");
+      hits = all.filter(function (e) {
+        if (v.c && e.c !== v.c) return false;
+        if (v.n && country[e.c] !== v.n) return false;
+        if (v.g && !(e.g || []).some(function (t) { return t.split(".")[0] === v.g; })) return false;
+        if (v.k && e.k !== v.k) return false;
+        if (y0 !== null && !(e.y >= y0)) return false;
+        if (y1 !== null && !(e.y <= y1)) return false;
+        if ((d0 !== null || d1 !== null) && !e.d) return false;
+        if (d0 !== null && e.d < d0) return false;
+        if (d1 !== null && e.d > d1) return false;
+        if (v.h && !e.h) return false;
+        if (v.a && !e.a) return false;
+        if (v.v && !e.v) return false;
+        return true;
+      });
+      var byLoc = function (a, b) { return a.l < b.l ? -1 : a.l > b.l ? 1 : 0; };
+      var sorts = {
+        old: function (a, b) { return (a.y || 9999) - (b.y || 9999) || byLoc(a, b); },
+        hard: function (a, b) { return (b.d || 0) - (a.d || 0) || b.y - a.y || byLoc(a, b); },
+        easy: function (a, b) { return (a.d || 99) - (b.d || 99) || b.y - a.y || byLoc(a, b); }
+      };
+      hits.sort(sorts[v.s] || function (a, b) { return b.y - a.y || byLoc(a, b); });
+      fstatus.textContent = hits.length === 1 ? "1 problem" : hits.length + " problems";
+      rows.innerHTML = "";
+      shown = 0;
+      show(200);
+    };
+    new URL(location.href).searchParams.forEach(function (val, key) {
+      var el = facets.elements[key];
+      if (!el) return;
+      if (el.type === "checkbox") el.checked = val === "1"; else el.value = val;
+    });
+    more.addEventListener("click", function () { show(200); });
+    facets.addEventListener("input", apply);
+    facets.addEventListener("change", apply);
+    facets.addEventListener("submit", function (e) { e.preventDefault(); });
+    fetch(facets.getAttribute("data-facets")).then(function (r) { return r.json(); }).then(function (data) {
+      all = data;
+      apply();
+    }).catch(function () { fstatus.textContent = "The list did not load. Try again later."; });
+  }
+
   // Search: the index is one JSON file. Each word of the query must be in the title, the locator or the text.
   var results = document.getElementById("results");
   if (!results) return;
@@ -137,21 +230,4 @@
       run();
     });
   }).catch(function () { status.textContent = "The search index did not load. Try again later."; });
-  // The filter of the competition list hides each row that does not contain the text, and each group that has no row left.
-  var filter = document.querySelector("[data-filter]");
-  if (filter) {
-    filter.addEventListener("input", function () {
-      var q = filter.value.trim().toLowerCase();
-      var shown = 0;
-      document.querySelectorAll("[data-row]").forEach(function (row) {
-        var hit = row.getAttribute("data-text").toLowerCase().indexOf(q) >= 0;
-        row.hidden = !hit;
-        if (hit) shown++;
-      });
-      document.querySelectorAll("[data-group]").forEach(function (g) {
-        g.hidden = !g.querySelector("[data-row]:not([hidden])");
-      });
-      document.querySelector("[data-empty]").hidden = shown > 0;
-    });
-  }
 })();

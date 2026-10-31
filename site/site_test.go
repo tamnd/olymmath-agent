@@ -159,6 +159,19 @@ func TestBand(t *testing.T) {
 	}
 }
 
+func TestFacets(t *testing.T) {
+	out := build(t, "/")
+	f := read(t, out, "problems/index.html")
+	for _, want := range []string{`data-facets="/search.json"`, `<option value="imo" data-country="">International Mathematical Olympiad</option>`, `<option value="N">Number theory</option>`, `<option value="proof">proof</option>`} {
+		if !strings.Contains(f, want) {
+			t.Errorf("problems/index.html has no %q", want)
+		}
+	}
+	if !strings.Contains(read(t, out, "search.json"), `"k":"proof"`) {
+		t.Error("the search index has no type")
+	}
+}
+
 func TestCountryName(t *testing.T) {
 	if countryName("VN") != "Vietnam" || countryName("ZZ") != "ZZ" {
 		t.Error("countryName is wrong")

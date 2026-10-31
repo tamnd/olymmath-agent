@@ -125,6 +125,7 @@ func (b *builder) all() error {
 		b.coverage,
 		b.sources,
 		b.topics,
+		b.facets,
 		b.searchIndex,
 		b.machine,
 	}
@@ -898,7 +899,30 @@ type searchEntry struct {
 	Comp     string   `json:"c"`
 	Topics   []string `json:"g,omitempty"`
 	Band     int      `json:"d,omitempty"`
-	Locator  string   `json:"l"`
+	Type     string   `json:"k,omitempty"`
+	// Human, AI and Verified are 1 when the problem has a human or official solution, has an AI solution, or has a verified statement.
+	Human    int    `json:"h,omitempty"`
+	AI       int    `json:"a,omitempty"`
+	Verified int    `json:"v,omitempty"`
+	Locator  string `json:"l"`
+}
+
+// hasOrigin tells if the problem has a solution with one of the origins.
+func hasOrigin(p *content.Problem, origins ...string) bool {
+	for _, s := range p.Solutions {
+		if slices.Contains(origins, s.Origin) {
+			return true
+		}
+	}
+	return false
+}
+
+// flag gives 1 for true and 0 for false, so that the search index can leave out a false key.
+func flag(ok bool) int {
+	if ok {
+		return 1
+	}
+	return 0
 }
 
 func (b *builder) searchIndex() error {
@@ -913,6 +937,10 @@ func (b *builder) searchIndex() error {
 			Comp:     p.Competition,
 			Topics:   p.Topics,
 			Band:     p.Band(),
+			Type:     p.Type,
+			Human:    flag(hasOrigin(p, "human", "official", "human+ai")),
+			AI:       flag(hasOrigin(p, "ai")),
+			Verified: flag(p.Status.Statement == "verified"),
 			Locator:  p.Locator(),
 		})
 	}
