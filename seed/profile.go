@@ -23,6 +23,8 @@ type Row struct {
 	Answer    string   `json:"answer,omitempty"`
 	Solutions int      `json:"solutions,omitempty"`
 	Ref       string   `json:"ref,omitempty"`
+	// Author is the id of the register source that wrote the text, when it is not the dataset. For example, the NuminaMath rows from the notes files have the texts of Evan Chen.
+	Author string `json:"author,omitempty"`
 }
 
 // Profile tells how to read the rows of one dataset.
@@ -85,6 +87,14 @@ func numinaLabels(exam, path string) []string {
 	return labels(exam)
 }
 
+// numinaAuthor gives the author of a NuminaMath row from its resource path. The files that end in "-notes.jsonl" have the texts of the notes of Evan Chen.
+func numinaAuthor(path string) string {
+	if strings.HasSuffix(path, "-notes.jsonl") {
+		return "evanchen"
+	}
+	return ""
+}
+
 // Profiles maps a source id of the source register to the profile of its dataset. A source with no profile uses Generic.
 var Profiles = map[string]Profile{
 	"hf-mathnet": {
@@ -106,6 +116,7 @@ var Profiles = map[string]Profile{
 			return Row{
 				Labels: numinaLabels(r.Get("exam"), r.Get("metadata.resource_path")), Year: y, Number: r.Get("problem_label"), Lang: "en",
 				Statement: r.Get("problem"), Solutions: count(r, "solution"), Ref: r.Get("metadata.resource_path"),
+				Author: numinaAuthor(r.Get("metadata.resource_path")),
 			}, r.Get("problem") != ""
 		},
 	},
@@ -116,6 +127,7 @@ var Profiles = map[string]Profile{
 			return Row{
 				Labels: numinaLabels(r.Get("metadata.exam"), r.Get("metadata.resource_path")), Year: y, Number: r.Get("metadata.problem_label"), Lang: "en",
 				Statement: r.Get("problem"), Answer: r.Get("answer"), Solutions: count(r, "solution"), Ref: r.Get("metadata.resource_path"),
+				Author: numinaAuthor(r.Get("metadata.resource_path")),
 			}, r.Get("problem") != ""
 		},
 	},

@@ -25,8 +25,9 @@ func TestSeedsLocate(t *testing.T) {
 	}}
 	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO"}, Year: 2023, Statement: text})
 	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO"}, Year: 2022, Statement: text})
+	s.Add(seed.Row{Source: "imo-official", Author: "evanchen", Labels: []string{"IMO"}, Year: 2023, Number: "5", Statement: text})
 	got := s.Candidates()
-	if len(got["imo/2023/p4"]) != 1 || s.Located != 1 || s.Skipped["no valid position"] != 1 {
+	if len(got["imo/2023/p4"]) != 1 || len(got["imo/2023/p5"]) != 0 || s.Located != 1 || s.Skipped["no valid position"] != 1 || s.Skipped["text in zone Z3"] != 1 {
 		t.Errorf("candidates %v, located %d, skipped %v", got, s.Located, s.Skipped)
 	}
 }

@@ -14,6 +14,7 @@ import (
 
 	"github.com/tamnd/olymmath-agent/canon"
 	"github.com/tamnd/olymmath-agent/content"
+	"github.com/tamnd/olymmath-agent/normalize"
 	"github.com/tamnd/olymmath-agent/official"
 	"github.com/tamnd/olymmath-agent/review"
 	"github.com/tamnd/olymmath-agent/seed"
@@ -30,7 +31,7 @@ func runImport(env Env, args []string) int {
 	dir := fs.String("seed", seed.DefaultDir(), "the directory of the seed rows")
 	comps := fs.String("comp", "", "a comma-separated list of competition codes; the default is all competitions")
 	dry := fs.Bool("dry", false, "print the plan and write no file")
-	anchor := fs.Bool("anchor", false, "give a position to each IMO row with no number from the official papers in the raw store")
+	anchor := fs.Bool("anchor", false, "give a position to each IMO row with no number from the official papers in the raw store, and to each other row with no number from the texts of zone Z3")
 	dir2, remote := storeFlags(fs)
 	maxDoubt := fs.Float64("max-doubt", canon.MaxDoubt, "skip a competition whose review doubts per appearance are above this share")
 	if _, err := parseMixed(fs, args); err != nil {
@@ -58,6 +59,11 @@ func runImport(env Env, args []string) int {
 	if *comps != "" {
 		s.Comps = strings.Split(*comps, ",")
 	}
+	sources, err := seed.Sources(*dir)
+	if err != nil {
+		fmt.Fprintf(env.Stderr, "om import: %v\n", err)
+		return ExitFailure
+	}
 	if *anchor {
 		st, err := openStore(*dir2, *remote)
 		if err != nil {
@@ -69,18 +75,19 @@ func runImport(env Env, args []string) int {
 			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
 			return ExitFailure
 		}
-		fmt.Fprintf(env.Stderr, "om import: %d official papers.\n", len(papers))
-		s.Locate = func(code string, year int, text string) string {
-			if code != "imo" {
-				return ""
-			}
-			return papers.Locate("imo/"+strconv.Itoa(year), text)
+		keys, err := zoneKeys(*dir, sources, corpus, al)
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
+			return ExitFailure
 		}
-	}
-	sources, err := seed.Sources(*dir)
-	if err != nil {
-		fmt.Fprintf(env.Stderr, "om import: %v\n", err)
-		return ExitFailure
+		fmt.Fprintf(env.Stderr, "om import: %d official papers, %d editions with texts of zone Z3.\n", len(papers), len(keys))
+		s.Locate = func(code string, year int, text string) string {
+			ed := code + "/" + strconv.Itoa(year)
+			if code == "imo" {
+				return papers.Locate(ed, text)
+			}
+			return keys.Locate(ed, text)
+		}
 	}
 	for _, src := range sources {
 		if err := seed.Read(*dir, src, func(r seed.Row) error { s.Add(r); return nil }); err != nil {
@@ -204,10 +211,37 @@ func runImport(env Env, args []string) int {
 	}
 	sort.Strings(reasons)
 	if *anchor {
-		fmt.Fprintf(env.Stdout, "%d rows got a position from an official paper.\n", s.Located)
+		fmt.Fprintf(env.Stdout, "%d rows got a position from an official paper or from a text of zone Z3.\n", s.Located)
 	}
 	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, len(items), strings.Join(reasons, ", "))
 	return ExitOK
+}
+
+// zoneKeys gives the texts of zone Z3 with a known position, by edition. A text of zone Z3 is a link only, so the import does not publish it, but it can give the position of a row with no number, for example an AoPS row of a USAMO problem.
+func zoneKeys(dir string, sources []string, corpus *content.Corpus, al *seed.Aliases) (official.Papers, error) {
+	z3 := func(id string) bool {
+		src := corpus.Source(id)
+		return src != nil && src.Zone.Statement == "Z3"
+	}
+	keys := official.Papers{}
+	for _, src := range sources {
+		err := seed.Read(dir, src, func(r seed.Row) error {
+			if !z3(r.Source) && !z3(r.Author) {
+				return nil
+			}
+			code, pos := al.Code(r.Labels), seed.Position(r.Number)
+			if code == "" || code == "-" || r.Year == 0 || pos == "" {
+				return nil
+			}
+			ed := code + "/" + strconv.Itoa(r.Year)
+			keys[ed] = append(keys[ed], official.Segment{Position: pos, Text: normalize.Statement(r.Statement, pos)})
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", src, err)
+		}
+	}
+	return keys, nil
 }
 
 // original gives the original language of a competition, or "" when the register does not say.

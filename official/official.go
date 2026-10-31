@@ -184,19 +184,24 @@ const Margin = 0.15
 // Papers holds the segments of the papers of each edition.
 type Papers map[string][]Segment
 
-// Locate gives the position of a text in the paper of an edition: the position of the segment with the best word signal. It gives "" when the edition has no paper, when the best signal is less than Least, or when the second best signal is less than Margin below the best.
+// Locate gives the position of a text in the paper of an edition: the position of the segment with the best word signal. It gives "" when the edition has no paper, when the best signal is less than Least, or when the best signal of another position is less than Margin below the best. Two segments of one position, for example two copies of one text, do not compete.
 func (ps Papers) Locate(edition, text string) string {
-	best, second, pos := 0.0, 0.0, ""
+	best := map[string]float64{}
 	for _, sg := range ps[edition] {
-		t := Signal(text, sg.Text)
+		if t := Signal(text, sg.Text); t > best[sg.Position] {
+			best[sg.Position] = t
+		}
+	}
+	top, second, pos := 0.0, 0.0, ""
+	for p, t := range best {
 		switch {
-		case t > best:
-			best, second, pos = t, best, sg.Position
+		case t > top || (t == top && p < pos):
+			top, second, pos = t, top, p
 		case t > second:
 			second = t
 		}
 	}
-	if best < Least || best-second < Margin {
+	if top < Least || top-second < Margin {
 		return ""
 	}
 	return pos
