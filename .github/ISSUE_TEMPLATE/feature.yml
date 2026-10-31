@@ -1,0 +1,16 @@
+name: Feature
+description: Ask for a new function or a new command.
+labels: ["type: feature"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: The need
+      description: Tell us what you want to do and why you cannot do it now.
+    validations:
+      required: true
+  - type: textarea
+    id: spec
+    attributes:
+      label: The specification
+      description: Give the section of spec/ that this concerns, if you know it.
