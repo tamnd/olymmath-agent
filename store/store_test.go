@@ -206,3 +206,46 @@ func TestCursor(t *testing.T) {
 		t.Fatalf("got %q", c)
 	}
 }
+
+func TestSyncRestore(t *testing.T) {
+	rem := &memRemote{objs: map[string][]byte{}}
+	dir := t.TempDir()
+	s, _ := Open(dir, rem)
+	a, err := s.PutBytes([]byte("alpha"), Capture{Source: "src-a", URL: "u1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.PutBytes([]byte("beta"), Capture{Source: "org/b", URL: "u2"}); err != nil {
+		t.Fatal(err)
+	}
+	st, err := s.Sync(context.Background(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.Blobs != 2 || st.Indexes != 2 || rem.objs[Key(a.Hash)] == nil || rem.objs[ListKey] == nil {
+		t.Fatalf("sync %+v, keys %d", st, len(rem.objs))
+	}
+	// A second run sends no blob again.
+	if st, _ := s.Sync(context.Background(), nil); st.Blobs != 0 || st.Skipped != 2 {
+		t.Errorf("second sync %+v", st)
+	}
+	// A new store with the same remote gets the index back and reads the bytes from the remote.
+	s2, _ := Open(t.TempDir(), rem)
+	n, err := s2.Restore(context.Background())
+	if err != nil || n != 2 {
+		t.Fatalf("restore %d %v", n, err)
+	}
+	cs, _ := s2.Captures("org/b")
+	if len(cs) != 1 {
+		t.Fatalf("captures %+v", cs)
+	}
+	rc, err := s2.Get(context.Background(), a.Hash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(rc)
+	rc.Close()
+	if string(b) != "alpha" {
+		t.Errorf("bytes %q", b)
+	}
+}

@@ -12,7 +12,7 @@ import (
 )
 
 func init() {
-	register(command{"store", "use the raw store (om store ls, put, cat, push)", runStore})
+	register(command{"store", "use the raw store (om store ls, put, cat, push, sync, restore)", runStore})
 }
 
 // storeFlags adds the flags that each command of the raw store has.
@@ -39,6 +39,8 @@ const storeUsage = `usage:
   om store put -source S [-url U] FILE    add a file to the store
   om store cat HASH                       write the bytes of a hash to stdout
   om store push [-evict] HASH...          send local bytes to the R2 bucket
+  om store sync                           send each new local blob and each index file to the R2 bucket
+  om store restore                        get the index files from the R2 bucket
 `
 
 func runStore(env Env, args []string) int {
@@ -57,7 +59,7 @@ func runStore(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if sub == "push" {
+	if sub == "push" || sub == "sync" || sub == "restore" {
 		*remote = true
 	}
 	s, err := openStore(*dir, *remote)
@@ -120,6 +122,20 @@ func runStore(env Env, args []string) int {
 		if _, err := io.Copy(env.Stdout, rc); err != nil {
 			return fail(err)
 		}
+		return ExitOK
+	case "sync":
+		st, err := s.Sync(ctx, env.Stderr)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Fprintf(env.Stdout, "%d blobs sent (%d MB), %d already sent, %d index files\n", st.Blobs, st.Bytes>>20, st.Skipped, st.Indexes)
+		return ExitOK
+	case "restore":
+		n, err := s.Restore(ctx)
+		if err != nil {
+			return fail(err)
+		}
+		fmt.Fprintf(env.Stdout, "%d index files restored\n", n)
 		return ExitOK
 	case "push":
 		if len(pos) == 0 {
