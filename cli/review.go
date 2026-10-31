@@ -15,7 +15,7 @@ func init() {
 func runReview(env Env, args []string) int {
 	fs := newFlags("review", env.Stderr)
 	root := fs.String("content", ".", "the root of the content repository")
-	kind := fs.String("kind", "", "show only the items of this kind: pair, doubt, dispute or canonical")
+	kind := fs.String("kind", "", "show only the items of this kind: pair, doubt, dispute, canonical or official")
 	limit := fs.Int("n", 20, "show at most this number of items; 0 means all items")
 	decide := fs.String("decide", "", "the id of the item or the merge to decide")
 	as := fs.String("as", "", "the decision: "+strings.Join(review.Decisions, ", "))

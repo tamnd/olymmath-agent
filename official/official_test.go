@@ -1,0 +1,77 @@
+package official
+
+import (
+	"testing"
+
+	"github.com/tamnd/olymmath-agent/content"
+)
+
+const paperText = `Language: English
+Day: 1
+Monday, July 15, 2024
+Problem 1. Determine all real numbers a such that, for every positive integer n, the integer
+x is a multiple of n.
+Problem 2. Determine all pairs (a, b) of positive integers for which there exist positive
+integers g and N such that gcd(a^n + b, b^n + a) = g holds for all integers n ≥ N.
+` + "\f" + `Language: English
+Day: 2
+Problem 4. Let ABC be a triangle with AB < AC < BC.
+Problem 1. Une copie dans une autre langue.
+`
+
+func TestSplit(t *testing.T) {
+	segs := Split(paperText)
+	if len(segs) != 3 {
+		t.Fatalf("got %d segments, want 3: %+v", len(segs), segs)
+	}
+	if segs[0].Position != "p1" || segs[0].Page != 1 || segs[0].Text != "Determine all real numbers a such that, for every positive integer n, the integer x is a multiple of n." {
+		t.Errorf("segment 1: %+v", segs[0])
+	}
+	if segs[2].Position != "p4" || segs[2].Page != 2 || segs[2].Text != "Let ABC be a triangle with AB < AC < BC." {
+		t.Errorf("segment 3: %+v", segs[2])
+	}
+	old := Split("1959/1. Prove that the fraction is irreducible.\n1959/2. For what real values of x")
+	if len(old) != 2 || old[1].Position != "p2" {
+		t.Errorf("old markers: %+v", old)
+	}
+}
+
+func TestSignal(t *testing.T) {
+	if s := Signal(`Let $\triangle ABC$ be a triangle`, "Let ABC be a triangle."); s != 1 {
+		t.Errorf("same words: %v", s)
+	}
+	if s := Signal("Find all functions", "Prove that the sum is odd"); s != 0 {
+		t.Errorf("other words: %v", s)
+	}
+	if s := Signal("", "words"); s != 0 {
+		t.Errorf("empty: %v", s)
+	}
+}
+
+func TestIMO(t *testing.T) {
+	ps := IMO(1979, 1981)
+	if len(ps) != 2 || ps[1].Edition != "imo/1981" || ps[1].URL != "https://www.imo-official.org/assets/documents/problems/1981/1981_eng.pdf" {
+		t.Errorf("papers: %+v", ps)
+	}
+}
+
+func TestAnchor(t *testing.T) {
+	p1 := &content.Problem{Tag: "a", Appearances: []content.Appearance{{At: "imo/2024/p1"}}, Canonical: content.Canonical{Statement: "S1"},
+		Statements: []content.Statement{{ID: "S1", Source: "aops", Text: "Determine all real numbers $a$ such that for every positive integer $n$ the integer $x$ is a multiple of $n$."}}}
+	p2 := &content.Problem{Tag: "b", Appearances: []content.Appearance{{At: "imo/2024/p2"}}, Canonical: content.Canonical{Statement: "S1"},
+		Statements: []content.Statement{{ID: "S1", Source: "aops", Text: "Find all functions on the reals with a strange property."}}}
+	p4 := &content.Problem{Tag: "c", Appearances: []content.Appearance{{At: "imo/2024/p4"}}, Canonical: content.Canonical{Statement: "S1"},
+		Statements: []content.Statement{{ID: "S1", Source: "imo-official"}}}
+	owners := map[string]*content.Problem{"imo/2024/p1": p1, "imo/2024/p2": p2, "imo/2024/p4": p4}
+	segs := append(Split(paperText), Segment{Position: "p5", Page: 2, Text: "x"})
+	r := Anchor(owners, "imo-official", Paper{Edition: "imo/2024", URL: "u"}, segs)
+	if len(r.Links) != 1 || r.Links[0].Problem != p1 || r.Links[0].Segment.Page != 1 {
+		t.Errorf("links: %+v", r.Links)
+	}
+	if len(r.Items) != 1 || r.Items[0].At != "imo/2024/p2" || r.Items[0].Kind != "official" || len(r.Items[0].ID) != 12 {
+		t.Errorf("items: %+v", r.Items)
+	}
+	if r.Have != 1 || len(r.Missing) != 1 || r.Missing[0] != "imo/2024/p5" {
+		t.Errorf("have %d, missing %v", r.Have, r.Missing)
+	}
+}

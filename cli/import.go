@@ -157,6 +157,17 @@ func runImport(env Env, args []string) int {
 		}
 	}
 	if !*dry {
+		// The items of om anchor stay, because an import does not make them.
+		old, err := review.Queue(*root)
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
+			return ExitFailure
+		}
+		for _, it := range old {
+			if it.Kind == "official" {
+				items = append(items, it)
+			}
+		}
 		if err := writeQueue(*root, items); err != nil {
 			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
 			return ExitFailure

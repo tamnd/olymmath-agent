@@ -57,6 +57,14 @@ om audit -content olymmath
 
 The `om new` command makes a file with the correct front matter and adds the new tag to `registers/tags.tsv`. The command does not write over a file. The `om fmt` command puts the front matter keys in the standard order. Use `om fmt -check` in CI to find files that are not formatted. The `om audit` command runs all the rules. Use `om audit -list` to see the rules.
 
+## Anchor to the official papers
+
+```
+om anchor -content olymmath imo-official
+```
+
+The `om anchor` command gets the official English IMO papers into the raw store and reads their text with `pdftotext`. You must install Poppler to get `pdftotext`. The command compares each problem of a paper with the canonical text of the same problem in the content. When the words agree, the command adds a link to the paper and its page. When the words do not agree, the command adds a review item of kind `official` to the review queue. The command does not change a canonical text. Use `-from` and `-to` to select the years.
+
 ## Layout
 
 | Path | What it has |
