@@ -75,6 +75,8 @@ type builder struct {
 	stats  Stats
 	pages  []string // the URL paths for the sitemap
 	asset  string   // the version suffix of the assets, for cache busting
+	// similar gives the similar problems of each problem.
+	similar map[*content.Problem][]*content.Problem
 }
 
 func newBuilder(corpus *content.Corpus, opts Options) (*builder, error) {
@@ -118,6 +120,7 @@ func (b *builder) all() error {
 		b.assets,
 		b.home,
 		b.competitions,
+		b.findSimilar,
 		b.editions,
 		b.problems,
 		b.redirects,
@@ -344,6 +347,8 @@ type problemView struct {
 	Solutions []solutionView
 	// Also lists the other appearances of the problem, with links to their editions.
 	Also []alsoView
+	// Similar are the problems with the most similar statements.
+	Similar []alsoView
 	// Label names the position in its edition, for example "Problem 3" or "G1".
 	Label string
 	// Primary is the title of the primary appearance when the view shows the problem in another edition.
@@ -398,6 +403,9 @@ func (b *builder) view(p *content.Problem) *problemView {
 		if c := b.corpus.Competition(a.Locator.Comp); c != nil {
 			v.Also = append(v.Also, alsoView{Title: appearanceTitle(c, a.Locator.Edition, a.Locator.Position), Link: b.link("/" + a.Locator.Comp + "/" + a.Locator.Edition + "/#" + a.Locator.Position)})
 		}
+	}
+	for _, q := range b.similar[p] {
+		v.Similar = append(v.Similar, alsoView{Title: problemTitle(q), Link: b.link(problemPath(q))})
 	}
 	return v
 }
