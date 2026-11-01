@@ -23,7 +23,7 @@ type Topics struct {
 	topics map[string]map[string]bool
 }
 
-// Add reads one row of a numbered source. When the text of the row starts with a line that names the paper and the problem, the position comes from that line and the layout of the competition, because the source numbers some papers again from 1. A row with no year, no number or no topic link gives nothing, except a row whose text is a title that gives the year, as described at TitleAt. When two rows give one topic two different appearances, the topic gets no appearance. When two topics claim one appearance, neither gets it, because the source numbers some papers again from 1 on each day, as the AoPS wiki does for some years of the IMO.
+// Add reads one row of a numbered source. When the text of the row starts with a line that names the paper and the problem, the position comes from that line and the layout of the competition, because the source numbers some papers again from 1. A row with no year, no number or no topic link gives nothing, except a row whose text is a title that gives the year, as described at TitleAt. When the text is a title that names the problem, such as "Vietnam MO 1982 P5", the position comes from the title, as described at TitlePosition. When two rows give one topic two different appearances, the topic gets no appearance. When two topics claim one appearance, neither gets it, because the source numbers some papers again from 1 on each day, as the AoPS wiki does for some years of the IMO.
 func (t *Topics) Add(r seed.Row) {
 	m := topicRE.FindStringSubmatch(r.Ref)
 	pos := seed.Position(r.Number)
@@ -43,13 +43,24 @@ func (t *Topics) Add(r seed.Row) {
 		letter = Letter(r.Labels)
 	}
 	if year == 0 {
-		var ok bool
-		if year, pos, letter, ok = TitleAt(comp, r.Statement, pos); !ok {
+		y, p, l, ok := TitleAt(comp, r.Statement, pos)
+		if !ok && letter == "" {
+			// The number of the title can differ from the number column. TitlePosition then reads the title.
+			if ys := titleYearRE.FindAllString(r.Statement, -1); len(ys) == 1 {
+				y, _ = strconv.Atoi(ys[0])
+				p = TitlePosition(comp, t.Aliases, y, pos, r.Statement)
+				ok = p != "" && (comp == nil || comp.EditionForm != "year-letter")
+			}
+		}
+		if !ok {
 			return
 		}
+		year, pos, letter = y, p, l
 	} else if p, _, ok := PaperPosition(comp, year, r.Statement); ok {
 		pos = p
 	} else if p, ok := namedPaper(comp, year, r.Statement, pos); ok {
+		pos = p
+	} else if p := TitlePosition(comp, t.Aliases, year, pos, r.Statement); p != "" {
 		pos = p
 	}
 	if pos == "" {
@@ -207,4 +218,51 @@ func PaperPosition(c *content.Competition, year int, text string) (pos, rest str
 		return p, rest, true
 	}
 	return "", rest, true
+}
+
+var (
+	// sectionRE finds a problem of a shortlist with sections in a title, for example "G2", "Algebra 2" or "number theory problem 4".
+	sectionRE = regexp.MustCompile(`(?i)(?:^|[^a-z])(algebra|combinatorics|geometry|number theory|[acgn])\s*(?:problem\s*)?#?\s*([0-9]{1,2})\b`)
+	// shortlistRE tells that a title names a shortlist.
+	shortlistRE = regexp.MustCompile(`(?i)short\s*list|\bisl\b`)
+	// numberRE matches a title that ends with the number of the problem, for example "Vietnam MO 1982 P5" or "Iberoamerican 2004 problem 6". The name before the number has one year and no other digit.
+	numberRE = regexp.MustCompile(`(?i)^([^0-9]*?)\b((?:19|20)[0-9]{2})\b([^0-9]*?)(?:\bp|\bproblem|\bq|#)\s*\.?\s*([0-9]{1,2})\s*[.:]?$`)
+	// partRE finds a word that names a part of an edition, such as a day, a grade or a level. The number after the word "P" can then count from 1 in that part.
+	partRE = regexp.MustCompile(`(?i)\b(short\s*list|long\s*list|day|grade|class|level|junior|senior|test|exam|round|paper|quiz|tst|team|individual|part|and)\b|&`)
+)
+
+// TitlePosition reads the title of a problem, such as "Vietnam MO 1982 P5" or "IMO Shortlist 2011 G2", and gives the position that it names in the competition c in the year. It gives "" when the title does not name exactly one position. The AoPS wiki gives each topic the number of the problem in its day or in its section, so that number is not the position in many editions. Agent decision: the number in the title is the position, because the title names it and the wiki number does not. For a competition with sections, such as the IMO Shortlist, the title must name the shortlist and one section, and the position is the section letter and the number. For other competitions, the title replaces only a plain number pos. A title that names a day, a grade or another part does not give a position, because the parts of the edition are not known, and the number then counts from 1 in the part. A title that names another competition does not give a position.
+func TitlePosition(c *content.Competition, al *seed.Aliases, year int, pos, text string) string {
+	text = strings.TrimSpace(text)
+	if c == nil || text == "" || strings.ContainsAny(text, "\n$") || len(text) > 80 || !strings.Contains(text, strconv.Itoa(year)) {
+		return ""
+	}
+	if c.TopicPositions {
+		ms := sectionRE.FindAllStringSubmatch(text, -1)
+		if len(ms) != 1 || !shortlistRE.MatchString(text) {
+			return ""
+		}
+		n, _ := strconv.Atoi(ms[0][2])
+		if n == 0 {
+			return ""
+		}
+		return strings.ToLower(ms[0][1][:1]) + strconv.Itoa(n)
+	}
+	if pos != "" && pos[0] != 'p' {
+		return ""
+	}
+	m := numberRE.FindStringSubmatch(text)
+	if m == nil || m[2] != strconv.Itoa(year) || partRE.MatchString(m[1]+" "+m[3]) {
+		return ""
+	}
+	if name := strings.TrimSpace(m[1] + " " + m[3]); al != nil && name != "" {
+		if code := al.Code([]string{name}); code != "" && code != c.Code {
+			return ""
+		}
+	}
+	n, _ := strconv.Atoi(m[4])
+	if n == 0 {
+		return ""
+	}
+	return "p" + strconv.Itoa(n)
 }
