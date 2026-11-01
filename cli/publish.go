@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/tamnd/olymmath-agent/content"
@@ -16,6 +17,7 @@ func runSiteSplit(env Env, args []string) int {
 	root := fs.String("content", ".", "the root of the content repository")
 	in := fs.String("in", "build/site", "the built site. The static assets stay here")
 	out := fs.String("out", "build/r2", "the directory for the files that go to R2")
+	maxAssets := fs.Int("max-assets", 19000, "the most static asset files. The free plan of Workers allows 20000 for each version, and om site pack adds one index for each folder")
 	if err := fs.Parse(args); err != nil {
 		return ExitUsage
 	}
@@ -35,6 +37,14 @@ func runSiteSplit(env Env, args []string) int {
 		return ExitFailure
 	}
 	fmt.Fprintf(env.Stdout, "%d redirect pages deleted, %d files moved to %s\n", deleted, moved, *out)
+	fit, codes, err := publish.Fit(*in, *out, corpus, *maxAssets)
+	if len(codes) > 0 {
+		fmt.Fprintf(env.Stdout, "%d more files moved to %s to keep the static assets at most %d: %s\n", fit, *out, *maxAssets, strings.Join(codes, ", "))
+	}
+	if err != nil {
+		fmt.Fprintf(env.Stderr, "om site split: %v\n", err)
+		return ExitFailure
+	}
 	return ExitOK
 }
 
