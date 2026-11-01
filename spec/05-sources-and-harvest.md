@@ -26,6 +26,20 @@ The register (`registers/competitions.yaml`, 14.1) starts from the catalogue in 
 
 Each row has the slug, the names in each language, first year, gaps, the positions per paper, the official URL, whether official solutions are published, the copyright note, and the sources that hold it. Lower rounds become their own competition codes when a source holds them (`ru-allrussian-regional`, `de-mo-r3`).
 
+The positions of an edition come from `layout` (papers with positions) or from `per_year` (p1 to pN). When the format changed over the years, `eras` gives the format of a range of years, and `overrides` gives the positions of one year. The top-level `layout` and `per_year` are the default for the years that no era and no override covers. An era with no `to` did not end. An era with no `layout` and no `per_year` says that the format of its years is not known: the import accepts any valid position, and the coverage report expects no position. Eras must not overlap.
+
+```yaml
+- code: isl
+  eras:
+    - {from: 1959, to: 2005}
+  layout:
+    - {paper: shortlist, name: Shortlist, positions: [a1, a2, c1, c2, g1, g2, n1, n2]}
+  overrides:
+    1970: [p1, p2, p3]
+```
+
+The coverage report, the import (`om import`, `om coverage`) and `om edit` use the format of the year of each record. Grades and rounds that share the numbers of their positions, for example grade 9 and grade 10 of `ru-allrussian`, need the paper part of the locator (`ru-allrussian/2019/g10-d2/p3`). The records and the import do not use the paper part yet, so their editions have one flat list of positions, and the register gives them no layout.
+
 ## 5.3 The source register
 
 `registers/sources.yaml` has one entry per source:

@@ -75,7 +75,6 @@ func (c Count) Percent(m int) string {
 
 // Grid gives the year grid of a competition, the newest year first, and the total count. The years go from the first year of the register to thisYear, or to the last year, with no gap year, and include each edition of the content.
 func Grid(c *content.Competition, thisYear int) ([]Row, Count) {
-	usual := shape(c)
 	editions := map[int]*content.Edition{}
 	years := map[int]bool{}
 	for _, e := range c.Editions {
@@ -84,7 +83,7 @@ func Grid(c *content.Competition, thisYear int) ([]Row, Count) {
 		}
 		years[e.Year] = true
 	}
-	if c.FirstYear > 0 && len(usual) > 0 {
+	if c.FirstYear > 0 && c.HasShape() {
 		last := thisYear
 		if c.LastYear > 0 {
 			last = c.LastYear
@@ -107,7 +106,7 @@ func Grid(c *content.Competition, thisYear int) ([]Row, Count) {
 	var rows []Row
 	var total Count
 	for _, y := range ys {
-		r := row(y, editions[y], usual)
+		r := row(y, editions[y], c.Shape(y).Positions())
 		rows = append(rows, r)
 		total.Add(r.Count)
 	}

@@ -28,14 +28,19 @@ type Competition struct {
 	Gaps        []int  `yaml:"gaps"`
 	EditionForm string `yaml:"edition_form"`
 	// TopicPositions is true when the letter of a position is the topic of the problem, as in the IMO Shortlist: a3 is algebra.
-	TopicPositions    bool     `yaml:"topic_positions"`
-	Layout            []Layout `yaml:"layout"`
-	PerYear           int      `yaml:"per_year"`
-	OfficialSolutions *bool    `yaml:"official_solutions"`
-	Languages         []string `yaml:"languages"`
-	Copyright         string   `yaml:"copyright"`
-	Sources           []string `yaml:"sources"`
-	Description       string   `yaml:"description"`
+	TopicPositions bool `yaml:"topic_positions"`
+	// Layout and PerYear give the usual format of an edition. They are the default for the years that no era and no override covers.
+	Layout  []Layout `yaml:"layout"`
+	PerYear int      `yaml:"per_year"`
+	// Eras give the format of a range of years, when the format changed over the years.
+	Eras []Era `yaml:"eras"`
+	// Overrides give the positions of one year, when the format of that year is not the format of its era.
+	Overrides         map[int][]string `yaml:"overrides"`
+	OfficialSolutions *bool            `yaml:"official_solutions"`
+	Languages         []string         `yaml:"languages"`
+	Copyright         string           `yaml:"copyright"`
+	Sources           []string         `yaml:"sources"`
+	Description       string           `yaml:"description"`
 
 	Editions []*Edition `yaml:"-"`
 }
@@ -45,6 +50,60 @@ type Layout struct {
 	Paper     string   `yaml:"paper"`
 	Name      string   `yaml:"name"`
 	Positions []string `yaml:"positions"`
+}
+
+// Era is the format of the editions of a competition from the year From to the year To. To is 0 when the era did not end. An era with no layout and no per_year says that the format of its years is not known: any valid position is accepted, and no position is expected.
+type Era struct {
+	From    int      `yaml:"from"`
+	To      int      `yaml:"to"`
+	Layout  []Layout `yaml:"layout"`
+	PerYear int      `yaml:"per_year"`
+}
+
+// Shape is the format of one edition: its papers, or its number of problems.
+type Shape struct {
+	Layout  []Layout
+	PerYear int
+}
+
+// Positions gives the positions of the shape: the positions of the papers, or p1 to pN when there is no layout.
+func (f Shape) Positions() []string {
+	var ps []string
+	for _, l := range f.Layout {
+		ps = append(ps, l.Positions...)
+	}
+	if len(ps) == 0 {
+		for i := 1; i <= f.PerYear; i++ {
+			ps = append(ps, "p"+strconv.Itoa(i))
+		}
+	}
+	return ps
+}
+
+// Shape gives the format of the edition of the year. An override of the year comes first, then the era that covers the year, then the top-level layout and per_year. The override gives one paper.
+func (c *Competition) Shape(year int) Shape {
+	if ps, ok := c.Overrides[year]; ok && year > 0 {
+		return Shape{Layout: []Layout{{Paper: "paper", Name: "Paper", Positions: ps}}, PerYear: len(ps)}
+	}
+	for _, e := range c.Eras {
+		if year > 0 && year >= e.From && (e.To == 0 || year <= e.To) {
+			return Shape{Layout: e.Layout, PerYear: e.PerYear}
+		}
+	}
+	return Shape{Layout: c.Layout, PerYear: c.PerYear}
+}
+
+// HasShape reports whether the register gives the format of at least one year of the competition.
+func (c *Competition) HasShape() bool {
+	if len(c.Layout) > 0 || c.PerYear > 0 || len(c.Overrides) > 0 {
+		return true
+	}
+	for _, e := range c.Eras {
+		if len(e.Layout) > 0 || e.PerYear > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // Groups are the groups of the competition register, in the order of the site.

@@ -154,25 +154,10 @@ func Build(corpus *content.Corpus, al *seed.Aliases, thisYear int, rows func(fn 
 	return rep, nil
 }
 
-// shape gives the usual positions of an edition, from the layout or from the number of problems for each year.
-func shape(c *content.Competition) []string {
-	var ps []string
-	for _, l := range c.Layout {
-		ps = append(ps, l.Positions...)
-	}
-	if len(ps) == 0 && c.PerYear > 0 {
-		for i := 1; i <= c.PerYear; i++ {
-			ps = append(ps, "p"+strconv.Itoa(i))
-		}
-	}
-	return ps
-}
-
 func measure(c *content.Competition, cand map[int]map[string]bool, seen map[int]int, rows, thisYear int) *Comp {
 	out := &Comp{Code: c.Code, Name: c.Name, Group: c.Group}
 	out.Rows = rows
-	usual := shape(c)
-	out.Shape = len(usual) > 0
+	out.Shape = c.HasShape()
 	editions := map[int]*content.Edition{}
 	for _, e := range c.Editions {
 		if _, ok := editions[e.Year]; !ok {
@@ -205,7 +190,7 @@ func measure(c *content.Competition, cand map[int]map[string]bool, seen map[int]
 	slices.Sort(ys)
 	for _, y := range ys {
 		yr := &Year{Year: y, Rows: seen[y]}
-		expected := usual
+		expected := c.Shape(y).Positions()
 		have := map[string]*content.Problem{}
 		if e := editions[y]; e != nil {
 			if ps := e.Positions(); len(ps) > 0 {

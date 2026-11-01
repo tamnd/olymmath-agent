@@ -104,6 +104,9 @@ func (l *loader) competitions() {
 		case c.Name == "":
 			l.add(rel, "", "the competition %q has no name", c.Code)
 		default:
+			if msg := shapeError(c); msg != "" {
+				l.add(rel, "", "the competition %q: %s", c.Code, msg)
+			}
 			if c.Short == "" {
 				c.Short = strings.ToUpper(c.Code)
 			}
@@ -463,4 +466,59 @@ func strictYAML(b []byte, v any) error {
 		return fmt.Errorf("YAML: %w", err)
 	}
 	return nil
+}
+
+// shapeError gives the first error of the layout, the eras and the overrides of a competition, or "".
+func shapeError(c *Competition) string {
+	if msg := layoutError(c.Layout, c.PerYear); msg != "" {
+		return msg
+	}
+	for i, e := range c.Eras {
+		switch {
+		case e.From <= 0:
+			return fmt.Sprintf("era %d has no from year", i+1)
+		case e.To != 0 && e.To < e.From:
+			return fmt.Sprintf("era %d ends before it starts", i+1)
+		}
+		if msg := layoutError(e.Layout, e.PerYear); msg != "" {
+			return fmt.Sprintf("era %d: %s", i+1, msg)
+		}
+		for j, o := range c.Eras[:i] {
+			if (o.To == 0 || e.From <= o.To) && (e.To == 0 || o.From <= e.To) {
+				return fmt.Sprintf("era %d overlaps era %d", i+1, j+1)
+			}
+		}
+	}
+	for y, ps := range c.Overrides {
+		if y <= 0 {
+			return fmt.Sprintf("the override year %d is not valid", y)
+		}
+		if len(ps) == 0 {
+			return fmt.Sprintf("the override of %d has no positions", y)
+		}
+		if msg := layoutError([]Layout{{Positions: ps}}, 0); msg != "" {
+			return fmt.Sprintf("the override of %d: %s", y, msg)
+		}
+	}
+	return ""
+}
+
+// layoutError gives the first error of a layout, or "". A position must be valid and must not be in the layout two times.
+func layoutError(ls []Layout, perYear int) string {
+	if perYear < 0 {
+		return fmt.Sprintf("per_year %d is negative", perYear)
+	}
+	seen := map[string]bool{}
+	for _, l := range ls {
+		for _, p := range l.Positions {
+			if _, err := locator.Parse("x/2000/" + p); err != nil {
+				return fmt.Sprintf("the position %q is not valid", p)
+			}
+			if seen[p] {
+				return fmt.Sprintf("the position %q is in the layout two times", p)
+			}
+			seen[p] = true
+		}
+	}
+	return ""
 }

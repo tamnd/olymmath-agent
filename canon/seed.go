@@ -115,7 +115,7 @@ func (s *Seeds) Add(r seed.Row) {
 	}
 	pos := seed.Position(r.Number)
 	// A line such as "Paper 2 P1" at the start of the text is surer than the number, because some sources number each paper from 1.
-	if p, rest, ok := PaperPosition(comp, r.Statement); ok {
+	if p, rest, ok := PaperPosition(comp, r.Year, r.Statement); ok {
 		pos, r.Statement = p, rest
 		if pos == "" {
 			s.skip("no valid position")
@@ -132,7 +132,7 @@ func (s *Seeds) Add(r seed.Row) {
 			s.Located++
 		}
 	}
-	if pos == "" || !validPosition(comp, pos) {
+	if pos == "" || !validPosition(comp, r.Year, pos) {
 		s.skip("no valid position")
 		return
 	}
@@ -173,7 +173,7 @@ func (s *Seeds) Add(r seed.Row) {
 		s.skip("edition form not supported")
 		return
 	}
-	if len(comp.Layout) == 0 && comp.PerYear == 0 && pos[0] != 'p' {
+	if len(comp.Shape(r.Year).Positions()) == 0 && pos[0] != 'p' {
 		if s.sections == nil {
 			s.sections = map[string]map[int]bool{}
 		}
@@ -232,17 +232,8 @@ func (s *Seeds) Candidates() map[string][]*Candidate {
 	return out
 }
 
-func validPosition(c *content.Competition, pos string) bool {
-	var all []string
-	for _, l := range c.Layout {
-		all = append(all, l.Positions...)
-	}
-	if len(all) == 0 && c.PerYear > 0 {
-		for i := 1; i <= c.PerYear; i++ {
-			all = append(all, "p"+strconv.Itoa(i))
-		}
-	}
-	if len(all) > 0 {
+func validPosition(c *content.Competition, year int, pos string) bool {
+	if all := c.Shape(year).Positions(); len(all) > 0 {
 		return slices.Contains(all, pos)
 	}
 	return positionRE.MatchString(pos)
