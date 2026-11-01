@@ -50,6 +50,8 @@ type Layout struct {
 	Paper     string   `yaml:"paper"`
 	Name      string   `yaml:"name"`
 	Positions []string `yaml:"positions"`
+	// Days is the number of days of a paper that is written over several days with the same number of problems each day, such as a league of the Tuymaada Olympiad. A title such as "Senior League Second Day P1" then counts the problem from 1 in the day. It is 0 for a paper of one day.
+	Days int `yaml:"days"`
 }
 
 // Era is the format of the editions of a competition from the year From to the year To. To is 0 when the era did not end. An era with no layout and no per_year says that the format of its years is not known: any valid position is accepted, and no position is expected.

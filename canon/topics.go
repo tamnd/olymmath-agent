@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/seed"
@@ -160,7 +161,7 @@ func TitleAt(c *content.Competition, title, pos string) (year int, at, letter st
 	return year, pos, letter, true
 }
 
-// namedPaper reads a title that names one paper of the layout of c in the year, such as "P2 Francophone MO Junior 2023" for the paper Junior. It gives the position of problem pos of that paper, or "" when the paper has no such problem. The result ok is false when the title is not a short title or does not name exactly one paper. A paper with a name such as "Day 1" or "Paper" is not named, because PaperPosition reads these.
+// namedPaper reads a title that names one paper of the layout of c in the year, such as "P2 Francophone MO Junior 2023" for the paper Junior or "Middle European MO 2013 T 5" for the position t5. It gives the position of problem pos of that paper, or "" when the paper has no such problem. The result ok is false when the title is not a short title, or when it names no position and not exactly one paper. A paper with a name such as "Day 1" or "Paper" is not named, because PaperPosition reads these. A word of the title can end at a punctuation mark, as in "(Advanced)" or "2016,Advanced". When the title ends with a problem number that is not pos, the number counts in the paper or across the papers, and the title gives no position when the two numbers do not agree. For a paper of several days, a title that names a day counts the number from 1 in that day, as described at dayPosition. A number above the size of the paper counts across the papers in the order of the layout: problem 10 of a title that names the paper Team after a paper of four problems is problem 6 of Team.
 func namedPaper(c *content.Competition, year int, title, pos string) (string, bool) {
 	if c == nil || !isTitle(title) {
 		return "", false
@@ -169,8 +170,56 @@ func namedPaper(c *content.Competition, year int, title, pos string) (string, bo
 	if len(layout) < 2 {
 		return "", false
 	}
-	words := strings.Fields(strings.ToLower(title))
-	var found *content.Layout
+	if p := layoutToken(layout, title); p != "" {
+		return p, true
+	}
+	i := namedIndex(layout, title)
+	if i < 0 {
+		return "", false
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(pos, "p"))
+	if err != nil || n < 1 {
+		return "", true
+	}
+	offset := 0
+	for _, l := range layout[:i] {
+		offset += len(l.Positions)
+	}
+	// Agent decision: in a paper of several days, the number of the title counts in the day or in the paper, and pos counts in the day, in the paper or across the days, as in "Tuymaada 2014 Day 2 P1 Junior League" with pos p5. The number of the title is used when one of these counts explains pos.
+	if d := titleDay(title); d > 0 && layout[i].Days > 1 {
+		t := titleMark(title)
+		if t == 0 {
+			return dayPosition(layout[i], d, n), true
+		}
+		before := (d - 1) * (len(layout[i].Positions) / layout[i].Days)
+		if t != n && t+before != n && t-before != n {
+			return "", true
+		}
+		return dayPosition(layout[i], d, t), true
+	}
+	// Agent decision: the number of the title and pos can count in two ways, from 1 in the paper or across the papers. When the offset of the paper explains the difference, as in "MEMO 2008 Team P5" for problem 1 of Team, or in "MEMO 2009 problem 1 team competition" with pos p5, the number in the paper is used. Else the true number is not known.
+	if t := titleMark(title); t > 0 && t != n {
+		switch {
+		case t+offset == n:
+			n = t
+		case t-offset != n:
+			return "", true
+		}
+	}
+	ps := layout[i].Positions
+	if n <= len(ps) {
+		return ps[n-1], true
+	}
+	if n > offset && n <= offset+len(ps) {
+		return ps[n-offset-1], true
+	}
+	return "", true
+}
+
+// namedIndex gives the index of the one paper of the layout that the text names, -1 when it names none and -2 when it names more than one. A paper with a name that has a space or a digit, or the name "Paper", is never named.
+func namedIndex(layout []content.Layout, text string) int {
+	words := strings.FieldsFunc(strings.ToLower(text), func(r rune) bool { return !unicode.IsLetter(r) })
+	found := -1
 	for i := range layout {
 		name := strings.ToLower(layout[i].Name)
 		if name == "" || strings.ContainsAny(name, " 0123456789") || name == "paper" {
@@ -179,19 +228,80 @@ func namedPaper(c *content.Competition, year int, title, pos string) (string, bo
 		if !slices.ContainsFunc(words, func(w string) bool { return strings.HasPrefix(w, name) }) {
 			continue
 		}
-		if found != nil {
-			return "", false
+		if found >= 0 {
+			return -2
 		}
-		found = &layout[i]
+		found = i
 	}
-	if found == nil {
-		return "", false
+	return found
+}
+
+// tokenRE finds a position with a letter in a title, such as "T 5" in "Middle European MO 2013 T 5", "J1" in "Tuymaada 2021 / J1", "I-3" or "PI 3".
+var tokenRE = regexp.MustCompile(`(?i)(?:^|[^a-z0-9])p?([a-z])\s*-?\s*([0-9]{1,2})(?:[^0-9]|$)`)
+
+// layoutToken gives the position that a title names with its letter, such as t5 for "Middle European MO 2013 T 5", when that position is in the layout and its letter is not p. It gives "" when the title names no such position or more than one.
+func layoutToken(layout []content.Layout, title string) string {
+	var all []string
+	for _, l := range layout {
+		all = append(all, l.Positions...)
 	}
-	n, err := strconv.Atoi(strings.TrimPrefix(pos, "p"))
-	if err != nil || n < 1 || n > len(found.Positions) {
-		return "", true
+	found := ""
+	for _, m := range tokenRE.FindAllStringSubmatch(title, -1) {
+		letter := strings.ToLower(m[1])
+		n, _ := strconv.Atoi(m[2])
+		p := letter + strconv.Itoa(n)
+		if letter == "p" || !slices.Contains(all, p) {
+			continue
+		}
+		if found != "" && found != p {
+			return ""
+		}
+		found = p
 	}
-	return found.Positions[n-1], true
+	return found
+}
+
+// titleMark gives the number after the one mark of a problem number in a title, such as 5 for "MEMO 2008 Team P5" or 1 for "MEMO 2009 problem 1 team competition". It gives 0 when the title has no such mark or more than one.
+func titleMark(title string) int {
+	ms := titleMarkNumRE.FindAllStringSubmatch(title, -1)
+	if len(ms) != 1 || len(titleMarkRE.FindAllString(title, -1)) != 1 {
+		return 0
+	}
+	n, _ := strconv.Atoi(ms[0][1])
+	return n
+}
+
+// titleMarkNumRE finds the number after a mark of a problem number in a title.
+var titleMarkNumRE = regexp.MustCompile(`(?i)(?:\bp|#|\bproblem|\bq|\bpb|/)\s*\.?\s*([0-9]{1,2})\b`)
+
+// dayRE finds the day in a title, such as "Day 2" or "Second Day".
+var dayRE = regexp.MustCompile(`(?i)\b(?:day\s*([1-9])|(first|second|third)\s+day)\b`)
+
+// titleDay gives the day that a text names, or 0 when it names no day or more than one.
+func titleDay(text string) int {
+	ms := dayRE.FindAllStringSubmatch(text, -1)
+	if len(ms) != 1 {
+		return 0
+	}
+	if ms[0][1] != "" {
+		d, _ := strconv.Atoi(ms[0][1])
+		return d
+	}
+	return ordinals[strings.ToLower(ms[0][2])]
+}
+
+// dayPosition gives the position of problem n of day d of the paper l, which has l.Days days with the same number of problems each. The number counts from 1 in the day, as in "Senior League Second Day P1", or it is a number of the paper, as in "Day 2 P5". It gives "" when the paper has no such problem.
+func dayPosition(l content.Layout, d, n int) string {
+	per := len(l.Positions) / l.Days
+	switch {
+	case d < 1 || d > l.Days || n < 1:
+		return ""
+	case n <= per:
+		return l.Positions[(d-1)*per+n-1]
+	case n > (d-1)*per && n <= d*per:
+		return l.Positions[n-1]
+	}
+	return ""
 }
 
 var (
@@ -238,6 +348,14 @@ func PaperPosition(c *content.Competition, year int, text string) (pos, rest str
 	}
 	n, _ := strconv.Atoi(text[m[6]:m[7]])
 	rest = strings.TrimSpace(text[m[1]:])
+	// In a layout of papers of several days, such as the leagues of the Tuymaada Olympiad, the number of the line is a day of the paper that the line names.
+	if slices.ContainsFunc(layout, func(l content.Layout) bool { return l.Days > 1 }) {
+		i := namedIndex(layout, text[:m[1]])
+		if i < 0 || layout[i].Days < 2 {
+			return "", rest, true
+		}
+		return dayPosition(layout[i], paper, n), rest, true
+	}
 	if paper > len(layout) || n == 0 {
 		return "", rest, true
 	}
