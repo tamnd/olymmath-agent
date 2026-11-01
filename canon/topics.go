@@ -38,7 +38,7 @@ func (t *Topics) Add(r seed.Row) {
 	if t.Corpus != nil {
 		comp = t.Corpus.Competition(code)
 	}
-	year, letter := r.Year, ""
+	year, letter, unsure := r.Year, "", false
 	if comp != nil && comp.EditionForm == "year-letter" {
 		letter = Letter(r.Labels)
 	}
@@ -62,6 +62,9 @@ func (t *Topics) Add(r seed.Row) {
 		pos = p
 	} else if p := TitlePosition(comp, t.Aliases, year, pos, r.Statement); p != "" {
 		pos = p
+	} else if n := titleNumber(r.Statement); n != "" && strings.HasPrefix(pos, "p") && n != pos {
+		// The title names a part, such as "China TST 1986 problem 5", so TitlePosition does not read it. Its number does not agree with the number of the row, so the topic gets no appearance. It still claims the appearance of its number, because the true position is not known.
+		unsure = true
 	}
 	if pos == "" {
 		return
@@ -74,7 +77,7 @@ func (t *Topics) Add(r seed.Row) {
 		t.topics[at] = map[string]bool{}
 	}
 	t.topics[at][m[1]] = true
-	if old, ok := t.at[m[1]]; ok && old != at {
+	if old, ok := t.at[m[1]]; unsure || (ok && old != at) {
 		at = ""
 	}
 	t.at[m[1]] = at
@@ -191,8 +194,31 @@ func namedPaper(c *content.Competition, year int, title, pos string) (string, bo
 	return found.Positions[n-1], true
 }
 
-// paperRE matches a line that names the paper or the day and the problem, for example "2006 IrMO Paper 2 P1" or "Day 1, Problem 3".
-var paperRE = regexp.MustCompile(`(?i)^[^\n]{0,40}?\b(?:paper|day)\s*([1-9])[\s,.:-]*(?:p|problem)\s*([0-9]{1,2})[.:)]?[ ]*(?:\n|$)`)
+var (
+	// titleEndRE finds the problem number at the end of a title, for example "P6" in "IMC 2013 P6" or "#4" in "2016 JMO Preliminary #4".
+	titleEndRE = regexp.MustCompile(`(?i)(?:\bp|#|\bproblem|\bq|\bpb|/)\s*\.?\s*([0-9]{1,2})\.?$`)
+	// titleMarkRE finds each mark of a problem number in a title. A title with two marks, such as "Tuymaada 2014 Day 1 P2 Juniors P4 Seniors", gives no number.
+	titleMarkRE = regexp.MustCompile(`(?i)(?:\bp|#|\bproblem|\bq|\bpb|/)\s*\.?\s*[0-9]`)
+)
+
+// titleNumber gives the position that the final problem number of a title gives, for example "p5" for "China TST 1986 problem 5". It gives "" when the text is not a short title, has no final number or has more than one number mark.
+func titleNumber(title string) string {
+	title = strings.TrimSpace(title)
+	if !isTitle(title) {
+		return ""
+	}
+	m := titleEndRE.FindStringSubmatch(title)
+	if m == nil || len(titleMarkRE.FindAllString(title, -1)) != 1 {
+		return ""
+	}
+	return seed.Position(m[1])
+}
+
+// paperRE matches a line that names the paper or the day and the problem, for example "2006 IrMO Paper 2 P1", "Day 1, Problem 3" or "Second Day P2".
+var paperRE = regexp.MustCompile(`(?i)^[^\n]{0,40}?\b(?:(?:paper|day)\s*([1-9])|(first|second|third)\s+(?:paper|day))[\s,.:-]*(?:p|problem)\s*([0-9]{1,2})[.:)]?[ ]*(?:\n|$)`)
+
+// ordinals gives the number of an ordinal word in a paper line, such as "Second Day".
+var ordinals = map[string]int{"first": 1, "second": 2, "third": 3}
 
 // PaperPosition reads a first line of text that names the paper and the problem, such as "2006 IrMO Paper 2 P1", and gives the position of that problem in the layout of the competition c in the year, and the text after the line. The problem number counts from 1 in its paper, or it is a position of the paper, as in "Day 2 Problem 4". The result ok is false when the text has no such line or c has no layout. The position is "" when the layout has no such problem.
 func PaperPosition(c *content.Competition, year int, text string) (pos, rest string, ok bool) {
@@ -204,8 +230,13 @@ func PaperPosition(c *content.Competition, year int, text string) (pos, rest str
 	if len(layout) == 0 {
 		return "", text, false
 	}
-	paper, _ := strconv.Atoi(text[m[2]:m[3]])
-	n, _ := strconv.Atoi(text[m[4]:m[5]])
+	var paper int
+	if m[2] >= 0 {
+		paper, _ = strconv.Atoi(text[m[2]:m[3]])
+	} else {
+		paper = ordinals[strings.ToLower(text[m[4]:m[5]])]
+	}
+	n, _ := strconv.Atoi(text[m[6]:m[7]])
 	rest = strings.TrimSpace(text[m[1]:])
 	if paper > len(layout) || n == 0 {
 		return "", rest, true

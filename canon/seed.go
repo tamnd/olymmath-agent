@@ -76,9 +76,12 @@ type Seeds struct {
 	Located int
 	// Numbered counts the rows that got a position from Topics.
 	Numbered int
+	// Trace, when it is not nil, gets each row with the code of its competition and the reason why it was skipped. The reason is "" for a row that gives a candidate, and at is the appearance of the candidate. Candidates also calls it for a candidate that it drops.
+	Trace func(r seed.Row, code, at, reason string)
 }
 
 type pendingRow struct {
+	row    seed.Row
 	c      *Candidate
 	comp   *content.Competition
 	year   int
@@ -86,31 +89,34 @@ type pendingRow struct {
 	pos    string
 }
 
-func (s *Seeds) skip(reason string) {
+func (s *Seeds) skip(r seed.Row, code, reason string) {
 	if s.Skipped == nil {
 		s.Skipped = map[string]int{}
 	}
 	s.Skipped[reason]++
+	if s.Trace != nil {
+		s.Trace(r, code, "", reason)
+	}
 }
 
 // Add reads one seed row.
 func (s *Seeds) Add(r seed.Row) {
 	code := s.Aliases.Code(r.Labels)
 	if code == "" || code == "-" {
-		s.skip("no competition")
+		s.skip(r, code, "no competition")
 		return
 	}
 	if len(s.Comps) > 0 && !slices.Contains(s.Comps, code) {
-		s.skip("other competition")
+		s.skip(r, code, "other competition")
 		return
 	}
 	comp := s.Corpus.Competition(code)
 	if comp == nil {
-		s.skip("no competition")
+		s.skip(r, code, "no competition")
 		return
 	}
 	if r.Year == 0 || (comp.FirstYear > 0 && r.Year < comp.FirstYear) || (s.ThisYear > 0 && r.Year > s.ThisYear) {
-		s.skip("no valid year")
+		s.skip(r, code, "no valid year")
 		return
 	}
 	pos := seed.Position(r.Number)
@@ -118,7 +124,7 @@ func (s *Seeds) Add(r seed.Row) {
 	if p, rest, ok := PaperPosition(comp, r.Year, r.Statement); ok {
 		pos, r.Statement = p, rest
 		if pos == "" {
-			s.skip("no valid position")
+			s.skip(r, code, "no position in the paper")
 			return
 		}
 	}
@@ -134,26 +140,26 @@ func (s *Seeds) Add(r seed.Row) {
 		}
 	}
 	if pos == "" || !validPosition(comp, r.Year, pos) {
-		s.skip("no valid position")
+		s.skip(r, code, "no valid position")
 		return
 	}
 	src := s.Corpus.Source(r.Source)
 	if src == nil || src.Origin == "M" || src.DoNotRepublish {
-		s.skip("source not usable")
+		s.skip(r, code, "source not usable")
 		return
 	}
 	// A text in zone Z3 is a link only (spec 11.2), so the import does not take it.
 	if a := s.Corpus.Source(r.Author); src.Zone.Statement == "Z3" || (a != nil && a.Zone.Statement == "Z3") {
-		s.skip("text in zone Z3")
+		s.skip(r, code, "text in zone Z3")
 		return
 	}
 	text := normalize.Statement(r.Statement, pos)
 	if utf8.RuneCountInString(text) < MinText || titleRE.MatchString(text) || isRef(text) || (len(strings.Fields(text)) < MinWords && !strings.Contains(text, "$")) || !strings.ContainsAny(text, "$.?!:") || (strings.Contains(text, ";") && !strings.Contains(text, "$") && len(strings.Fields(text)) < 30) {
-		s.skip("not a statement")
+		s.skip(r, code, "not a statement")
 		return
 	}
 	if s.Accept != nil && !s.Accept(text) {
-		s.skip("does not render")
+		s.skip(r, code, "does not render")
 		return
 	}
 	letter := ""
@@ -175,7 +181,7 @@ func (s *Seeds) Add(r seed.Row) {
 			s.lettered[code][r.Year] = true
 		}
 	default:
-		s.skip("edition form not supported")
+		s.skip(r, code, "edition form not supported")
 		return
 	}
 	if len(comp.Shape(r.Year).Positions()) == 0 && pos[0] != 'p' {
@@ -204,7 +210,7 @@ func (s *Seeds) Add(r seed.Row) {
 		Name: src.Name, URL: url, Ref: r.File + "#" + strconv.Itoa(r.Row),
 		Text: text, Answer: Answer(r.Answer), Key: key, Reworded: src.Reworded,
 	}
-	s.pending = append(s.pending, pendingRow{c: c, comp: comp, year: r.Year, letter: letter, pos: pos})
+	s.pending = append(s.pending, pendingRow{row: r, c: c, comp: comp, year: r.Year, letter: letter, pos: pos})
 }
 
 // Candidates returns the candidates of each appearance. A position such as p3 is dropped when another row of the same year has a position with a section letter, such as c3, because the two numberings do not agree. For a competition with two papers each year, a row with no letter is dropped when a row of the same year or of an earlier year has a letter, because the paper of the row is not known.
@@ -220,18 +226,21 @@ func (s *Seeds) Candidates() map[string][]*Candidate {
 	out := map[string][]*Candidate{}
 	for _, p := range s.pending {
 		if p.pos[0] == 'p' && s.sections[p.comp.Code][p.year] {
-			s.skip("numbered position in a year with sections")
+			s.skip(p.row, p.comp.Code, "numbered position in a year with sections")
 			continue
 		}
 		ed := strconv.Itoa(p.year)
 		if p.comp.EditionForm == "year-letter" {
 			if f, ok := first[p.comp.Code]; p.letter == "" && ok && p.year >= f {
-				s.skip("no edition letter")
+				s.skip(p.row, p.comp.Code, "no edition letter")
 				continue
 			}
 			ed += p.letter
 		}
 		p.c.At = p.comp.Code + "/" + ed + "/" + p.pos
+		if s.Trace != nil {
+			s.Trace(p.row, p.comp.Code, p.c.At, "")
+		}
 		out[p.c.At] = append(out[p.c.At], p.c)
 	}
 	return out

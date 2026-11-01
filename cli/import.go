@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/tamnd/olymmath-agent/canon"
 	"github.com/tamnd/olymmath-agent/content"
+	"github.com/tamnd/olymmath-agent/match"
 	"github.com/tamnd/olymmath-agent/normalize"
 	"github.com/tamnd/olymmath-agent/official"
 	"github.com/tamnd/olymmath-agent/review"
@@ -36,6 +39,7 @@ func runImport(env Env, args []string) int {
 	dir2, remote := storeFlags(fs)
 	doubts := fs.Bool("doubts", false, "print each doubt with its source and the source of the canonical candidate, to show why a competition is skipped")
 	promote := fs.Bool("promote", false, "make a candidate of class H1 or H2 the canonical statement of an existing problem when it ranks above the canonical statement and its text agrees with it")
+	explain := fs.String("explain", "", "write each seed row of a known competition to this TSV file with the appearance that it gives, or the reason why it gives none")
 	maxDoubt := fs.Float64("max-doubt", canon.MaxDoubt, "skip a competition whose review doubts per appearance are above this share")
 	if _, err := parseMixed(fs, args); err != nil {
 		return ExitUsage
@@ -66,6 +70,14 @@ func runImport(env Env, args []string) int {
 	}}
 	if *comps != "" {
 		s.Comps = strings.Split(*comps, ",")
+	}
+	var traces []rowTrace
+	if *explain != "" {
+		s.Trace = func(r seed.Row, code, at, reason string) {
+			if code != "" && code != "-" && reason != "other competition" {
+				traces = append(traces, rowTrace{code: code, year: r.Year, number: r.Number, source: r.Source, ref: r.File + "#" + strconv.Itoa(r.Row), at: at, reason: reason})
+			}
+		}
 	}
 	sources, err := seed.Sources(*dir)
 	if err != nil {
@@ -135,15 +147,26 @@ func runImport(env Env, args []string) int {
 	for _, g := range gated {
 		fmt.Fprintf(env.Stderr, "om import: %s skipped: %d doubts for %d appearances.\n", g.Comp, g.Doubts, g.Appearances)
 	}
+	if *explain != "" {
+		if err := writeExplain(*explain, traces, choices, gated); err != nil {
+			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
+			return ExitFailure
+		}
+	}
 	recs, items := canon.Plan(choices)
 
 	owner := map[string]*content.Problem{}
+	// texts holds the canonical text of each problem, with its first appearance, as rule D01 reads them.
+	texts := match.NewIndex()
 	for _, p := range corpus.All() {
 		for _, a := range p.Appearances {
 			owner[a.At] = p
 		}
+		if len(p.Appearances) > 0 && p.Statement != "" {
+			texts.Add(p.Appearances[0].At, match.Shingles(p.Statement))
+		}
 	}
-	var created, updated, merged, promoted int
+	var created, updated, merged, promoted, dupes int
 	var mergeRows []string
 	var newRecs []*canon.Record
 	for _, r := range recs {
@@ -182,6 +205,12 @@ func runImport(env Env, args []string) int {
 		}
 		// An appearance that already belongs to a problem does not merge into a new problem.
 		r.Merged = slices.DeleteFunc(r.Merged, func(m canon.Merge) bool { return owner[m.At] != nil })
+		// A new problem with the text of a problem in the content is not written, because rule D01 does not allow two problems with one text. One of the two appearances is wrong, so a review item names the pair.
+		if h, ok := duplicateOf(texts, r.Primary.Best.Shingles()); ok {
+			items = append(items, canon.Item{ID: canon.ItemID("pair", h.ID, r.Primary.At), Kind: "pair", At: h.ID, With: r.Primary.At, T: math.Round(h.T*1000) / 1000, Text: owner[h.ID].Statement, Other: r.Primary.Best.Text})
+			dupes++
+			continue
+		}
 		newRecs = append(newRecs, r)
 	}
 	created = len(newRecs)
@@ -258,8 +287,49 @@ func runImport(env Env, args []string) int {
 	if s.Numbered > 0 {
 		fmt.Fprintf(env.Stdout, "%d rows got a position from the number of their AoPS topic.\n", s.Numbered)
 	}
-	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d promoted statements, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, promoted, len(items), strings.Join(reasons, ", "))
+	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d promoted statements, %d new problems not written because their text is in the content, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, promoted, dupes, len(items), strings.Join(reasons, ", "))
 	return ExitOK
+}
+
+// rowTrace is one seed row for the -explain file.
+type rowTrace struct {
+	code, number, source, ref, at, reason string
+	year                                  int
+}
+
+// writeExplain writes one line for each traced row: the competition, the year, the number, the source, the reference of the row, the appearance and the reason. A row that gives a candidate has the reason "gated" when Gate removed its competition, "doubt" when its text does not agree with the canonical candidate, "no choice" when no candidate of its appearance can be canonical, and "ok" in the other cases.
+func writeExplain(path string, traces []rowTrace, choices []canon.Choice, gated []canon.Gated) error {
+	drop := map[string]bool{}
+	for _, g := range gated {
+		drop[g.Comp] = true
+	}
+	chosen := map[string]bool{}
+	doubt := map[string]bool{}
+	for _, ch := range choices {
+		chosen[ch.At] = true
+		for _, d := range ch.Doubts {
+			doubt[d.C.Ref] = true
+		}
+	}
+	var b strings.Builder
+	b.WriteString("code\tyear\tnumber\tsource\tref\tat\treason\n")
+	for _, t := range traces {
+		reason := t.reason
+		if reason == "" {
+			switch {
+			case drop[t.code]:
+				reason = "gated"
+			case !chosen[t.at]:
+				reason = "no choice"
+			case doubt[t.ref]:
+				reason = "doubt"
+			default:
+				reason = "ok"
+			}
+		}
+		fmt.Fprintf(&b, "%s\t%d\t%s\t%s\t%s\t%s\t%s\n", t.code, t.year, t.number, t.source, t.ref, t.at, reason)
+	}
+	return os.WriteFile(path, []byte(b.String()), 0o644) // #nosec G306 -- a diagnostic file.
 }
 
 // zoneKeys gives the texts of zone Z3 with a known position, by edition. A text of zone Z3 is a link only, so the import does not publish it, but it can give the position of a row with no number, for example an AoPS row of a USAMO problem.
@@ -373,4 +443,13 @@ func cmpOr(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// duplicateOf gives the text of the index that is most like the text with shingles sh, when its signal T is at or above match.Duplicate, the bound of rule D01. The result ok is false when the index has no such text.
+func duplicateOf(texts *match.Index, sh []uint64) (h match.Hit, ok bool) {
+	hits := texts.Near(sh, match.Duplicate)
+	if len(hits) == 0 {
+		return match.Hit{}, false
+	}
+	return slices.MaxFunc(hits, func(a, b match.Hit) int { return cmp.Or(cmp.Compare(a.T, b.T), strings.Compare(b.ID, a.ID)) }), true
 }

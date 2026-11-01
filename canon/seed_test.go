@@ -1,6 +1,8 @@
 package canon
 
 import (
+	"maps"
+	"strconv"
 	"testing"
 
 	"github.com/tamnd/olymmath-agent/content"
@@ -23,12 +25,20 @@ func TestSeedsLocate(t *testing.T) {
 		}
 		return ""
 	}}
+	traced := map[string]string{}
+	s.Trace = func(r seed.Row, code, at, reason string) {
+		traced[strconv.Itoa(r.Year)+"/"+r.Number] = code + " " + at + " " + reason
+	}
 	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO"}, Year: 2023, Statement: text})
 	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO"}, Year: 2022, Statement: text})
 	s.Add(seed.Row{Source: "imo-official", Author: "evanchen", Labels: []string{"IMO"}, Year: 2023, Number: "5", Statement: text})
 	got := s.Candidates()
 	if len(got["imo/2023/p4"]) != 1 || len(got["imo/2023/p5"]) != 0 || s.Located != 1 || s.Skipped["no valid position"] != 1 || s.Skipped["text in zone Z3"] != 1 {
 		t.Errorf("candidates %v, located %d, skipped %v", got, s.Located, s.Skipped)
+	}
+	want := map[string]string{"2023/": "imo imo/2023/p4 ", "2022/": "imo  no valid position", "2023/5": "imo  text in zone Z3"}
+	if !maps.Equal(traced, want) {
+		t.Errorf("traced %v, want %v", traced, want)
 	}
 }
 
@@ -185,6 +195,8 @@ func TestPaperPosition(t *testing.T) {
 		{"IMO 2023 Day 2, Problem 5", "p5", "", true},
 		{"Paper 1 P6", "", "", true},
 		{"Paper 3 P1", "", "", true},
+		{"Tuymaada 2009 Senior League Second Day P2", "p5", "", true},
+		{"Zhautykov 2009 day 2 problem 4.", "p4", "", true},
 		{"Let $n$ be odd.", "", "Let $n$ be odd.", false},
 		{"On day 1 problem 2 of the test, Ana wrote $n$.", "", "On day 1 problem 2 of the test, Ana wrote $n$.", false},
 	}
@@ -280,5 +292,13 @@ func TestTitlePosition(t *testing.T) {
 	c, _ := tp.Position("aops-topic:302", "imo", 1983)
 	if a != "p2" || b != "p5" || c != "p4" {
 		t.Errorf("the topics give %q, %q and %q", a, b, c)
+	}
+	// A title that names a part gives no position. When its number does not agree with the number of the row, the topic gets no position.
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2011, Number: "1", Ref: url + "303p1", Statement: "IMO 2011 TST problem 5"})
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2011, Number: "2", Ref: url + "304p1", Statement: "IMO 2011 TST problem 2"})
+	d, _ := tp.Position("aops-topic:303", "imo", 2011)
+	e, _ := tp.Position("aops-topic:304", "imo", 2011)
+	if d != "" || e != "p2" {
+		t.Errorf("the topics with a part give %q and %q", d, e)
 	}
 }
