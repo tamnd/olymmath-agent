@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/tamnd/olymmath-agent/canon"
+	"github.com/tamnd/olymmath-agent/match"
 )
 
 func TestWriteExplain(t *testing.T) {
@@ -33,5 +34,18 @@ func TestWriteExplain(t *testing.T) {
 	}
 	if got := strings.Join(reasons, ","); got != "ok,doubt,no choice,gated,no valid year" {
 		t.Errorf("reasons %s", got)
+	}
+}
+
+func TestDuplicateOf(t *testing.T) {
+	texts := match.NewIndex()
+	texts.Add("cn-mo/2010/p1", match.Shingles("Let $m,n\\ge 1$ and $a_1 < a_2 < \\ldots < a_n$ be integers. Prove that there exists a subset $T$ of the natural numbers with a small size."))
+	texts.Add("cn-mo/2010/p2", match.Shingles("Find all positive integers $n$ such that $2^n + 1$ is divisible by $n^2$, and prove that there are no others."))
+	h, ok := duplicateOf(texts, match.Shingles("Let $m,n\\ge 1$ and $a_1 < a_2 < \\ldots < a_n$ be integers. Prove that there exists a subset $T$ of the natural numbers with a small size."))
+	if !ok || h.ID != "cn-mo/2010/p1" || h.T < match.Duplicate {
+		t.Fatalf("duplicateOf gives %+v, %v", h, ok)
+	}
+	if h, ok := duplicateOf(texts, match.Shingles("Prove that every triangle with two equal angles has two equal sides, and find the third angle.")); ok {
+		t.Fatalf("a new text gives %+v", h)
 	}
 }

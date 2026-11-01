@@ -1,10 +1,12 @@
 package cli
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"slices"
@@ -15,6 +17,7 @@ import (
 
 	"github.com/tamnd/olymmath-agent/canon"
 	"github.com/tamnd/olymmath-agent/content"
+	"github.com/tamnd/olymmath-agent/match"
 	"github.com/tamnd/olymmath-agent/normalize"
 	"github.com/tamnd/olymmath-agent/official"
 	"github.com/tamnd/olymmath-agent/review"
@@ -153,12 +156,17 @@ func runImport(env Env, args []string) int {
 	recs, items := canon.Plan(choices)
 
 	owner := map[string]*content.Problem{}
+	// texts holds the canonical text of each problem, with its first appearance, as rule D01 reads them.
+	texts := match.NewIndex()
 	for _, p := range corpus.All() {
 		for _, a := range p.Appearances {
 			owner[a.At] = p
 		}
+		if len(p.Appearances) > 0 && p.Statement != "" {
+			texts.Add(p.Appearances[0].At, match.Shingles(p.Statement))
+		}
 	}
-	var created, updated, merged, promoted int
+	var created, updated, merged, promoted, dupes int
 	var mergeRows []string
 	var newRecs []*canon.Record
 	for _, r := range recs {
@@ -197,6 +205,12 @@ func runImport(env Env, args []string) int {
 		}
 		// An appearance that already belongs to a problem does not merge into a new problem.
 		r.Merged = slices.DeleteFunc(r.Merged, func(m canon.Merge) bool { return owner[m.At] != nil })
+		// A new problem with the text of a problem in the content is not written, because rule D01 does not allow two problems with one text. One of the two appearances is wrong, so a review item names the pair.
+		if h, ok := duplicateOf(texts, r.Primary.Best.Shingles()); ok {
+			items = append(items, canon.Item{ID: canon.ItemID("pair", h.ID, r.Primary.At), Kind: "pair", At: h.ID, With: r.Primary.At, T: math.Round(h.T*1000) / 1000, Text: owner[h.ID].Statement, Other: r.Primary.Best.Text})
+			dupes++
+			continue
+		}
 		newRecs = append(newRecs, r)
 	}
 	created = len(newRecs)
@@ -273,7 +287,7 @@ func runImport(env Env, args []string) int {
 	if s.Numbered > 0 {
 		fmt.Fprintf(env.Stdout, "%d rows got a position from the number of their AoPS topic.\n", s.Numbered)
 	}
-	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d promoted statements, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, promoted, len(items), strings.Join(reasons, ", "))
+	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d promoted statements, %d new problems not written because their text is in the content, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, promoted, dupes, len(items), strings.Join(reasons, ", "))
 	return ExitOK
 }
 
@@ -429,4 +443,13 @@ func cmpOr(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// duplicateOf gives the text of the index that is most like the text with shingles sh, when its signal T is at or above match.Duplicate, the bound of rule D01. The result ok is false when the index has no such text.
+func duplicateOf(texts *match.Index, sh []uint64) (h match.Hit, ok bool) {
+	hits := texts.Near(sh, match.Duplicate)
+	if len(hits) == 0 {
+		return match.Hit{}, false
+	}
+	return slices.MaxFunc(hits, func(a, b match.Hit) int { return cmp.Or(cmp.Compare(a.T, b.T), strings.Compare(b.ID, a.ID)) }), true
 }
