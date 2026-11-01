@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/tamnd/olymmath-agent/content"
 )
@@ -94,6 +95,25 @@ func TestSync(t *testing.T) {
 	}
 	if res, _ = Sync(ctx, r, dir, 4); res.Put != 0 || res.Deleted != 0 {
 		t.Errorf("a sync with no change did %+v", res)
+	}
+}
+
+func TestSyncUntil(t *testing.T) {
+	f := &fakeR2{objects: map[string]string{}, types: map[string]string{}}
+	srv := httptest.NewServer(f)
+	defer srv.Close()
+	r := &R2{Account: "acc", Bucket: "site", Token: "token", Base: srv.URL, Rate: -1}
+	dir := t.TempDir()
+	write(t, dir, "a.html", "a")
+	write(t, dir, "b.html", "b")
+	ctx := context.Background()
+	// A time in the past sends nothing and leaves both files for the next run.
+	res, err := SyncUntil(ctx, r, dir, 1, time.Now().Add(-time.Second))
+	if err != nil || res.Put != 0 || res.Left != 2 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	if res, err = Sync(ctx, r, dir, 1); err != nil || res.Put != 2 || res.Left != 0 {
+		t.Fatalf("the next run did %+v %v", res, err)
 	}
 }
 

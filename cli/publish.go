@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/publish"
@@ -42,6 +43,7 @@ func runSiteUpload(env Env, args []string) int {
 	dir := fs.String("dir", "build/r2", "the directory to upload")
 	bucket := fs.String("bucket", "olymmath-site", "the R2 bucket")
 	workers := fs.Int("workers", 8, "the number of requests at the same time")
+	budget := fs.Duration("budget", 0, "send no new file after this time, for example 40m, and leave the rest to the next run; 0 has no limit")
 	if err := fs.Parse(args); err != nil {
 		return ExitUsage
 	}
@@ -54,11 +56,18 @@ func runSiteUpload(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om site upload: %v\n", err)
 		return ExitFailure
 	}
-	res, err := publish.Sync(context.Background(), r, *dir, *workers)
+	var until time.Time
+	if *budget > 0 {
+		until = time.Now().Add(*budget)
+	}
+	res, err := publish.SyncUntil(context.Background(), r, *dir, *workers, until)
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om site upload: %v\n", err)
 		return ExitFailure
 	}
 	fmt.Fprintf(env.Stdout, "%d files, %d uploaded, %d deleted in R2 bucket %s\n", res.Files, res.Put, res.Deleted, *bucket)
+	if res.Left > 0 {
+		fmt.Fprintf(env.Stdout, "The time budget is over. %d changes are left for the next run.\n", res.Left)
+	}
 	return ExitOK
 }
