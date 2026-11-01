@@ -62,7 +62,7 @@ type Seeds struct {
 	// Locate, when it is not nil, gives the position of a row that has no number, for example from the official paper of the edition. It gives "" when it does not know the position.
 	Locate func(code string, year int, text string) string
 
-	// Topics, when it is not nil, gives the numbers of AoPS topics. A row with no number and the reference of a topic takes the number of the topic when the topic has the same competition and year.
+	// Topics, when it is not nil, gives the numbers of AoPS topics. A row with no number and the reference of a topic takes the number of the topic when the topic has the same competition and year, and the letter of the paper when the row has none.
 	Topics *Topics
 
 	pending []pendingRow
@@ -122,8 +122,9 @@ func (s *Seeds) Add(r seed.Row) {
 			return
 		}
 	}
+	topicLetter := ""
 	if pos == "" && r.Number == "" && s.Topics != nil {
-		if pos = s.Topics.Position(r.Ref, code, r.Year); pos != "" {
+		if pos, topicLetter = s.Topics.Position(r.Ref, code, r.Year); pos != "" {
 			s.Numbered++
 		}
 	}
@@ -160,6 +161,10 @@ func (s *Seeds) Add(r seed.Row) {
 	case "", "year":
 	case "year-letter":
 		letter = Letter(r.Labels)
+		// A row with no letter, such as a row of the AoPS collection "2009 AMC 10" that holds both papers, takes the letter that the AoPS wiki gives its topic. A row of a collection that names a season, such as "2021 AMC 10 Fall", does not, because that year had four papers.
+		if letter == "" && !seasonRE.MatchString(strings.Join(r.Labels, " ")) {
+			letter = topicLetter
+		}
 		if letter != "" {
 			if s.lettered == nil {
 				s.lettered = map[string]map[int]bool{}

@@ -76,18 +76,100 @@ func TestTopics(t *testing.T) {
 	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2023, Number: "1", Ref: url + "101p2"})
 	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 2023, Number: "1", Ref: url + "102p3"})
 	tp.Add(seed.Row{Labels: []string{"IMO"}, Number: "2", Ref: url + "103p4"})
-	if got := tp.Position("aops-topic:100", "imo", 2023); got != "p4" {
+	// A row of a contest list has no year. Its title gives the year.
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Number: "3", Ref: url + "300p1", Statement: "IMO 2021 #3"})
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Number: "2", Ref: url + "301p1", Statement: "Germany 2013/5"})
+	pos := func(ref string, year int) string {
+		p, _ := tp.Position(ref, "imo", year)
+		return p
+	}
+	if got := pos("aops-topic:100", 2023); got != "p4" {
 		t.Errorf("topic 100 gives %q", got)
 	}
-	if a, b := tp.Position("aops-topic:200", "imo", 2024), tp.Position("aops-topic:201", "imo", 2024); a != "p1" || b != "p4" {
+	if a, b := pos("aops-topic:200", 2024), pos("aops-topic:201", 2024); a != "p1" || b != "p4" {
 		t.Errorf("the topics of the two papers give %q and %q", a, b)
 	}
-	if got := tp.Position("aops-topic:100", "imo", 2022); got != "" {
+	if got := pos("aops-topic:100", 2022); got != "" {
 		t.Errorf("topic 100 in 2022 gives %q", got)
 	}
-	for _, ref := range []string{"aops-topic:101", "aops-topic:103", "aops-topic:999", "x"} {
-		if got := tp.Position(ref, "imo", 2023); got != "" {
-			t.Errorf("%s gives %q", ref, got)
+	if got := pos("aops-topic:300", 2021); got != "p3" {
+		t.Errorf("the topic of a title gives %q", got)
+	}
+	for _, ref := range []string{"aops-topic:101", "aops-topic:103", "aops-topic:301", "aops-topic:999", "x"} {
+		for _, y := range []int{2013, 2023} {
+			if got := pos(ref, y); got != "" {
+				t.Errorf("%s gives %q", ref, got)
+			}
+		}
+	}
+}
+
+func TestTopicsLetter(t *testing.T) {
+	corpus, fs := content.Load("../content/testdata/valid")
+	if fs.Errors() > 0 {
+		t.Fatal(fs)
+	}
+	al, err := seed.LoadAliases("../content/testdata/valid", corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := corpus.Competition("imo")
+	c.EditionForm = "year-letter"
+	c.Layout = nil
+	tp := &Topics{Aliases: al, Corpus: corpus}
+	url := "https://artofproblemsolving.com/community/c5h"
+	// Problem 1 of the A paper and problem 1 of the B paper are two appearances.
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Number: "1", Ref: url + "1p1", Statement: "2014 AMC 10A #1/ 12A #1"})
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Number: "1", Ref: url + "2p1", Statement: "AMC 10B 2014 P1"})
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Number: "2", Ref: url + "3p1", Statement: "2021 AMC 10A/12A (Fall) #2"})
+	if p, l := tp.Position("aops-topic:1", "imo", 2014); p != "p1" || l != "a" {
+		t.Errorf("topic 1 gives %q %q", p, l)
+	}
+	if p, l := tp.Position("aops-topic:2", "imo", 2014); p != "p1" || l != "b" {
+		t.Errorf("topic 2 gives %q %q", p, l)
+	}
+	if p, _ := tp.Position("aops-topic:3", "imo", 2021); p != "" {
+		t.Errorf("a title with a season gives %q", p)
+	}
+	text := "What is the value of $1+2+3+4$, the sum of the first four positive integers?"
+	s := &Seeds{Corpus: corpus, Aliases: al, Topics: tp}
+	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO"}, Year: 2014, Ref: "aops-topic:2", Statement: text})
+	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO", "2014 IMO Spring"}, Year: 2014, Ref: "aops-topic:1", Statement: text})
+	if got := s.Candidates(); len(got["imo/2014b/p1"]) != 1 || len(got["imo/2014a/p1"]) != 0 || s.Skipped["no edition letter"] != 1 {
+		t.Errorf("candidates %v, skipped %v", got, s.Skipped)
+	}
+}
+
+func TestTitleAt(t *testing.T) {
+	c := &content.Competition{Layout: []content.Layout{
+		{Paper: "junior", Name: "Junior", Positions: []string{"j1", "j2", "j3", "j4"}},
+		{Paper: "senior", Name: "Senior", Positions: []string{"s1", "s2", "s3", "s4"}},
+	}}
+	cases := []struct {
+		title, pos string
+		year       int
+		at         string
+		ok         bool
+	}{
+		{"2017 AMC 8 #4", "p4", 2017, "p4", true},
+		{"Bundeswettbewerb Mathematik 2023 Round 1 P1", "p1", 2023, "p1", true},
+		{"USEMO 2019/2", "p2", 2019, "p2", true},
+		{"2023 Olympic Revenge problem 2", "p2", 2023, "p2", true},
+		{"P3 Francophone MO Junior 2023", "p3", 2023, "j3", true},
+		{"2021 Francophone MO Seniors p4", "p4", 2021, "s4", true},
+		// The number column and the title do not agree.
+		{"Germany 2013/5", "p2", 0, "", false},
+		// No number, no year, two years, a later round, a statement.
+		{"2015 Brazilian Olympic Revenge", "p1", 0, "", false},
+		{"25th Olympic Revenge", "p1", 0, "", false},
+		{"ITAMO 1998 p2 Bundeswettbewerb Mathematik 1975 R1 p2", "p2", 0, "", false},
+		{"Bundeswettbewerb Mathematik 2023 Round 2 P1", "p1", 0, "", false},
+		{"Find all $n$ such that $2023 \\mid n$ #1", "p1", 0, "", false},
+	}
+	for _, tc := range cases {
+		year, at, _, ok := TitleAt(c, tc.title, tc.pos)
+		if year != tc.year || at != tc.at || ok != tc.ok {
+			t.Errorf("TitleAt(%q, %q) = %d, %q, %v, want %d, %q, %v", tc.title, tc.pos, year, at, ok, tc.year, tc.at, tc.ok)
 		}
 	}
 }
