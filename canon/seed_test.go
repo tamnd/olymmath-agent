@@ -218,6 +218,52 @@ func TestPaperPosition(t *testing.T) {
 	}
 }
 
+func TestNamedPaper(t *testing.T) {
+	memo := &content.Competition{Layout: []content.Layout{
+		{Paper: "individual", Name: "Individual", Positions: []string{"i1", "i2", "i3", "i4"}},
+		{Paper: "team", Name: "Team", Positions: []string{"t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8"}},
+	}}
+	tuymaada := &content.Competition{Layout: []content.Layout{
+		{Paper: "junior", Name: "Junior", Days: 2, Positions: []string{"j1", "j2", "j3", "j4", "j5", "j6", "j7", "j8"}},
+		{Paper: "senior", Name: "Senior", Days: 2, Positions: []string{"s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"}},
+	}}
+	cases := []struct {
+		c          *content.Competition
+		title, pos string
+		at         string
+		ok         bool
+	}{
+		{memo, "Middle European MO 2013 T 5", "p5", "t5", true},
+		{memo, "2019 MEMO PI 3", "p3", "i3", true},
+		{memo, "MEMO 2016,Team P2", "p2", "t2", true},
+		{memo, "MEMO 2008 (Team) P5", "p1", "t1", true},
+		{memo, "MEMO 2009 problem 1 team competition", "p5", "t1", true},
+		{memo, "MEMO 2010 Team P5", "p2", "", true},
+		{memo, "MEMO 2010", "p2", "", false},
+		{tuymaada, "Tuymaada 2014 Day 2 P1 Junior League", "p5", "j5", true},
+		{tuymaada, "Tuymaada 2012 P5 Day 2 Juniors", "p1", "j5", true},
+		{tuymaada, "Tuymaada 2017 Seniors Q8 (day 2 P4)", "p8", "s8", true},
+		{tuymaada, "Tuymaada 2015 Day 1 P6 Junior League", "p6", "", true},
+		{tuymaada, "Tuymaada 2016 Senior P2 Junior P3", "p2", "", false},
+	}
+	for _, tc := range cases {
+		at, ok := namedPaper(tc.c, 2020, tc.title, tc.pos)
+		if at != tc.at || ok != tc.ok {
+			t.Errorf("namedPaper(%q, %q) = %q, %v, want %q, %v", tc.title, tc.pos, at, ok, tc.at, tc.ok)
+		}
+	}
+	for _, tc := range []struct{ text, pos string }{
+		{"Tuymaada 2009 Senior League Second Day P2", "s6"},
+		{"Tuymaada 2009 Junior League Day 1 P3", "j3"},
+		{"Tuymaada 2009 Junior League Day 2 P7", "j7"},
+		{"Tuymaada 2009 Day 2 P1", ""},
+	} {
+		if pos, _, _ := PaperPosition(tuymaada, 2009, tc.text); pos != tc.pos {
+			t.Errorf("PaperPosition(%q) = %q, want %q", tc.text, pos, tc.pos)
+		}
+	}
+}
+
 func TestValidPositionEra(t *testing.T) {
 	c := &content.Competition{
 		Eras:    []content.Era{{From: 1959, To: 2005, PerYear: 30}, {From: 2006, To: 2006}},
