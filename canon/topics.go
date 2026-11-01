@@ -35,7 +35,7 @@ func (t *Topics) Add(r seed.Row) {
 		return
 	}
 	if t.Corpus != nil {
-		if p, _, ok := PaperPosition(t.Corpus.Competition(code), r.Statement); ok {
+		if p, _, ok := PaperPosition(t.Corpus.Competition(code), r.Year, r.Statement); ok {
 			pos = p
 		}
 	}
@@ -73,19 +73,23 @@ func (t *Topics) Position(ref, code string, year int) string {
 // paperRE matches a line that names the paper or the day and the problem, for example "2006 IrMO Paper 2 P1" or "Day 1, Problem 3".
 var paperRE = regexp.MustCompile(`(?i)^[^\n]{0,40}?\b(?:paper|day)\s*([1-9])[\s,.:-]*(?:p|problem)\s*([0-9]{1,2})[.:)]?[ ]*(?:\n|$)`)
 
-// PaperPosition reads a first line of text that names the paper and the problem, such as "2006 IrMO Paper 2 P1", and gives the position of that problem in the layout of the competition c, and the text after the line. The problem number counts from 1 in its paper, or it is a position of the paper, as in "Day 2 Problem 4". The result ok is false when the text has no such line or c has no layout. The position is "" when the layout has no such problem.
-func PaperPosition(c *content.Competition, text string) (pos, rest string, ok bool) {
+// PaperPosition reads a first line of text that names the paper and the problem, such as "2006 IrMO Paper 2 P1", and gives the position of that problem in the layout of the competition c in the year, and the text after the line. The problem number counts from 1 in its paper, or it is a position of the paper, as in "Day 2 Problem 4". The result ok is false when the text has no such line or c has no layout. The position is "" when the layout has no such problem.
+func PaperPosition(c *content.Competition, year int, text string) (pos, rest string, ok bool) {
 	m := paperRE.FindStringSubmatchIndex(text)
-	if m == nil || c == nil || len(c.Layout) == 0 {
+	if m == nil || c == nil {
+		return "", text, false
+	}
+	layout := c.Shape(year).Layout
+	if len(layout) == 0 {
 		return "", text, false
 	}
 	paper, _ := strconv.Atoi(text[m[2]:m[3]])
 	n, _ := strconv.Atoi(text[m[4]:m[5]])
 	rest = strings.TrimSpace(text[m[1]:])
-	if paper > len(c.Layout) || n == 0 {
+	if paper > len(layout) || n == 0 {
 		return "", rest, true
 	}
-	ps := c.Layout[paper-1].Positions
+	ps := layout[paper-1].Positions
 	switch p := "p" + strconv.Itoa(n); {
 	case n <= len(ps):
 		return ps[n-1], rest, true

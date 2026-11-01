@@ -107,12 +107,38 @@ func TestPaperPosition(t *testing.T) {
 		{"On day 1 problem 2 of the test, Ana wrote $n$.", "", "On day 1 problem 2 of the test, Ana wrote $n$.", false},
 	}
 	for _, tc := range cases {
-		pos, rest, ok := PaperPosition(c, tc.text)
+		pos, rest, ok := PaperPosition(c, 2006, tc.text)
 		if pos != tc.pos || rest != tc.rest || ok != tc.ok {
 			t.Errorf("PaperPosition(%q) = %q, %q, %v, want %q, %q, %v", tc.text, pos, rest, ok, tc.pos, tc.rest, tc.ok)
 		}
 	}
-	if _, _, ok := PaperPosition(&content.Competition{}, "Paper 1 P1"); ok {
+	if _, _, ok := PaperPosition(&content.Competition{}, 2006, "Paper 1 P1"); ok {
 		t.Error("a competition with no layout reads the paper line")
+	}
+	c.Eras = []content.Era{{From: 1990, To: 1999, Layout: []content.Layout{{Positions: []string{"p1", "p2", "p3", "p4"}}, {Positions: []string{"p5", "p6", "p7", "p8"}}}}}
+	if pos, _, _ := PaperPosition(c, 1995, "Paper 2 P1"); pos != "p5" {
+		t.Errorf("in an era, paper 2 P1 gives %q", pos)
+	}
+	if pos, _, _ := PaperPosition(c, 2000, "Paper 2 P1"); pos != "p4" {
+		t.Errorf("after the era, paper 2 P1 gives %q", pos)
+	}
+}
+
+func TestValidPositionEra(t *testing.T) {
+	c := &content.Competition{
+		Eras:    []content.Era{{From: 1959, To: 2005, PerYear: 30}, {From: 2006, To: 2006}},
+		Layout:  []content.Layout{{Positions: []string{"a1", "c1", "g1", "n1"}}},
+		PerYear: 4,
+	}
+	for _, tc := range []struct {
+		year int
+		pos  string
+		want bool
+	}{
+		{1990, "p30", true}, {1990, "a1", false}, {2010, "a1", true}, {2010, "p1", false}, {2006, "p99", true},
+	} {
+		if got := validPosition(c, tc.year, tc.pos); got != tc.want {
+			t.Errorf("validPosition(%d, %s) = %v", tc.year, tc.pos, got)
+		}
 	}
 }

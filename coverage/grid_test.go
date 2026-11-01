@@ -39,4 +39,9 @@ func TestGrid(t *testing.T) {
 	if ft.Expected != 1 || ft.Percent(C0) != "-" || ft.Percent(C1) != "0%" {
 		t.Errorf("no shape %+v", ft)
 	}
+	eras := &content.Competition{Code: "ahsme", FirstYear: 2000, LastYear: 2003, PerYear: 3, Eras: []content.Era{{From: 2000, To: 2001, PerYear: 2}}, Overrides: map[int][]string{2003: {"p1"}}}
+	_, et := Grid(eras, 2025)
+	if et.Expected != 2+2+3+1 {
+		t.Errorf("eras %+v", et)
+	}
 }

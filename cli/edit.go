@@ -320,9 +320,9 @@ func newEdition(root string, corpus *content.Corpus, at string) (string, error) 
 		year = year*10 + int(r-'0')
 	}
 	fmt.Fprintf(&b, "year: %d\n", year)
-	if c := corpus.Competition(l.Comp); c != nil && len(c.Layout) > 0 {
+	if c := corpus.Competition(l.Comp); c != nil && len(c.Shape(year).Layout) > 0 {
 		b.WriteString("papers:\n")
-		for _, p := range c.Layout {
+		for _, p := range c.Shape(year).Layout {
 			fmt.Fprintf(&b, "  - name: %s\n    problems: [%s]\n", p.Name, strings.Join(p.Positions, ", "))
 		}
 	}

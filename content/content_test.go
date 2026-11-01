@@ -106,3 +106,47 @@ func TestLoadFindings(t *testing.T) {
 		})
 	}
 }
+
+func TestShape(t *testing.T) {
+	c := &Competition{
+		Layout:    []Layout{{Positions: []string{"a1", "c1"}}},
+		Eras:      []Era{{From: 1959, To: 2005, PerYear: 3}, {From: 2015, To: 2015}, {From: 2020, Layout: []Layout{{Positions: []string{"a1"}}, {Positions: []string{"g1"}}}}},
+		Overrides: map[int][]string{1990: {"p1", "p2"}},
+	}
+	for _, tc := range []struct {
+		year int
+		want string
+	}{
+		{1959, "p1 p2 p3"}, {1990, "p1 p2"}, {2005, "p1 p2 p3"}, {2010, "a1 c1"}, {2030, "a1 g1"}, {0, "a1 c1"}, {2015, ""},
+	} {
+		if got := strings.Join(c.Shape(tc.year).Positions(), " "); got != tc.want {
+			t.Errorf("Shape(%d) = %q, want %q", tc.year, got, tc.want)
+		}
+	}
+	if !c.HasShape() || (&Competition{}).HasShape() || !(&Competition{Eras: []Era{{From: 2000, PerYear: 4}}}).HasShape() {
+		t.Error("HasShape is wrong")
+	}
+}
+
+func TestShapeError(t *testing.T) {
+	ok := Layout{Positions: []string{"p1", "p2"}}
+	for _, tc := range []struct {
+		c    Competition
+		want string
+	}{
+		{Competition{Layout: []Layout{ok}, Eras: []Era{{From: 1990, To: 1999, PerYear: 4}, {From: 2000, PerYear: 5}}, Overrides: map[int][]string{1995: {"p1"}}}, ""},
+		{Competition{Layout: []Layout{{Positions: []string{"p1", "p1"}}}}, "two times"},
+		{Competition{Layout: []Layout{{Positions: []string{"P 1"}}}}, "not valid"},
+		{Competition{Eras: []Era{{To: 1990, PerYear: 4}}}, "no from year"},
+		{Competition{Eras: []Era{{From: 1990, To: 1980, PerYear: 4}}}, "ends before"},
+		{Competition{Eras: []Era{{From: 1990}}}, ""},
+		{Competition{Eras: []Era{{From: 1990, To: 2000, PerYear: 4}, {From: 2000, PerYear: 5}}}, "overlaps"},
+		{Competition{Eras: []Era{{From: 1990, PerYear: 4}, {From: 1980, To: 1985, PerYear: 5}, {From: 1995, PerYear: 5}}}, "era 3 overlaps era 1"},
+		{Competition{Overrides: map[int][]string{1990: {}}}, "no positions"},
+	} {
+		got := shapeError(&tc.c)
+		if (tc.want == "") != (got == "") || !strings.Contains(got, tc.want) {
+			t.Errorf("shapeError(%+v) = %q, want %q", tc.c, got, tc.want)
+		}
+	}
+}
