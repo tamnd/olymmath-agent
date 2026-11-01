@@ -123,7 +123,7 @@ func pairKey(a, b string) string {
 	return a + " " + b
 }
 
-// readDecisions reads the decisions of a person on pairs: one line for each pair with the two tags and same or different, separated by tabs. A line that starts with # is a comment.
+// readDecisions reads the decisions of a person on pairs: one line for each pair with the two tags and same, different or variant, separated by tabs. A variant is a changed form of the other problem. It is not a missed duplicate. A line that starts with # is a comment.
 func readDecisions(path string) (map[string]string, error) {
 	out := map[string]string{}
 	f, err := os.Open(path) // #nosec G304 -- a file of the content repository.
@@ -141,8 +141,8 @@ func readDecisions(path string) (map[string]string, error) {
 			continue
 		}
 		cols := strings.Split(t, "\t")
-		if len(cols) < 3 || (cols[2] != "same" && cols[2] != "different") {
-			return nil, fmt.Errorf("%s:%d: want two tags and same or different", path, line)
+		if len(cols) < 3 || (cols[2] != "same" && cols[2] != "different" && cols[2] != "variant") {
+			return nil, fmt.Errorf("%s:%d: want two tags and same, different or variant", path, line)
 		}
 		out[pairKey(cols[0], cols[1])] = cols[2]
 	}
