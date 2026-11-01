@@ -179,6 +179,8 @@ func ContentType(name string) string {
 // SyncResult tells what Sync did.
 type SyncResult struct {
 	Files, Put, Deleted int
+	// Left is the number of changes that SyncUntil did not send because its time was over.
+	Left int
 }
 
 // SavePoint is the number of changes after which Sync writes the manifest.
@@ -186,6 +188,11 @@ const SavePoint = 500
 
 // Sync makes the bucket hold the files of dir. It compares the hash of each file with the manifest of the last sync, uploads only the new and changed files, deletes the objects of the files that are gone, and then writes the new manifest. workers requests run at the same time. Sync also writes the manifest after each SavePoint changes and when a request fails, so a new run does not send again the files that are already in the bucket.
 func Sync(ctx context.Context, r *R2, dir string, workers int) (SyncResult, error) {
+	return SyncUntil(ctx, r, dir, workers, time.Time{})
+}
+
+// SyncUntil is Sync, but it sends no new change after the time until, when until is not zero. It then writes the manifest of the objects that the bucket holds, and the result tells how many changes are left. A new run sends them.
+func SyncUntil(ctx context.Context, r *R2, dir string, workers int, until time.Time) (SyncResult, error) {
 	var res SyncResult
 	files := map[string]string{}
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
@@ -286,17 +293,28 @@ func Sync(ctx context.Context, r *R2, dir string, workers int) (SyncResult, erro
 			}
 		}()
 	}
+	all := make([]job, 0, len(put)+len(del))
 	for _, k := range put {
-		jobs <- job{key: k}
+		all = append(all, job{key: k})
 	}
 	for _, k := range del {
-		jobs <- job{key: k, delete: true}
+		all = append(all, job{key: k, delete: true})
+	}
+	for i, j := range all {
+		if !until.IsZero() && time.Now().After(until) {
+			res.Left = len(all) - i
+			break
+		}
+		jobs <- j
 	}
 	close(jobs)
 	wg.Wait()
 	if first != nil {
 		_ = save()
 		return res, first
+	}
+	if res.Left > 0 {
+		return res, save()
 	}
 	done = files
 	return res, save()
