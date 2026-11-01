@@ -205,6 +205,19 @@ func TestProfiles(t *testing.T) {
 	if row.Labels[0] != "IMO" || row.Author != "evanchen" {
 		t.Errorf("notes row %+v", row)
 	}
+	for _, tc := range []struct{ path, label, label0, number string }{
+		{"HarvardMIT/segmented/en-102-2007-feb-alg-solutions.jsonl", "7", "HMMT February", "a7"},
+		{"HarvardMIT/segmented/en-102-2002-feb-adv-solutions.jsonl", "AT10", "HMMT February", "v10"},
+		{"HarvardMIT/segmented/en-102-2019-feb-guts-solutions.jsonl", "M_{13}", "HMMT February", ""},
+		{"HarvardMIT/segmented/en-102-2011-feb-algcalc-solutions.jsonl", "3", "HMMT February", ""},
+		{"HarvardMIT/segmented/en-102-2015-nov-thm-solutions.jsonl", "4", "HMMT November", "h4"},
+		{"HarvardMIT/segmented/en-164-tournaments-2013-hmic-solutions.jsonl", "2", "HMIC", "p2"},
+	} {
+		row, _ = Profiles["hf-numina-olympiads"].Map(Record{"exam": {"HMMT"}, "problem_label": {tc.label}, "problem": {"x"}, "metadata.resource_path": {tc.path}})
+		if row.Labels[0] != tc.label0 || row.Number != tc.number {
+			t.Errorf("HMMT row %s %s: %q %q", tc.path, tc.label, row.Labels[0], row.Number)
+		}
+	}
 	row, _ = Profiles["hf-ai-mo-aops"].Map(Record{"metadata.path": {"Contest Collections/2022 Contests/2022 3rd Memorial &quot;A&quot;/1.json"}, "problem": {"x"}})
 	if row.Labels[0] != `3rd Memorial "A"` {
 		t.Errorf("label %q", row.Labels[0])

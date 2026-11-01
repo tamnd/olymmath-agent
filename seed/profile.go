@@ -87,6 +87,41 @@ func numinaLabels(exam, path string) []string {
 	return labels(exam)
 }
 
+// hmmtRE reads the tournament and the round of a NuminaMath row of HMMT from its resource path, such as "en-102-2007-feb-alg-solutions.jsonl" or "en-164-tournaments-2013-hmic-solutions.jsonl".
+var hmmtRE = regexp.MustCompile(`[0-9]{4}-(feb|nov|hmic)(?:-([a-z0-9]+))?-solutions\.jsonl$`)
+
+// hmmtTournaments gives the label of each tournament of HMMT in a resource path.
+var hmmtTournaments = map[string]string{"feb": "HMMT February", "nov": "HMMT November", "hmic": "HMIC"}
+
+// hmmtRounds gives the letter of the position of each round of HMMT in a resource path. The rounds of one tournament share the numbers 1 to 10, so the letter tells them apart. Algebra (to 2016) and Algebra and Number Theory (from 2017) are never in one year, so they share the letter a. Agent decision: the six rounds of 2011 with two subjects each, such as "algcalc", have no letter, because the order of their problems is not the order of the subject rounds.
+var hmmtRounds = map[string]string{
+	"feb-alg": "a", "feb-algnt": "a", "feb-geo": "g", "feb-comb": "c", "feb-calc": "k", "feb-adv": "v",
+	"feb-gen1": "e", "feb-gen2": "f", "feb-guts": "u", "feb-team": "t", "feb-team1": "t", "feb-team2": "s", "feb-oral": "o",
+	"nov-gen": "e", "nov-gen1": "e", "nov-gen2": "f", "nov-thm": "h", "nov-team": "t", "nov-guts": "u",
+	"hmic": "p",
+}
+
+// hmmtNumberRE reads a problem label of an HMMT row, such as "7", "A7" or "AT10".
+var hmmtNumberRE = regexp.MustCompile(`^[A-Z]{0,2}([0-9]{1,2})$`)
+
+// numinaRow gives the labels and the problem label of a NuminaMath row. For a row of HMMT, the label names the tournament and the problem label has the letter of the round, such as "a7" for problem 7 of the algebra round of February. A problem label of HMMT that the round does not explain, such as "M_{13}" in a guts round, gives no problem label.
+func numinaRow(exam, path, number string) ([]string, string) {
+	m := hmmtRE.FindStringSubmatch(path)
+	if m == nil || !strings.HasPrefix(path, "HarvardMIT/") {
+		return numinaLabels(exam, path), number
+	}
+	round := m[1]
+	if m[2] != "" {
+		round += "-" + m[2]
+	}
+	letter, ok := hmmtRounds[round]
+	n := hmmtNumberRE.FindStringSubmatch(strings.TrimSpace(number))
+	if !ok || n == nil {
+		return labels(hmmtTournaments[m[1]]), ""
+	}
+	return labels(hmmtTournaments[m[1]]), letter + n[1]
+}
+
 // numinaAuthor gives the author of a NuminaMath row from its resource path. The files that end in "-notes.jsonl" have the texts of the notes of Evan Chen.
 func numinaAuthor(path string) string {
 	if strings.HasSuffix(path, "-notes.jsonl") {
@@ -113,8 +148,9 @@ var Profiles = map[string]Profile{
 		Columns: []string{"year", "tier", "problem_label", "exam", "problem", "solution", "metadata.resource_path"},
 		Map: func(r Record) (Row, bool) {
 			y, _ := strconv.Atoi(r.Get("year"))
+			ls, n := numinaRow(r.Get("exam"), r.Get("metadata.resource_path"), r.Get("problem_label"))
 			return Row{
-				Labels: numinaLabels(r.Get("exam"), r.Get("metadata.resource_path")), Year: y, Number: r.Get("problem_label"), Lang: "en",
+				Labels: ls, Year: y, Number: n, Lang: "en",
 				Statement: r.Get("problem"), Solutions: count(r, "solution"), Ref: r.Get("metadata.resource_path"),
 				Author: numinaAuthor(r.Get("metadata.resource_path")),
 			}, r.Get("problem") != ""
@@ -124,8 +160,9 @@ var Profiles = map[string]Profile{
 		Columns: []string{"problem", "solution", "answer", "metadata.exam", "metadata.year", "metadata.problem_label", "metadata.resource_path"},
 		Map: func(r Record) (Row, bool) {
 			y, _ := strconv.Atoi(r.Get("metadata.year"))
+			ls, n := numinaRow(r.Get("metadata.exam"), r.Get("metadata.resource_path"), r.Get("metadata.problem_label"))
 			return Row{
-				Labels: numinaLabels(r.Get("metadata.exam"), r.Get("metadata.resource_path")), Year: y, Number: r.Get("metadata.problem_label"), Lang: "en",
+				Labels: ls, Year: y, Number: n, Lang: "en",
 				Statement: r.Get("problem"), Answer: r.Get("answer"), Solutions: count(r, "solution"), Ref: r.Get("metadata.resource_path"),
 				Author: numinaAuthor(r.Get("metadata.resource_path")),
 			}, r.Get("problem") != ""
