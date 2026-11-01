@@ -224,3 +224,61 @@ func TestValidPositionEra(t *testing.T) {
 		}
 	}
 }
+
+func TestTitlePosition(t *testing.T) {
+	corpus, fs := content.Load("../content/testdata/valid")
+	if fs.Errors() > 0 {
+		t.Fatal(fs)
+	}
+	al, err := seed.LoadAliases("../content/testdata/valid", corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	imo := corpus.Competition("imo")
+	isl := &content.Competition{Code: "isl", TopicPositions: true}
+	cases := []struct {
+		c    *content.Competition
+		year int
+		pos  string
+		text string
+		want string
+	}{
+		{imo, 1982, "p2", "IMO 1982 P5", "p5"},
+		{imo, 2004, "p2", "International Mathematical Olympiad 2004 problem 6.", "p6"},
+		{imo, 2004, "p2", "IMO 2004 #3", "p3"},
+		{imo, 2004, "", "IMO 2004 P3", "p3"},
+		{imo, 2004, "p2", "IMO 2005 P3", ""},
+		{imo, 2004, "p2", "IMO 2004 Day 2 P3", ""},
+		{imo, 2004, "p2", "IMO Shortlist 2003 G4 IMO 2004 P3", ""},
+		{imo, 2004, "p2", "IMO 2004 Junior P3", ""},
+		{imo, 2004, "p2", "Practice Test 1 2004 P3", ""},
+		{imo, 2004, "p2", "IMO 2004", ""},
+		{imo, 2004, "p2", "IMO 2004 P3\nLet $n$ be odd.", ""},
+		{imo, 2004, "a2", "IMO 2004 P3", ""},
+		{isl, 2011, "2", "IMO Shortlist 2011 G2", "g2"},
+		{isl, 2004, "3", "Moldova TST 2005 IMO Shortlist 2004 geometry problem 3", "g3"},
+		{isl, 2011, "2", "IMO Shortlist 2011 Algebra 2", "a2"},
+		{isl, 1994, "5", "IMO 1994 P3 IMO Shortlist 1994 N5", "n5"},
+		{isl, 2006, "2", "IMO Shortlist 2006 G4 A2", ""},
+		{isl, 2011, "2", "Romania 2011 G2", ""},
+		{isl, 1990, "12", "IMO ShortList 1990 P12 (IRE 1)", ""},
+	}
+	for _, tc := range cases {
+		if got := TitlePosition(tc.c, al, tc.year, tc.pos, tc.text); got != tc.want {
+			t.Errorf("TitlePosition(%q) = %q, want %q", tc.text, got, tc.want)
+		}
+	}
+	// The wiki numbers each day from 1, so two topics claim P2. The titles give P2 and P5.
+	tp := &Topics{Aliases: al, Corpus: corpus}
+	url := "https://artofproblemsolving.com/community/c6h"
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 1982, Number: "2", Ref: url + "300p1", Statement: "IMO 1982 P2"})
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Year: 1982, Number: "2", Ref: url + "301p1", Statement: "IMO 1982 P5"})
+	// A wiki row with no year takes the year of its title.
+	tp.Add(seed.Row{Labels: []string{"IMO"}, Number: "1", Ref: url + "302p1", Statement: "IMO 1983 P4"})
+	a, _ := tp.Position("aops-topic:300", "imo", 1982)
+	b, _ := tp.Position("aops-topic:301", "imo", 1982)
+	c, _ := tp.Position("aops-topic:302", "imo", 1983)
+	if a != "p2" || b != "p5" || c != "p4" {
+		t.Errorf("the topics give %q, %q and %q", a, b, c)
+	}
+}
