@@ -57,10 +57,13 @@
       <p class="foot-head">Project</p>
       <p><a href="https://github.com/tamnd/olymmath">Content on GitHub</a><br><a href="https://github.com/tamnd/olymmath-agent">Toolchain on GitHub</a><br><a href="{{link "about/"}}">About and licences</a></p>
     </div>
+    {{- /* The build line is on the about page only, so that a new build does not change each page and a deploy sends only the pages that changed. */}}
+    {{- if eq .Path "/about/"}}
     <div>
       <p class="foot-head">Build</p>
       <p>Built on {{.Site.Built}}{{if .Site.Commit}} from <a href="https://github.com/tamnd/olymmath/commit/{{.Site.Commit}}"><code>{{short .Site.Commit}}</code></a>{{end}}{{if .Site.Version}} with om {{.Site.Version}}{{end}}.</p>
     </div>
+    {{- end}}
   </div>
 </footer>
 </body>

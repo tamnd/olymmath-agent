@@ -2,6 +2,7 @@ package publish
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -184,5 +185,79 @@ func TestSyncResume(t *testing.T) {
 	res, err := Sync(ctx, r, dir, 1)
 	if err != nil || res.Put != 1 {
 		t.Errorf("second sync put %d files, error %v; want 1", res.Put, err)
+	}
+}
+
+func TestPack(t *testing.T) {
+	in, out, index := t.TempDir(), t.TempDir(), t.TempDir()
+	write(t, in, "nz/2020/p1.html", "one")
+	write(t, in, "nz/2020/p1.md", "two")
+	write(t, in, "ca/2021/p2.html", "three")
+	res, err := Pack(in, out, index)
+	if err != nil || res.Files != 3 || res.Packs != 2 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	b, err := os.ReadFile(filepath.Join(index, "nz.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ix PackIndex
+	if err := json.Unmarshal(b, &ix); err != nil {
+		t.Fatal(err)
+	}
+	pack, err := os.ReadFile(filepath.Join(out, filepath.FromSlash(ix.Pack)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for f, want := range map[string]string{"2020/p1.html": "one", "2020/p1.md": "two"} {
+		e := ix.Files[f]
+		if got := string(pack[e.Offset : e.Offset+e.Length]); got != want || len(e.Hash) != 16 {
+			t.Errorf("%s gives %q and hash %q", f, got, e.Hash)
+		}
+	}
+	// The same files give the same pack, and a change gives a new pack name.
+	first := ix.Pack
+	if _, err := Pack(in, t.TempDir(), index); err != nil {
+		t.Fatal(err)
+	}
+	if b2, _ := os.ReadFile(filepath.Join(index, "nz.json")); string(b2) != string(b) {
+		t.Error("the same files give another index")
+	}
+	write(t, in, "nz/2020/p1.md", "new")
+	if _, err := Pack(in, t.TempDir(), index); err != nil {
+		t.Fatal(err)
+	}
+	b, _ = os.ReadFile(filepath.Join(index, "nz.json"))
+	if err := json.Unmarshal(b, &ix); err != nil || ix.Pack == first {
+		t.Errorf("a changed file keeps the pack %s", ix.Pack)
+	}
+	write(t, in, "top.html", "x")
+	if _, err := Pack(in, t.TempDir(), t.TempDir()); err == nil {
+		t.Error("a file that is not in a folder is packed")
+	}
+}
+
+func TestSyncKeep(t *testing.T) {
+	f := &fakeR2{objects: map[string]string{}, types: map[string]string{}}
+	srv := httptest.NewServer(f)
+	defer srv.Close()
+	r := &R2{Account: "acc", Bucket: "site", Token: "token", Base: srv.URL, Rate: -1}
+	dir := t.TempDir()
+	write(t, dir, "pack/a.1.pack", "a")
+	ctx := context.Background()
+	if _, err := Sync(ctx, r, dir, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(dir, "pack", "a.1.pack")); err != nil {
+		t.Fatal(err)
+	}
+	write(t, dir, "pack/a.2.pack", "b")
+	res, err := SyncWith(ctx, r, dir, SyncOptions{Workers: 1, Keep: true})
+	if err != nil || res.Put != 1 || res.Deleted != 0 || f.objects["pack/a.1.pack"] != "a" {
+		t.Fatalf("a sync with keep did %+v %v", res, err)
+	}
+	// The next sync with no keep deletes the old pack, because the manifest still lists it.
+	if res, err = Sync(ctx, r, dir, 1); err != nil || res.Put != 0 || res.Deleted != 1 {
+		t.Fatalf("the sync after keep did %+v %v", res, err)
 	}
 }
