@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -150,6 +151,32 @@ func TestSplit(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
 			t.Errorf("%s did not move: %v", rel, err)
 		}
+	}
+}
+
+func TestFit(t *testing.T) {
+	dir, out := t.TempDir(), t.TempDir()
+	for _, rel := range []string{"index.html", "imo/index.html", "imo/2024/p1.html", "imo/2024/p2.html", "imo/2024/p3.html", "aime/index.html", "aime/2024/p1.html"} {
+		write(t, dir, rel, "x")
+	}
+	corpus := &content.Corpus{Competitions: []*content.Competition{{Code: "aime"}, {Code: "imo"}}}
+	if n, codes, err := Fit(dir, out, corpus, 10); n != 0 || codes != nil || err != nil {
+		t.Fatalf("a site under the limit changed: %d %v %v", n, codes, err)
+	}
+	n, codes, err := Fit(dir, out, corpus, 5)
+	if err != nil || n != 3 || !slices.Equal(codes, []string{"imo"}) {
+		t.Fatalf("%d %v %v", n, codes, err)
+	}
+	for _, rel := range []string{"imo/index.html", "aime/2024/p1.html"} {
+		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
+			t.Errorf("%s: %v", rel, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(out, "imo/2024/p2.html")); err != nil {
+		t.Errorf("imo/2024/p2.html did not move: %v", err)
+	}
+	if _, _, err := Fit(dir, out, corpus, 1); err == nil {
+		t.Error("a site over the limit after the move gave no error")
 	}
 }
 
