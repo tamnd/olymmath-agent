@@ -38,11 +38,29 @@ func runSiteSplit(env Env, args []string) int {
 	return ExitOK
 }
 
+func runSitePack(env Env, args []string) int {
+	fs := newFlags("site pack", env.Stderr)
+	in := fs.String("in", "build/r2", "the files that go to R2, from om site split")
+	out := fs.String("out", "build/pack", "the directory for the packs. om site upload sends it")
+	index := fs.String("index", "build/site/_pack", "the directory for the index of each pack. It is in the static assets, so that the Worker reads it with no R2 request")
+	if err := fs.Parse(args); err != nil {
+		return ExitUsage
+	}
+	res, err := publish.Pack(*in, *out, *index)
+	if err != nil {
+		fmt.Fprintf(env.Stderr, "om site pack: %v\n", err)
+		return ExitFailure
+	}
+	fmt.Fprintf(env.Stdout, "%d files in %d packs in %s\n", res.Files, res.Packs, *out)
+	return ExitOK
+}
+
 func runSiteUpload(env Env, args []string) int {
 	fs := newFlags("site upload", env.Stderr)
-	dir := fs.String("dir", "build/r2", "the directory to upload")
+	dir := fs.String("dir", "build/pack", "the directory to upload")
 	bucket := fs.String("bucket", "olymmath-site", "the R2 bucket")
 	workers := fs.Int("workers", 8, "the number of requests at the same time")
+	keep := fs.Bool("keep", false, "keep the objects of the files that are gone; a deploy uploads with -keep before the new Worker is live and without it after")
 	budget := fs.Duration("budget", 0, "send no new file after this time, for example 40m, and leave the rest to the next run; 0 has no limit")
 	if err := fs.Parse(args); err != nil {
 		return ExitUsage
@@ -60,7 +78,7 @@ func runSiteUpload(env Env, args []string) int {
 	if *budget > 0 {
 		until = time.Now().Add(*budget)
 	}
-	res, err := publish.SyncUntil(context.Background(), r, *dir, *workers, until)
+	res, err := publish.SyncWith(context.Background(), r, *dir, publish.SyncOptions{Workers: *workers, Until: until, Keep: *keep})
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om site upload: %v\n", err)
 		return ExitFailure

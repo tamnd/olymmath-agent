@@ -193,6 +193,22 @@ func Sync(ctx context.Context, r *R2, dir string, workers int) (SyncResult, erro
 
 // SyncUntil is Sync, but it sends no new change after the time until, when until is not zero. It then writes the manifest of the objects that the bucket holds, and the result tells how many changes are left. A new run sends them.
 func SyncUntil(ctx context.Context, r *R2, dir string, workers int, until time.Time) (SyncResult, error) {
+	return SyncWith(ctx, r, dir, SyncOptions{Workers: workers, Until: until})
+}
+
+// SyncOptions are the options of SyncWith.
+type SyncOptions struct {
+	// Workers is the number of requests at the same time.
+	Workers int
+	// Until is the time after which no new change is sent. The zero time has no limit.
+	Until time.Time
+	// Keep keeps the objects of the files that are gone. A deploy uploads the new packs with Keep before the new Worker is live, because the old Worker still reads the old packs, and it deletes them after.
+	Keep bool
+}
+
+// SyncWith is Sync with options.
+func SyncWith(ctx context.Context, r *R2, dir string, opt SyncOptions) (SyncResult, error) {
+	workers, until := opt.Workers, opt.Until
 	var res SyncResult
 	files := map[string]string{}
 	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
@@ -230,7 +246,7 @@ func SyncUntil(ctx context.Context, r *R2, dir string, workers int, until time.T
 		}
 	}
 	for k := range old {
-		if _, ok := files[k]; !ok {
+		if _, ok := files[k]; !ok && !opt.Keep {
 			del = append(del, k)
 		}
 	}
@@ -313,7 +329,7 @@ func SyncUntil(ctx context.Context, r *R2, dir string, workers int, until time.T
 		_ = save()
 		return res, first
 	}
-	if res.Left > 0 {
+	if res.Left > 0 || opt.Keep {
 		return res, save()
 	}
 	done = files

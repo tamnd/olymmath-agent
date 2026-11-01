@@ -100,12 +100,34 @@ func newBuilder(corpus *content.Corpus, opts Options) (*builder, error) {
 		return nil, err
 	}
 	b := &builder{corpus: corpus, opts: opts, markup: m}
-	b.asset = shortHash(opts.Version + opts.Commit + opts.Date.Format(time.RFC3339))
+	if b.asset, err = assetHash(); err != nil {
+		return nil, err
+	}
 	b.tmpl, err = template.New("").Funcs(b.funcs()).ParseFS(templateFS, "templates/*.html")
 	if err != nil {
 		return nil, err
 	}
 	return b, nil
+}
+
+// assetHash gives the hash of the bytes of the assets. The links to the assets end in ?v= and this hash, so a page changes only when an asset changes, and a build of the same content gives the same pages.
+func assetHash() (string, error) {
+	var all strings.Builder
+	for _, fsys := range []fs.FS{staticFS, katex.Assets()} {
+		err := fs.WalkDir(fsys, ".", func(p string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() {
+				return err
+			}
+			data, err := fs.ReadFile(fsys, p)
+			all.WriteString(p)
+			all.Write(data)
+			return err
+		})
+		if err != nil {
+			return "", err
+		}
+	}
+	return shortHash(all.String()), nil
 }
 
 func shortHash(s string) string {
