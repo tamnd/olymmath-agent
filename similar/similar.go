@@ -3,8 +3,11 @@ package similar
 
 import (
 	"math"
+	"runtime"
 	"sort"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"unicode"
 )
 
@@ -36,12 +39,14 @@ func Words(text string) []string {
 	return out
 }
 
+// posting is one text of a word in the index, with the weight of the word in the text.
+type posting struct {
+	doc int
+	w   float64
+}
+
 // Find gives, for each text, at most n other texts with a score of at least least, the best first. A word that is in more than a tenth of the texts does not count, because it is too common to tell texts apart.
 func Find(texts []string, n int, least float64) [][]Match {
-	type posting struct {
-		doc int
-		w   float64
-	}
 	tf := make([]map[string]float64, len(texts))
 	df := map[string]int{}
 	for i, t := range texts {
@@ -56,70 +61,78 @@ func Find(texts []string, n int, least float64) [][]Match {
 	limit := max(len(texts)/10, 2)
 	index := map[string][]posting{}
 	vecs := make([]map[string]float64, len(texts))
+	// The words of each text in order, so that the sums do not depend on the order of a map.
+	sorted := make([][]string, len(texts))
 	for i := range texts {
 		vecs[i] = map[string]float64{}
-		var norm float64
-		for w, c := range tf[i] {
-			if df[w] < 2 || df[w] > limit {
-				continue
+		for w := range tf[i] {
+			if df[w] >= 2 && df[w] <= limit {
+				sorted[i] = append(sorted[i], w)
 			}
-			x := (1 + math.Log(c)) * math.Log(float64(len(texts))/float64(df[w]))
+		}
+		sort.Strings(sorted[i])
+		var norm float64
+		for _, w := range sorted[i] {
+			x := (1 + math.Log(tf[i][w])) * math.Log(float64(len(texts))/float64(df[w]))
 			vecs[i][w] = x
 			norm += x * x
 		}
 		norm = math.Sqrt(norm)
-		for w := range vecs[i] {
-			vecs[i][w] /= norm
-		}
-	}
-	// The words of each text in order, so that the sums of the scores do not depend on the order of a map.
-	sorted := make([][]string, len(texts))
-	for i := range texts {
-		for w := range vecs[i] {
-			sorted[i] = append(sorted[i], w)
-		}
-		sort.Strings(sorted[i])
 		for _, w := range sorted[i] {
+			vecs[i][w] /= norm
 			index[w] = append(index[w], posting{i, vecs[i][w]})
 		}
 	}
 	out := make([][]Match, len(texts))
-	for i := range texts {
-		score := map[int]float64{}
-		for _, w := range sorted[i] {
-			x := vecs[i][w]
-			for _, p := range index[w] {
-				if p.doc != i {
-					score[p.doc] += x * p.w
+	// The scores of one text do not depend on the other scores, so the workers share the texts.
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	for range min(max(runtime.NumCPU(), 1), max(len(texts), 1)) {
+		wg.Go(func() {
+			for {
+				i := int(next.Add(1)) - 1
+				if i >= len(texts) {
+					return
 				}
+				out[i] = best(i, sorted[i], vecs[i], index, n, least)
 			}
-		}
-		var ms []Match
-		for d, s := range score {
-			if s >= least {
-				ms = append(ms, Match{d, s})
-			}
-		}
-		sort.Slice(ms, func(a, b int) bool {
-			if ms[a].Score != ms[b].Score {
-				return ms[a].Score > ms[b].Score
-			}
-			return ms[a].Doc < ms[b].Doc
 		})
-		if len(ms) > n {
-			ms = ms[:n]
-		}
-		out[i] = ms
 	}
+	wg.Wait()
 	return out
+}
+
+// best gives the n best matches of text i.
+func best(i int, words []string, vec map[string]float64, index map[string][]posting, n int, least float64) []Match {
+	score := map[int]float64{}
+	for _, w := range words {
+		x := vec[w]
+		for _, p := range index[w] {
+			if p.doc != i {
+				score[p.doc] += x * p.w
+			}
+		}
+	}
+	var ms []Match
+	for d, s := range score {
+		if s >= least {
+			ms = append(ms, Match{d, s})
+		}
+	}
+	sort.Slice(ms, func(a, b int) bool {
+		if ms[a].Score != ms[b].Score {
+			return ms[a].Score > ms[b].Score
+		}
+		return ms[a].Doc < ms[b].Doc
+	})
+	if len(ms) > n {
+		ms = ms[:n]
+	}
+	return ms
 }
 
 // Nearest gives, for each query, the doc with the best score, or a Match with Doc -1 when no doc shares a word with the query. The weights of the words come from the docs only, so that a large set of queries does not change them, and only the docs are indexed.
 func Nearest(docs, queries []string) []Match {
-	type posting struct {
-		doc int
-		w   float64
-	}
 	df := map[string]int{}
 	tfs := make([]map[string]float64, len(docs))
 	for i, t := range docs {

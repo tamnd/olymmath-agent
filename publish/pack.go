@@ -90,34 +90,42 @@ func Pack(in, out, index string) (PackResult, error) {
 		folders = append(folders, f)
 	}
 	sort.Strings(folders)
-	for _, folder := range folders {
-		files := groups[folder]
-		sort.Strings(files)
-		var buf bytes.Buffer
-		ix := PackIndex{Files: make(map[string]PackEntry, len(files))}
-		for _, f := range files {
-			b, err := os.ReadFile(filepath.Join(in, folder, filepath.FromSlash(f))) // #nosec G304 -- the path comes from the walk of the directory.
-			if err != nil {
-				return res, err
-			}
-			sum := sha256.Sum256(b)
-			ix.Files[f] = PackEntry{Offset: buf.Len(), Length: len(b), Hash: hex.EncodeToString(sum[:8])}
-			buf.Write(b)
-		}
-		sum := sha256.Sum256(buf.Bytes())
-		ix.Pack = PackDir + "/" + folder + "." + hex.EncodeToString(sum[:6]) + ".pack"
-		if err := os.WriteFile(filepath.Join(out, filepath.FromSlash(ix.Pack)), buf.Bytes(), 0o644); err != nil { // #nosec G306 -- the site is public.
-			return res, err
-		}
-		js, err := json.Marshal(ix)
-		if err != nil {
-			return res, err
-		}
-		if err := os.WriteFile(filepath.Join(index, folder+".json"), js, 0o644); err != nil { // #nosec G306 G703 -- the site is public.
-			return res, err
-		}
-		res.Files += len(files)
+	// Each folder gives its own pack, so the workers share the folders.
+	err = each(len(folders), func(i int) error {
+		return packFolder(in, out, index, folders[i], groups[folders[i]])
+	})
+	if err != nil {
+		return res, err
+	}
+	for _, f := range folders {
+		res.Files += len(groups[f])
 		res.Packs++
 	}
 	return res, nil
+}
+
+// packFolder writes the pack of one folder and its index.
+func packFolder(in, out, index, folder string, files []string) error {
+	sort.Strings(files)
+	var buf bytes.Buffer
+	ix := PackIndex{Files: make(map[string]PackEntry, len(files))}
+	for _, f := range files {
+		b, err := os.ReadFile(filepath.Join(in, folder, filepath.FromSlash(f))) // #nosec G304 -- the path comes from the walk of the directory.
+		if err != nil {
+			return err
+		}
+		sum := sha256.Sum256(b)
+		ix.Files[f] = PackEntry{Offset: buf.Len(), Length: len(b), Hash: hex.EncodeToString(sum[:8])}
+		buf.Write(b)
+	}
+	sum := sha256.Sum256(buf.Bytes())
+	ix.Pack = PackDir + "/" + folder + "." + hex.EncodeToString(sum[:6]) + ".pack"
+	if err := os.WriteFile(filepath.Join(out, filepath.FromSlash(ix.Pack)), buf.Bytes(), 0o644); err != nil { // #nosec G306 -- the site is public.
+		return err
+	}
+	js, err := json.Marshal(ix)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(index, folder+".json"), js, 0o644) // #nosec G306 G703 -- the site is public.
 }

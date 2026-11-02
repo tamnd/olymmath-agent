@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -40,7 +41,7 @@ func Assets() fs.FS {
 const Timeout = 5 * time.Second
 
 // prelude makes a global object for the script and a render function with fixed options. Each call gets a new copy of the macros, so that a \gdef in one formula does not change the next formula.
-const prelude = `var window = this, module = {exports: {}}, exports = module.exports;`
+const prelude = `var window = this, module = {exports: {}}, exports = module.exports, omTokenRegex;`
 
 const glue = `
 var omkatex = module.exports.renderToString ? module.exports : katex;
@@ -64,13 +65,28 @@ type Error struct {
 
 func (e *Error) Error() string { return e.Message }
 
-// Renderer renders formulas with one set of macros. It keeps the result of each formula, so a formula that a site uses many times costs one render. Its methods are safe for concurrent use, but one Renderer renders one formula at a time.
+// lexerNew is the part of the script that makes the regular expression of the lexer. KaTeX makes a new lexer for each formula and each macro, and goja compiles the expression again each time, which was about half the time of a render. The patch compiles it once, and each lexer gets a copy that shares the compiled form and has its own lastIndex.
+const (
+	lexerNew  = `this.tokenRegex=new RegExp(Xn,"g")`
+	lexerOnce = `this.tokenRegex=new RegExp(omTokenRegex||(omTokenRegex=new RegExp(Xn,"g")))`
+)
+
+// Renderer renders formulas with one set of macros. It keeps the result of each formula, so a formula that a site uses many times costs one render. Its methods are safe for concurrent use: it runs up to runtime.NumCPU KaTeX engines at a time, and each engine renders one formula at a time.
 type Renderer struct {
-	mu     sync.Mutex
+	macros map[string]any
+	name   string        // the name of the cache file
+	idle   chan *engine  // the engines that render nothing now
+	slots  chan struct{} // one token for each engine that may still start
+
+	mu    sync.Mutex
+	cache map[key]result
+}
+
+// engine is one JavaScript runtime with KaTeX loaded.
+type engine struct {
 	vm     *goja.Runtime
 	render goja.Callable
 	macros goja.Value
-	cache  map[key]result
 }
 
 type key struct {
@@ -79,50 +95,107 @@ type key struct {
 }
 
 type result struct {
-	html string
-	err  error
+	html    string
+	err     error
+	timeout bool // the render took too long. This depends on the load of the machine, so the cache file does not keep it
+	used    bool // the formula was asked for since New, so the cache file keeps it
 }
 
 // New returns a Renderer with the macros. A key of macros is a control sequence such as \R, and its value is the expansion, with #1 for the first argument.
 func New(macros map[string]string) (*Renderer, error) {
+	m := map[string]any{}
+	for k, v := range macros {
+		m[k] = v
+	}
+	n := max(runtime.NumCPU(), 1)
+	r := &Renderer{macros: m, name: cacheName(macros), idle: make(chan *engine, n), slots: make(chan struct{}, n-1), cache: map[key]result{}}
+	for range n - 1 {
+		r.slots <- struct{}{}
+	}
+	// The first engine starts now, so that a broken script is an error of New.
+	e, err := r.newEngine()
+	if err != nil {
+		return nil, err
+	}
+	r.idle <- e
+	return r, nil
+}
+
+func (r *Renderer) newEngine() (*engine, error) {
 	vm := goja.New()
-	if _, err := vm.RunScript("katex.min.js", prelude+"\n"+script+"\n"+glue); err != nil {
+	src := strings.Replace(script, lexerNew, lexerOnce, 1)
+	if _, err := vm.RunScript("katex.min.js", prelude+"\n"+src+"\n"+glue); err != nil {
 		return nil, fmt.Errorf("katex: load KaTeX %s: %w", Version, err)
 	}
 	render, ok := goja.AssertFunction(vm.Get("omrender"))
 	if !ok {
 		return nil, errors.New("katex: the script has no render function")
 	}
-	m := map[string]any{}
-	for k, v := range macros {
-		m[k] = v
+	return &engine{vm: vm, render: render, macros: vm.ToValue(r.macros)}, nil
+}
+
+// get returns an idle engine. It starts a new engine when none is idle and fewer than the limit run.
+func (r *Renderer) get() (*engine, error) {
+	select {
+	case e := <-r.idle:
+		return e, nil
+	default:
 	}
-	return &Renderer{vm: vm, render: render, macros: vm.ToValue(m), cache: map[key]result{}}, nil
+	select {
+	case e := <-r.idle:
+		return e, nil
+	case <-r.slots:
+		e, err := r.newEngine()
+		if err != nil {
+			r.slots <- struct{}{}
+			return nil, err
+		}
+		return e, nil
+	}
 }
 
 // Render returns the HTML and MathML of tex. display selects display math, else the formula is inline. The error is an *Error when KaTeX cannot parse tex.
 func (r *Renderer) Render(tex string, display bool) (string, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
 	k := key{tex, display}
-	if res, ok := r.cache[k]; ok {
+	r.mu.Lock()
+	res, ok := r.cache[k]
+	if ok && !res.used {
+		res.used = true
+		r.cache[k] = res
+	}
+	r.mu.Unlock()
+	if ok {
 		return res.html, res.err
 	}
-	t := time.AfterFunc(Timeout, func() { r.vm.Interrupt("timeout") })
-	v, err := r.render(goja.Undefined(), r.vm.ToValue(tex), r.vm.ToValue(display), r.macros)
+	e, err := r.get()
+	if err != nil {
+		return "", err
+	}
+	res = e.run(tex, display)
+	res.used = true
+	r.idle <- e
+	r.mu.Lock()
+	r.cache[k] = res
+	r.mu.Unlock()
+	return res.html, res.err
+}
+
+func (e *engine) run(tex string, display bool) result {
+	t := time.AfterFunc(Timeout, func() { e.vm.Interrupt("timeout") })
+	v, err := e.render(goja.Undefined(), e.vm.ToValue(tex), e.vm.ToValue(display), e.macros)
 	t.Stop()
-	r.vm.ClearInterrupt()
+	e.vm.ClearInterrupt()
 	var res result
 	switch {
 	case err == nil:
 		res.html = v.String()
 	case isInterrupt(err):
 		res.err = &Error{TeX: tex, Message: fmt.Sprintf("KaTeX took more than %s", Timeout)}
+		res.timeout = true
 	default:
 		res.err = &Error{TeX: tex, Message: message(err)}
 	}
-	r.cache[k] = res
-	return res.html, res.err
+	return res
 }
 
 func isInterrupt(err error) bool {

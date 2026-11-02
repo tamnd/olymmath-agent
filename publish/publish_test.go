@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -286,5 +287,55 @@ func TestSyncKeep(t *testing.T) {
 	// The next sync with no keep deletes the old pack, because the manifest still lists it.
 	if res, err = Sync(ctx, r, dir, 1); err != nil || res.Put != 0 || res.Deleted != 1 {
 		t.Fatalf("the sync after keep did %+v %v", res, err)
+	}
+}
+
+// tree lists the folders and the files under root, with the bytes of each file.
+func tree(t *testing.T, root string) map[string]string {
+	t.Helper()
+	out := map[string]string{}
+	err := filepath.WalkDir(root, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			out[rel+"/"] = ""
+			return nil
+		}
+		b, err := os.ReadFile(p) // #nosec G304 -- a test file.
+		out[rel] = string(b)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// TestMoveFolders moves whole folders, a folder with only an index page and a folder that out has already, and wants the same trees as a move of each file.
+func TestMoveFolders(t *testing.T) {
+	dir, out := t.TempDir(), t.TempDir()
+	for _, rel := range []string{"nz/index.html", "nz/top.html", "nz/2020/index.html", "nz/2020/p1.html", "nz/2020/p1.json", "nz/2020/deep/index.json", "nz/2020/deep/x.md", "nz/2021/index.html", "nz/2022/p1.html", "nz/2022/p2.html"} {
+		write(t, dir, rel, rel)
+	}
+	write(t, out, "nz/2022/p0.md", "before")
+	n, err := moveFiles(dir, out, "nz", true)
+	if err != nil || n != 6 {
+		t.Fatalf("%d files moved, %v, want 6", n, err)
+	}
+	wantDir := map[string]string{"nz/": "", "nz/index.html": "nz/index.html", "nz/2020/": "", "nz/2020/index.html": "nz/2020/index.html", "nz/2020/deep/": "", "nz/2020/deep/index.json": "nz/2020/deep/index.json", "nz/2021/": "", "nz/2021/index.html": "nz/2021/index.html", "nz/2022/": ""}
+	wantOut := map[string]string{"nz/": "", "nz/top.html": "nz/top.html", "nz/2020/": "", "nz/2020/p1.html": "nz/2020/p1.html", "nz/2020/p1.json": "nz/2020/p1.json", "nz/2020/deep/": "", "nz/2020/deep/x.md": "nz/2020/deep/x.md", "nz/2022/": "", "nz/2022/p0.md": "before", "nz/2022/p1.html": "nz/2022/p1.html", "nz/2022/p2.html": "nz/2022/p2.html"}
+	gotDir, gotOut := tree(t, dir), tree(t, out)
+	delete(gotDir, "./")
+	delete(gotOut, "./")
+	if !maps.Equal(gotDir, wantDir) {
+		t.Errorf("the site has %v, want %v", gotDir, wantDir)
+	}
+	if !maps.Equal(gotOut, wantOut) {
+		t.Errorf("out has %v, want %v", gotOut, wantOut)
 	}
 }

@@ -14,10 +14,13 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tamnd/olymmath-agent/content"
@@ -41,6 +44,10 @@ type Options struct {
 	Version string    // the version of om
 	Date    time.Time // the build date
 	Repo    string    // the URL of the content repository, for the edit links
+	// Cache is a directory for the formulas that KaTeX rendered in an earlier build, or "" for no cache. A formula gives the same HTML each time, so the cache changes only the time of a build.
+	Cache string
+	// Workers is the number of pages that render at the same time and of files that write at the same time. It is runtime.NumCPU when it is 0. The output does not depend on it.
+	Workers int
 }
 
 // Stats are the counts that a build reports.
@@ -61,10 +68,20 @@ func Build(corpus *content.Corpus, opts Options) (Stats, error) {
 	if err := os.RemoveAll(opts.Out); err != nil {
 		return Stats{}, err
 	}
-	if err := b.all(); err != nil {
-		return b.stats, err
+	if opts.Cache != "" {
+		b.markup.tex.LoadCache(opts.Cache)
 	}
-	return b.stats, nil
+	b.out = newWriter(b.opts.Workers)
+	err = b.all()
+	if werr := b.out.close(); err == nil {
+		err = werr
+	}
+	if err == nil && opts.Cache != "" {
+		if cerr := b.markup.tex.SaveCache(opts.Cache); cerr != nil {
+			b.stats.Errors = append(b.stats.Errors, fmt.Errorf("site: the formula cache is not saved: %w", cerr))
+		}
+	}
+	return b.stats, err
 }
 
 type builder struct {
@@ -79,6 +96,15 @@ type builder struct {
 	moved map[string]string
 	// similar gives the similar problems of each problem.
 	similar map[*content.Problem][]*content.Problem
+	// rendered keeps the HTML of each Markdown text. A problem shows on its page and on the page of its edition, so each text renders once.
+	rendered map[string]renderedText
+	out      *writer
+}
+
+// renderedText is the HTML of a Markdown text and the errors of its formulas and figures.
+type renderedText struct {
+	html string
+	errs []error
 }
 
 func newBuilder(corpus *content.Corpus, opts Options) (*builder, error) {
@@ -89,6 +115,9 @@ func newBuilder(corpus *content.Corpus, opts Options) (*builder, error) {
 		return nil, fmt.Errorf("site: the base %q must start and end with a slash", opts.Base)
 	}
 	opts.URL = strings.TrimSuffix(opts.URL, "/")
+	if opts.Workers <= 0 {
+		opts.Workers = max(runtime.NumCPU(), 1)
+	}
 	if opts.Date.IsZero() {
 		opts.Date = time.Now().UTC()
 	}
@@ -99,7 +128,7 @@ func newBuilder(corpus *content.Corpus, opts Options) (*builder, error) {
 	if err != nil {
 		return nil, err
 	}
-	b := &builder{corpus: corpus, opts: opts, markup: m}
+	b := &builder{corpus: corpus, opts: opts, markup: m, rendered: map[string]renderedText{}}
 	if b.asset, err = assetHash(); err != nil {
 		return nil, err
 	}
@@ -141,6 +170,7 @@ func shortHash(s string) string {
 
 func (b *builder) all() error {
 	steps := []func() error{
+		b.prerender,
 		b.assets,
 		b.home,
 		b.competitions,
@@ -317,21 +347,70 @@ func (b *builder) render(name string, pg page) error {
 	return nil
 }
 
+// write hands the file to the writer, which writes it in the background. data must not change after the call.
 func (b *builder) write(rel string, data []byte) error {
-	full := filepath.Join(b.opts.Out, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
-		return err
-	}
 	b.stats.Files++
-	return os.WriteFile(full, data, 0o600)
+	return b.out.write(filepath.Join(b.opts.Out, filepath.FromSlash(rel)), data)
 }
 
 func (b *builder) html(src, where string) template.HTML {
-	out, errs := b.markup.HTML(src)
-	for _, err := range errs {
+	r, ok := b.rendered[src]
+	if !ok {
+		r.html, r.errs = b.markup.HTML(src)
+		b.rendered[src] = r
+	}
+	for _, err := range r.errs {
 		b.stats.Errors = append(b.stats.Errors, fmt.Errorf("%s: %w", where, err))
 	}
-	return template.HTML(out) // #nosec G203 -- goldmark escapes raw HTML and KaTeX escapes its input.
+	return template.HTML(r.html) // #nosec G203 -- goldmark escapes raw HTML and KaTeX escapes its input.
+}
+
+// prerender renders each Markdown text of the corpus, with one worker for each CPU. The pages then take the HTML from b.rendered, in the same order as before, so the output and the order of the warnings do not depend on the workers.
+func (b *builder) prerender() error {
+	var texts []string
+	seen := map[string]bool{}
+	add := func(s string) {
+		if s != "" && !seen[s] {
+			seen[s] = true
+			texts = append(texts, s)
+		}
+	}
+	for _, ps := range [][]*content.Problem{b.corpus.All(), b.corpus.Loose} {
+		for _, p := range ps {
+			add(p.Statement)
+			add(p.Answer)
+			for _, s := range p.Solutions {
+				add(s.Body)
+			}
+		}
+	}
+	out := make([]renderedText, len(texts))
+	parallel(b.opts.Workers, len(texts), func(i int) {
+		out[i].html, out[i].errs = b.markup.HTML(texts[i])
+	})
+	for i, t := range texts {
+		b.rendered[t] = out[i]
+	}
+	return nil
+}
+
+// parallel calls f for each i from 0 to n-1, with at most workers calls at the same time.
+func parallel(workers, n int, f func(i int)) {
+	workers = min(workers, n)
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Go(func() {
+			for {
+				i := int(next.Add(1)) - 1
+				if i >= n {
+					return
+				}
+				f(i)
+			}
+		})
+	}
+	wg.Wait()
 }
 
 func (b *builder) assets() error {
