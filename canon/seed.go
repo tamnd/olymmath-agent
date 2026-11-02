@@ -62,6 +62,9 @@ type Seeds struct {
 	// Locate, when it is not nil, gives the position of a row that has no number, for example from the official paper of the edition. It gives "" when it does not know the position.
 	Locate func(code string, year int, text string) string
 
+	// Confirm, when it is not nil, can refuse the position that a row got from Topics. It gives false when the official paper of the edition has another problem at that position.
+	Confirm func(code string, year int, text, pos string) bool
+
 	// Topics, when it is not nil, gives the numbers of AoPS topics. A row with no number and the reference of a topic takes the number of the topic when the topic has the same competition and year, and the letter of the paper when the row has none.
 	Topics *Topics
 
@@ -131,6 +134,10 @@ func (s *Seeds) Add(r seed.Row) {
 	topicLetter := ""
 	if pos == "" && r.Number == "" && s.Topics != nil {
 		if pos, topicLetter = s.Topics.Position(r.Ref, code, r.Year); pos != "" {
+			if s.Confirm != nil && !s.Confirm(code, r.Year, normalize.Statement(r.Statement, ""), pos) {
+				s.skip(r, code, "not the problem of the official paper")
+				return
+			}
 			s.Numbered++
 		}
 	}

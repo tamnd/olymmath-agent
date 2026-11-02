@@ -237,6 +237,21 @@ func (ps Papers) Locate(edition, text string) string {
 	return pos
 }
 
+// Disagrees tells if the English paper of an edition has another problem at the position pos than the text: the paper has a segment at pos in English, the word signal of the text and that segment is less than Least, and Locate does not place the text at pos. A paper in another language never disagrees, because the formula signal is too weak to refuse a position. An edition with no segment at pos never disagrees.
+func (ps Papers) Disagrees(edition, text, pos string) bool {
+	found := false
+	for _, sg := range ps[edition] {
+		if sg.Position != pos || !English(sg.Lang) {
+			continue
+		}
+		if Signal(text, sg.Text) >= Least {
+			return false
+		}
+		found = true
+	}
+	return found && ps.Locate(edition, text) != pos
+}
+
 // TraceLeast is the lowest order signal at which a transcription is traced to the text of a paper.
 const TraceLeast = 0.9
 

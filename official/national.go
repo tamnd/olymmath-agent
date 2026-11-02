@@ -306,3 +306,25 @@ func IMOJPPapers(page string) []National {
 	})
 	return out
 }
+
+// AMTListing is the page of the Australian Maths Trust that lists its past papers.
+const AMTListing = "https://amt.edu.au/department/past-papers"
+
+// amtRE matches the link to a paper of the Australian Mathematical Olympiad: 2016-AMO-Paper-and-Solutions.pdf or AMO-2019-paper-and-solutions.pdf. The papers of the AIMO and the AJMO have other names.
+var amtRE = regexp.MustCompile(`(?i)href="(?:https?://(?:www\.)?amt\.edu\.au)?(/wp-content/uploads/[0-9]{4}/[0-9]{2}/(?:([0-9]{4})-AMO|AMO-([0-9]{4}))-[^"/]*\.pdf)"`)
+
+// AMTPapers gives the papers of the Australian Mathematical Olympiad (au-amo) on the past papers page of the AMT. Each file holds the eight problems of the two days and then the solutions, so its paper holds all the positions. The year is the year in the name of the file, which is the year of the olympiad.
+func AMTPapers(page string) []National {
+	var out []National
+	seen := map[int]bool{}
+	for _, m := range amtRE.FindAllStringSubmatch(page, -1) {
+		y, _ := strconv.Atoi(m[2] + m[3])
+		if y == 0 || seen[y] {
+			continue
+		}
+		seen[y] = true
+		out = append(out, National{Competition: "au-amo", Year: y, URL: "https://amt.edu.au" + m[1]})
+	}
+	slices.SortStableFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}
