@@ -2,11 +2,9 @@
 package official
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"os/exec"
 	"regexp"
 	"slices"
 	"strconv"
@@ -41,10 +39,23 @@ func (p Paper) Segments(text string) []Segment {
 
 // Segment is the text of one problem in a paper.
 type Segment struct {
+	// Position is the position of the problem in the edition. It is "" for a problem of a paper whose problems have no position in the content, such as the paper of an earlier stage of a national olympiad. Such a segment only competes with the others in Locate.
 	Position string
 	// Page is the page of the paper where the problem starts, from 1.
 	Page int
 	Text string
+	// Lang is the code of the language of the paper. It is "" for English.
+	Lang string
+	// URL is the address of the paper. LoadEditions sets it.
+	URL string
+}
+
+// Compare gives the signal of a text in English and a segment: the word signal when the paper is in English, or else the formula signal.
+func Compare(text string, sg Segment) float64 {
+	if English(sg.Lang) {
+		return Signal(text, sg.Text)
+	}
+	return FormulaSignal(text, sg.Text, sg.Lang)
 }
 
 // IMO gives the English papers of the IMO from one year to another. There was no IMO in 1980.
@@ -69,32 +80,18 @@ var ErrNoText = errors.New("the text layer of the PDF is not readable")
 
 // Text runs pdftotext on the bytes of a PDF and returns the text, with a form feed between pages. It returns ErrNoText when less than half of the letters are ASCII letters.
 func Text(ctx context.Context, pdf []byte) (string, error) {
-	cmd := exec.CommandContext(ctx, "pdftotext", "-layout", "-enc", "UTF-8", "-", "-")
-	cmd.Stdin = bytes.NewReader(pdf)
-	var out, errb bytes.Buffer
-	cmd.Stdout = &out
-	cmd.Stderr = &errb
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("pdftotext: %w: %s", err, strings.TrimSpace(errb.String()))
+	text, err := pdftotext(ctx, pdf, "-layout")
+	if err != nil {
+		return "", err
 	}
-	text := out.String()
-	var ascii, all int
-	for _, r := range text {
-		if unicode.IsLetter(r) || unicode.IsSymbol(r) {
-			all++
-			if r < unicode.MaxASCII {
-				ascii++
-			}
-		}
-	}
-	if ascii*2 < all {
+	if !readable(text) {
 		return "", ErrNoText
 	}
 	return text, nil
 }
 
-// markerRE finds the start of a problem: "Problem 3." or "1959/3." at the start of a line.
-var markerRE = regexp.MustCompile(`(?m)^\s*(?:Problem\s+([0-9]{1,2})\s*[.:]|(?:19|20)[0-9]{2}\s*/\s*([0-9]{1,2})\s*\.)`)
+// markerRE finds the start of a problem: "Problem 3." or "1959/3." at the start of a line. The German word Aufgabe and the Polish word Zadanie are markers too, and a marker with a word can be alone on its line, as in "Aufgabe 3".
+var markerRE = regexp.MustCompile(`(?m)^\s*(?:(?:Problem|Aufgabe|Zadanie)\s+([0-9]{1,2})(?:\s*[.:]|[ \t]*$)|(?:19|20)[0-9]{2}\s*/\s*([0-9]{1,2})\s*\.)`)
 
 // bareRE finds the start of a problem in a paper with no word before the number: "3." at the start of a line.
 var bareRE = regexp.MustCompile(`(?m)^\s*()([0-9]{1,2})\.\s`)
@@ -201,27 +198,39 @@ const Least = 0.3
 // Margin is the smallest difference between the best and the second best word signal for which Locate gives a position.
 const Margin = 0.15
 
+// FormulaMargin is the smallest difference between the best and the second best formula signal for which Locate gives a position. It is larger than Margin, because two problems share more formula tokens, such as 1, 2 and n, than words. On the papers of pl-om and de-bundeswettbewerb, with the papers of the earlier stages of pl-om, the rows of hf-ai-mo-aops that Locate placed agreed with each of the 60 rows whose position was known, and no row of an earlier stage got a position.
+const FormulaMargin = 0.2
+
 // Papers holds the segments of the papers of each edition.
 type Papers map[string][]Segment
 
-// Locate gives the position of a text in the paper of an edition: the position of the segment with the best word signal. It gives "" when the edition has no paper, when the best signal is less than Least, or when the best signal of another position is less than Margin below the best. Two segments of one position, for example two copies of one text, do not compete.
+// Locate gives the position of a text in the papers of an edition: the position of the segment with the best signal (see Compare). It gives "" when the edition has no paper, when the best signal is less than Least, when the best signal of another position is less than Margin below the best, or when the best segment has no position. The margin is FormulaMargin when the best segment is not in English. Two segments of one position, for example two copies of one text, do not compete.
 func (ps Papers) Locate(edition, text string) string {
 	best := map[string]float64{}
+	english := map[string]bool{}
 	for _, sg := range ps[edition] {
-		if t := Signal(text, sg.Text); t > best[sg.Position] {
-			best[sg.Position] = t
+		if t := Compare(text, sg); t > best[sg.Position] || (t == best[sg.Position] && English(sg.Lang)) {
+			best[sg.Position], english[sg.Position] = t, English(sg.Lang)
 		}
 	}
 	top, second, pos := 0.0, 0.0, ""
+	found := false
 	for p, t := range best {
 		switch {
-		case t > top || (t == top && p < pos):
-			top, second, pos = t, top, p
+		case !found || t > top || (t == top && p < pos):
+			if found {
+				second = max(second, top)
+			}
+			top, pos, found = t, p, true
 		case t > second:
 			second = t
 		}
 	}
-	if top < Least || top-second < Margin {
+	margin := Margin
+	if !english[pos] {
+		margin = FormulaMargin
+	}
+	if top < Least || top-second < margin {
 		return ""
 	}
 	return pos
