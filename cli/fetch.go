@@ -63,6 +63,16 @@ func runFetch(env Env, args []string) int {
 	h := &hf.Harvest{Hub: &hf.Client{Agent: fc.Agent, Token: os.Getenv("HF_TOKEN")}, Fetch: fc, LocalMax: *localMax << 20, RemoteMax: *remoteMax << 20, MaxFiles: *maxFiles, Log: env.Stdout}
 	code := ExitOK
 	for _, s := range sources {
+		if ps := officialPapers(corpus, s.ID); len(ps) > 0 {
+			fc.Delay = 2 * time.Second
+			n, err := fetchPapers(context.Background(), fc, s.ID, ps)
+			fmt.Fprintf(env.Stdout, "# %s: %d of %d official papers in the store\n", s.ID, n, len(ps))
+			if err != nil {
+				fmt.Fprintf(env.Stderr, "om fetch: %s: %v\n", s.ID, err)
+				code = ExitFailure
+			}
+			continue
+		}
 		id, ok := hf.DatasetID(s.URL)
 		if s.Access != "hf" || !ok {
 			fmt.Fprintf(env.Stderr, "om fetch: %s: the adapter for the access %q comes in a later milestone\n", s.ID, s.Access)
@@ -79,4 +89,33 @@ func runFetch(env Env, args []string) int {
 		fmt.Fprintf(env.Stdout, "manifest %s: %s@%s, %d files, licence %q\n", c.Hash, m.Dataset, m.Revision, len(m.Files), m.Licence)
 	}
 	return code
+}
+
+// officialPapers gives the URLs of the official papers of the editions that come from a source, in the order of the editions.
+func officialPapers(corpus *content.Corpus, source string) []string {
+	var out []string
+	for _, c := range corpus.Competitions {
+		for _, e := range c.Editions {
+			for _, o := range e.Official {
+				if o.Source == source {
+					out = append(out, o.URL)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// fetchPapers gets each paper into the store, one request at a time with the delay of the client. A paper that fails does not stop the others. It returns the number of papers in the store and the last error.
+func fetchPapers(ctx context.Context, fc *fetch.Client, source string, urls []string) (int, error) {
+	var n int
+	var last error
+	for _, u := range urls {
+		if _, err := fc.Get(ctx, source, u, fetch.Options{}); err != nil {
+			last = err
+			continue
+		}
+		n++
+	}
+	return n, last
 }

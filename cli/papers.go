@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -17,7 +18,7 @@ import (
 )
 
 func init() {
-	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive)", runPapers})
+	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb)", runPapers})
 }
 
 func runPapers(env Env, args []string) int {
@@ -30,8 +31,8 @@ func runPapers(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || (pos[0] != "imo-official" && pos[0] != "usa-tst-archive") {
-		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive")
+	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb"}, pos[0]) {
+		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -51,8 +52,11 @@ func runPapers(env Env, args []string) int {
 	fc := fetch.New(st)
 	fc.Agent = fmt.Sprintf("olymmath/%s (+https://olymmath.tamnd.com/about/)", env.Version)
 	ctx := context.Background()
-	if pos[0] == "usa-tst-archive" {
+	switch pos[0] {
+	case "usa-tst-archive":
 		return tstPapers(ctx, env, fc, corpus, *root, *from, *to)
+	case "om-sem", "bundeswettbewerb":
+		return nationalPapers(ctx, env, fc, corpus, *root, pos[0], *from, *to)
 	}
 	comp := corpus.Competition("imo")
 	if comp == nil {
@@ -124,6 +128,82 @@ func tstPapers(ctx context.Context, env Env, fc *fetch.Client, corpus *content.C
 	}
 	fmt.Fprintf(env.Stdout, "%d editions, %d new, %d official papers.\n", editions, created, editions)
 	return ExitOK
+}
+
+// nationals gives the listing page of each national source and the function that reads the papers from it.
+var nationals = map[string]struct {
+	listing string
+	lang    content.OfficialPaper
+	papers  func(string) []official.National
+}{
+	"om-sem":           {official.OMSemListing, content.OfficialPaper{Lang: "Polish", Code: "pl"}, official.OMSemPapers},
+	"bundeswettbewerb": {official.BWMListing, content.OfficialPaper{Lang: "German", Code: "de"}, official.BWMPapers},
+}
+
+// nationalPapers records the papers of a national source from its listing page. It writes the edition file when the corpus does not have the edition. The papers of one edition replace the papers of the source in the edition file, and the papers of other sources stay. Then om fetch SOURCE gets the papers into the store.
+func nationalPapers(ctx context.Context, env Env, fc *fetch.Client, corpus *content.Corpus, root, source string, from, to int) int {
+	n := nationals[source]
+	listing, err := get(ctx, fc, source, n.listing)
+	if err != nil {
+		fmt.Fprintf(env.Stderr, "om papers: %v\n", err)
+		return ExitFailure
+	}
+	byEdition := map[string][]content.OfficialPaper{}
+	var keys []string
+	for _, p := range n.papers(listing) {
+		if p.Year < from || p.Year > to {
+			continue
+		}
+		if corpus.Competition(p.Competition) == nil {
+			fmt.Fprintf(env.Stderr, "om papers: the content has no competition %s\n", p.Competition)
+			return ExitUsage
+		}
+		key := fmt.Sprintf("%s/%d", p.Competition, p.Year)
+		if byEdition[key] == nil {
+			keys = append(keys, key)
+		}
+		o := n.lang
+		o.URL, o.Paper, o.Source = p.URL, p.Paper, source
+		byEdition[key] = append(byEdition[key], o)
+	}
+	var created, papers int
+	for _, key := range keys {
+		rel, err := newEdition(root, corpus, key+"/p1")
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om papers: %s: %v\n", key, err)
+			return ExitFailure
+		}
+		if rel != "" {
+			created++
+		}
+		file := filepath.Join(root, "editions", filepath.FromSlash(key)+".yaml")
+		old, err := officialOf(file)
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om papers: %s: %v\n", file, err)
+			return ExitFailure
+		}
+		list := slices.DeleteFunc(old, func(o content.OfficialPaper) bool { return o.Source == source })
+		if err := setOfficial(file, append(list, byEdition[key]...)); err != nil {
+			fmt.Fprintf(env.Stderr, "om papers: %s: %v\n", file, err)
+			return ExitFailure
+		}
+		papers += len(byEdition[key])
+	}
+	fmt.Fprintf(env.Stdout, "%d editions, %d new, %d official papers.\n", len(keys), created, papers)
+	return ExitOK
+}
+
+// officialOf reads the list of official papers of an edition file.
+func officialOf(file string) ([]content.OfficialPaper, error) {
+	b, err := os.ReadFile(file) // #nosec G304 -- the path is inside the content root.
+	if err != nil {
+		return nil, err
+	}
+	var e content.Edition
+	if err := yaml.Unmarshal(b, &e); err != nil {
+		return nil, err
+	}
+	return e.Official, nil
 }
 
 // get gets a page into the store and returns its text.

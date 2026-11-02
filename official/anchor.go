@@ -104,3 +104,36 @@ func hasSource(p *content.Problem, source string) bool {
 }
 
 func round(f float64) float64 { return float64(int(f*1000+0.5)) / 1000 }
+
+// AnchorEdition compares the segments of the papers of an edition in another language than English with the problems of the edition. A problem links to the segment of its position when Locate places its canonical text at that position, among all the segments of the edition. Else the problem gets a review item. A segment with no position gives nothing. AnchorEdition does not trace a transcription, because the content has no transcription in the language of such a paper.
+func AnchorEdition(owners map[string]*content.Problem, source, edition string, papers Papers) Result {
+	var r Result
+	done := map[string]bool{}
+	for _, sg := range papers[edition] {
+		at := edition + "/" + sg.Position
+		if sg.Position == "" || done[at] {
+			continue
+		}
+		done[at] = true
+		pr := owners[at]
+		if pr == nil {
+			r.Missing = append(r.Missing, at)
+			continue
+		}
+		if hasSource(pr, source) {
+			r.Have++
+			continue
+		}
+		text := ""
+		if s := pr.CanonicalStatement(); s != nil {
+			text = s.Text
+		}
+		t := Compare(text, sg)
+		if papers.Locate(edition, text) == sg.Position {
+			r.Links = append(r.Links, Link{Problem: pr, Segment: sg, T: t})
+			continue
+		}
+		r.Items = append(r.Items, canon.Item{ID: canon.ItemID("official", at, source), Kind: "official", At: at, Source: source, Ref: sg.URL, T: round(t), Text: text, Other: sg.Text})
+	}
+	return r
+}

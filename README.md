@@ -111,6 +111,20 @@ om papers -content olymmath usa-tst-archive
 
 The USA TST Archive on GitHub has the problems, solutions and statistics of the IMO TST, the TSTST and the EGMO TST. The archive states no licence, so its texts are in zone Z2. The `om papers` command lists the files of the archive with the GitHub API and records each problems file as the official English paper of its edition. When the corpus does not have the edition, the command writes the edition file.
 
+### Place the rows of a national olympiad
+
+```sh
+om papers -content olymmath om-sem
+om papers -content olymmath bundeswettbewerb
+om fetch -content olymmath om-sem bundeswettbewerb
+om import -content olymmath -anchor -comp pl-om,de-bundeswettbewerb
+om anchor -content olymmath om-sem
+```
+
+The `om papers` command reads the listing page of the Polish Mathematical Olympiad (om.sem.edu.pl) or of the Bundeswettbewerb Mathematik (mathe-wettbewerbe.de) and records each paper in the edition file. An entry can name the paper of the layout that the file holds, such as `round2`, and the source of the file. The papers of the first and the second stages of the Polish olympiad have the paper `stage1` or `stage2`. Their problems have no position in the content, and they only help to find the rows of those stages. The `om fetch` command gets the papers into the raw store, with a delay of two seconds between requests.
+
+With `-anchor`, `om import` places each row of a competition that has official papers. The papers are in Polish or in German, so the command compares the formulas, not the words: the numbers, the letters alone and the names of points, such as ABC. A row gets the position of the best segment when the signal is at least 0.3 and at least 0.2 above the best signal of another position. A row that is nearest to a segment of an earlier stage gets no position. The `om anchor` command then links each problem to its paper and page when the paper places the canonical text at the position of the problem. Else the problem gets a review item.
+
 ### Link the human solutions
 
 ```sh

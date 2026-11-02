@@ -181,6 +181,10 @@ type OfficialPaper struct {
 	// Code is the code of the language that the organizer uses.
 	Code string `yaml:"code"`
 	URL  string `yaml:"url"`
+	// Paper is the id of the paper of the layout that the file holds, for example round2. It is empty when the file holds all the problems of the edition.
+	Paper string `yaml:"paper,omitempty"`
+	// Source is the id of the source that the file comes from. It is empty for a paper of the first source of the competition.
+	Source string `yaml:"source,omitempty"`
 }
 
 // Paper is one sitting of an edition, for example day 1 of the IMO.

@@ -35,7 +35,7 @@ func runImport(env Env, args []string) int {
 	dir := fs.String("seed", seed.DefaultDir(), "the directory of the seed rows")
 	comps := fs.String("comp", "", "a comma-separated list of competition codes; the default is all competitions")
 	dry := fs.Bool("dry", false, "print the plan and write no file")
-	anchor := fs.Bool("anchor", false, "give a position to each IMO row with no number from the official papers in the raw store, and to each other row with no number from the texts of zone Z3")
+	anchor := fs.Bool("anchor", false, "give a position to each row with no number from the official papers of its edition in the raw store, or, when the edition has no official paper in the store, from the texts of zone Z3")
 	dir2, remote := storeFlags(fs)
 	doubts := fs.Bool("doubts", false, "print each doubt with its source and the source of the canonical candidate, to show why a competition is skipped")
 	promote := fs.Bool("promote", false, "make a candidate of class H1 or H2 the canonical statement of an existing problem when it ranks above the canonical statement and its text agrees with it")
@@ -90,7 +90,7 @@ func runImport(env Env, args []string) int {
 			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
 			return ExitFailure
 		}
-		papers, err := official.Load(context.Background(), st, "imo-official", official.IMO(1959, time.Now().Year()))
+		papers, n, err := official.LoadEditions(context.Background(), st, corpus, s.Comps)
 		if err != nil {
 			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
 			return ExitFailure
@@ -100,10 +100,10 @@ func runImport(env Env, args []string) int {
 			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
 			return ExitFailure
 		}
-		fmt.Fprintf(env.Stderr, "om import: %d official papers, %d editions with texts of zone Z3.\n", len(papers), len(keys))
+		fmt.Fprintf(env.Stderr, "om import: %d official papers of %d editions, %d editions with texts of zone Z3.\n", n, len(papers), len(keys))
 		s.Locate = func(code string, year int, text string) string {
 			ed := code + "/" + strconv.Itoa(year)
-			if code == "imo" {
+			if _, ok := papers[ed]; ok {
 				return papers.Locate(ed, text)
 			}
 			return keys.Locate(ed, text)
