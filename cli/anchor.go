@@ -8,6 +8,8 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/tamnd/olymmath-agent/canon"
@@ -29,12 +31,14 @@ func runAnchor(env Env, args []string) int {
 	from := fs.Int("from", 1959, "the first year")
 	to := fs.Int("to", time.Now().Year(), "the last year")
 	dry := fs.Bool("dry", false, "print the result and write no file")
+	create := fs.Bool("missing", false, "make a new problem for each position of a paper that has no problem. The problem links to the page of the paper and holds no text of it")
+	pages := fs.String("pages", "", "a file of the pages of the problems of papers with no text, such as scans: one edition on each line, a tab, then the page of each problem from p1. With -missing")
 	pos, err := parseMixed(fs, args)
 	if err != nil {
 		return ExitUsage
 	}
 	if len(pos) != 1 {
-		fmt.Fprintln(env.Stderr, "usage: om anchor [-from YEAR] [-to YEAR] SOURCE\nSOURCE is imo-official, or a source whose papers om papers records, such as om-sem.")
+		fmt.Fprintln(env.Stderr, "usage: om anchor [-from YEAR] [-to YEAR] [-missing [-pages FILE]] SOURCE\nSOURCE is imo-official, or a source whose papers om papers records, such as om-sem.")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -53,7 +57,10 @@ func runAnchor(env Env, args []string) int {
 		return ExitFailure
 	}
 	if src.ID != "imo-official" {
-		return anchorEditions(env, *root, corpus, st, src, *from, *to, *dry)
+		return anchorEditions(env, *root, corpus, st, src, editionOptions{*from, *to, *dry, *create, *pages})
+	} else if *create || *pages != "" {
+		fmt.Fprintln(env.Stderr, "om anchor: -missing and -pages work for a source whose papers om papers records")
+		return ExitUsage
 	}
 	fc := fetch.New(st)
 	fc.Agent = fmt.Sprintf("olymmath/%s (+https://olymmath.tamnd.com/about/)", env.Version)
@@ -130,7 +137,8 @@ func replaceItems(root, source string, done map[string]bool, items []canon.Item)
 }
 
 // anchorEditions anchors the problems to the official papers of the editions files that come from the source, such as the papers that om papers records. The papers must be in the store: om fetch gets them. The papers are not in English, so a problem links to its paper when Locate places it at its own position (see official.AnchorEdition).
-func anchorEditions(env Env, root string, corpus *content.Corpus, st *store.Store, src *content.SourceRecord, from, to int, dry bool) int {
+func anchorEditions(env Env, root string, corpus *content.Corpus, st *store.Store, src *content.SourceRecord, o editionOptions) int {
+	from, to, dry := o.from, o.to, o.dry
 	var comps []string
 	for _, c := range corpus.Competitions {
 		for _, e := range c.Editions {
@@ -149,15 +157,42 @@ func anchorEditions(env Env, root string, corpus *content.Corpus, st *store.Stor
 		fmt.Fprintf(env.Stderr, "om anchor: %v\n", err)
 		return ExitFailure
 	}
+	scans := map[string][]int{}
+	if o.pages != "" {
+		if scans, err = readPages(o.pages); err != nil {
+			fmt.Fprintf(env.Stderr, "om anchor: %v\n", err)
+			return ExitUsage
+		}
+	}
 	owners := official.Owners(corpus)
 	var items []canon.Item
+	var news []newLink
 	done := map[string]bool{}
 	var links, have, missing int
 	for _, code := range comps {
 		c := corpus.Competition(code)
 		for _, e := range c.Editions {
 			at := e.Locator()
-			if e.Year < from || e.Year > to || len(papers[at]) == 0 {
+			if e.Year < from || e.Year > to {
+				continue
+			}
+			name := fmt.Sprintf("%s %d official paper", c.Name, e.Year)
+			if len(papers[at]) == 0 {
+				// A paper with no text gives the pages of its problems in the pages file.
+				url := paperURL(e, src.ID)
+				if !o.missing || url == "" || len(scans[at]) == 0 {
+					continue
+				}
+				n := 0
+				for i, pg := range scans[at] {
+					pos := fmt.Sprintf("%s/p%d", at, i+1)
+					if owners[pos] == nil {
+						news = append(news, newLink{pos, name, "en", url, pg})
+						n++
+					}
+				}
+				fmt.Fprintf(env.Stdout, "%s: a paper with no text, %d problems in the pages file, %d with no problem\n", at, len(scans[at]), n)
+				missing += n
 				continue
 			}
 			done[at] = true
@@ -167,6 +202,16 @@ func anchorEditions(env Env, root string, corpus *content.Corpus, st *store.Stor
 			have += r.Have
 			missing += len(r.Missing)
 			items = append(items, r.Items...)
+			if o.missing {
+				for _, pos := range r.Missing {
+					for _, sg := range papers[at] {
+						if at+"/"+sg.Position == pos {
+							news = append(news, newLink{pos, name, cmpOr(sg.Lang, "en"), sg.URL, sg.Page})
+							break
+						}
+					}
+				}
+			}
 			if dry {
 				continue
 			}
@@ -175,7 +220,7 @@ func anchorEditions(env Env, root string, corpus *content.Corpus, st *store.Stor
 				if lang == "" {
 					lang = "en"
 				}
-				cd := &canon.Candidate{Source: src.ID, Origin: src.Origin, Zone: src.Zone.Statement, Lang: lang, Name: fmt.Sprintf("%s %d official paper", c.Name, e.Year), URL: l.Segment.URL}
+				cd := &canon.Candidate{Source: src.ID, Origin: src.Origin, Zone: src.Zone.Statement, Lang: lang, Name: name, URL: l.Segment.URL}
 				if err := addLink(root, l.Problem, canon.AddLink(l.Problem, cd, l.Segment.Page)); err != nil {
 					fmt.Fprintf(env.Stderr, "om anchor: %s: %v\n", l.Problem.Path, err)
 					return ExitFailure
@@ -188,9 +233,90 @@ func anchorEditions(env Env, root string, corpus *content.Corpus, st *store.Stor
 			fmt.Fprintf(env.Stderr, "om anchor: %v\n", err)
 			return ExitFailure
 		}
+		if err := writeLinks(root, corpus, src, news); err != nil {
+			fmt.Fprintf(env.Stderr, "om anchor: %v\n", err)
+			return ExitFailure
+		}
 	}
 	fmt.Fprintf(env.Stdout, "%d papers of %d editions. %d new links, %d linked before, %d review items, %d segments with no problem.\n", n, len(done), links, have, len(items), missing)
+	if o.missing {
+		fmt.Fprintf(env.Stdout, "%d new problems that link to their paper.\n", len(news))
+	}
 	return ExitOK
+}
+
+// editionOptions are the flags of om anchor for anchorEditions.
+type editionOptions struct {
+	from, to     int
+	dry, missing bool
+	pages        string
+}
+
+// newLink is a new problem at a position of an official paper: its only statement links to the page of the paper.
+type newLink struct {
+	at, name, lang, url string
+	page                int
+}
+
+// paperURL gives the address of the official paper of the edition from the source, or "".
+func paperURL(e *content.Edition, source string) string {
+	for _, p := range e.Official {
+		if p.Source == source {
+			return p.URL
+		}
+	}
+	return ""
+}
+
+// readPages reads a pages file: an edition on each line, a tab, and the page of each problem from p1, such as "uk-bmo1/1975\t1 1 1 2 2". A line that starts with # is a comment.
+func readPages(name string) (map[string][]int, error) {
+	b, err := os.ReadFile(name) // #nosec G304 -- a file that the user names.
+	if err != nil {
+		return nil, err
+	}
+	out := map[string][]int{}
+	for i, line := range strings.Split(string(b), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		at, list, ok := strings.Cut(line, "\t")
+		if !ok {
+			return nil, fmt.Errorf("%s:%d: no tab", name, i+1)
+		}
+		for _, f := range strings.Fields(list) {
+			pg, err := strconv.Atoi(f)
+			if err != nil || pg < 1 {
+				return nil, fmt.Errorf("%s:%d: %q is not a page", name, i+1, f)
+			}
+			out[strings.TrimSpace(at)] = append(out[strings.TrimSpace(at)], pg)
+		}
+	}
+	return out, nil
+}
+
+// writeLinks writes a new problem file for each new link, with a new tag.
+func writeLinks(root string, corpus *content.Corpus, src *content.SourceRecord, news []newLink) error {
+	if len(news) == 0 {
+		return nil
+	}
+	tags, err := mintTags(corpus, len(news))
+	if err != nil {
+		return err
+	}
+	for i, l := range news {
+		c := &canon.Candidate{Source: src.ID, Origin: src.Origin, Zone: src.Zone.Statement, Lang: l.lang, Name: l.name, URL: l.url}
+		_, rule := canon.Rank(&canon.Candidate{Origin: src.Origin, Lang: l.lang}, original(corpus.Competition(strings.SplitN(l.at, "/", 2)[0])))
+		b, err := canon.RenderLink(l.at, tags[i], c, l.page, rule)
+		if err != nil {
+			return fmt.Errorf("%s: %w", l.at, err)
+		}
+		r := &canon.Record{Primary: canon.Choice{At: l.at}}
+		if err := writeNew(root, corpus, r, tags[i], b); err != nil {
+			return fmt.Errorf("%s: %w", l.at, err)
+		}
+	}
+	return nil
 }
 
 // paper gets a paper into the store and returns its segments.

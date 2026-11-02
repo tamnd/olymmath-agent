@@ -185,3 +185,20 @@ func TestAddReworded(t *testing.T) {
 		t.Fatalf("not reworded: better %v", a.Better)
 	}
 }
+
+func TestRenderLink(t *testing.T) {
+	c := &Candidate{Source: "ukmt", Origin: "H1", Zone: "Z2", Lang: "en", Name: "BMO1 2015 official paper", URL: "https://bmos.ukmt.org.uk/home/bmo1-2015.pdf"}
+	b, err := RenderLink("uk-bmo1/2015/p3", "a1b2", c, 2, "official-original")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(b)
+	for _, want := range []string{"tag: a1b2", "at: uk-bmo1/2015/p3", "primary: true", "rule: official-original", "statement: sourced", "kind: official", "page: 2", "source: ukmt"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("render has no %q:\n%s", want, s)
+		}
+	}
+	if !strings.HasSuffix(s, "---\n") {
+		t.Errorf("the body is not empty:\n%s", s)
+	}
+}

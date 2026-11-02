@@ -86,3 +86,34 @@ func BWMPapers(page string) []National {
 	})
 	return out
 }
+
+// UKMTListing is the page of the British Mathematical Olympiad Subtrust that lists the papers of BMO1 and BMO2.
+const UKMTListing = "https://bmos.ukmt.org.uk/home/bmo.shtml"
+
+// ukmtRE matches the link to the paper of one year: bmo-1985.pdf is the paper of the single British olympiad before 1992, bmo1-2015.pdf and bmo2-2015.pdf are the papers of the two rounds, and fist-1980.pdf is the paper of the Further International Selection Test, the round that became BMO2. A file with a report, solutions or a histogram has a longer name.
+var ukmtRE = regexp.MustCompile(`href="(?:https://bmos\.ukmt\.org\.uk)?(/home/(bmo|bmo1|bmo2|fist)-([0-9]{4})\.pdf)"`)
+
+// UKMTPapers gives the papers of BMO1 and BMO2 on the listing page of bmos.ukmt.org.uk. The year of a paper is the year in the name of its file, which is the year of the end of the school year: the BMO1 of November 2014 is BMO1 2015. The single olympiad before 1992 is the first round, and FIST is the second round. Each paper holds all the problems of its edition.
+func UKMTPapers(page string) []National {
+	var out []National
+	seen := map[string]bool{}
+	for _, m := range ukmtRE.FindAllStringSubmatch(page, -1) {
+		if seen[m[1]] {
+			continue
+		}
+		seen[m[1]] = true
+		y, _ := strconv.Atoi(m[3])
+		comp := "uk-bmo1"
+		if m[2] == "bmo2" || m[2] == "fist" {
+			comp = "uk-bmo2"
+		}
+		out = append(out, National{Competition: comp, Year: y, URL: "https://bmos.ukmt.org.uk" + m[1]})
+	}
+	slices.SortStableFunc(out, func(a, b National) int {
+		if a.Competition != b.Competition {
+			return strings.Compare(a.Competition, b.Competition)
+		}
+		return a.Year - b.Year
+	})
+	return out
+}

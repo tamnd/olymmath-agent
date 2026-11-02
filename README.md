@@ -125,6 +125,19 @@ The `om papers` command reads the listing page of the Polish Mathematical Olympi
 
 With `-anchor`, `om import` places each row of a competition that has official papers. The papers are in Polish or in German, so the command compares the formulas, not the words: the numbers, the letters alone and the names of points, such as ABC. A row gets the position of the best segment when the signal is at least 0.3 and at least 0.2 above the best signal of another position. A row that is nearest to a segment of an earlier stage gets no position. The `om anchor` command then links each problem to its paper and page when the paper places the canonical text at the position of the problem. Else the problem gets a review item.
 
+The British Mathematical Olympiad works the same way, with the source `ukmt`:
+
+```sh
+om papers -content olymmath ukmt
+om fetch -content olymmath ukmt
+om import -content olymmath -anchor -comp uk-bmo1,uk-bmo2
+om anchor -content olymmath -missing -pages pages.tsv ukmt
+```
+
+The `om papers` command reads the BMO page of bmos.ukmt.org.uk. A file of BMO1 or of the single olympiad before 1992 goes to `uk-bmo1`, and a file of BMO2 or of FIST goes to `uk-bmo2`. The edition is the year of the file, which is the year in which the school year ends. The papers are in English, so the command compares the words. Many papers have two pages side by side, and the first page holds the instructions, so the reader cuts the pages in half and drops the instructions.
+
+With `-missing`, `om anchor` makes a new problem for each position of a paper that has no problem in the content. The problem has no text. Its only statement links to the paper and the page, and the site tells the reader to read the problem in the paper. Use this when the licence of the papers does not let the content hold their text. The papers before 1993 are scans with no text, so the command cannot read their positions. The file of `-pages` gives them: one edition on each line, a tab, and the page of each problem from p1, such as `uk-bmo1/1975<TAB>1 1 1 2 2 2 2 2`.
+
 ### Link the human solutions
 
 ```sh

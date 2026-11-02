@@ -1,6 +1,7 @@
 package official
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/tamnd/olymmath-agent/content"
@@ -150,5 +151,60 @@ func TestAnchorEdition(t *testing.T) {
 	}
 	if len(r.Missing) != 1 || r.Missing[0] != "pl-om/2018/p3" {
 		t.Errorf("missing: %v", r.Missing)
+	}
+}
+
+func TestUKMTPapers(t *testing.T) {
+	page := `<a href="/home/bmo1-2015.pdf">BMO1</a>
+<a href="https://bmos.ukmt.org.uk/home/bmo2-2015.pdf">BMO2</a>
+<a href="/home/bmo-1975.pdf">BMO</a>
+<a href="/home/fist-1975.pdf">FIST</a>
+<a href="/home/bmo1-2015.pdf">again</a>
+<a href="/home/bmo1-2015-solutions.pdf">solutions</a>`
+	got := UKMTPapers(page)
+	want := []National{
+		{"uk-bmo1", 1975, "", "https://bmos.ukmt.org.uk/home/bmo-1975.pdf"},
+		{"uk-bmo1", 2015, "", "https://bmos.ukmt.org.uk/home/bmo1-2015.pdf"},
+		{"uk-bmo2", 1975, "", "https://bmos.ukmt.org.uk/home/fist-1975.pdf"},
+		{"uk-bmo2", 2015, "", "https://bmos.ukmt.org.uk/home/bmo2-2015.pdf"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("paper %d: got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestCover(t *testing.T) {
+	r := Readings["ukmt"]
+	cover := "Instructions\n1. Time allowed: 3½ hours.\n2. Full written solutions.\nDo not turn over until told to do so.\n"
+	got := r.cover([]string{cover, "1. Find all primes.\n", ""})
+	if len(got) != 3 || got[0] != "" || got[1] != "1. Find all primes.\n" {
+		t.Errorf("two pages: got %q", got)
+	}
+	got = r.cover([]string{cover + "1. Find all primes.\n"})
+	if len(got) != 1 || strings.TrimSpace(got[0]) != "1. Find all primes." {
+		t.Errorf("one page: got %q", got)
+	}
+	got = r.cover([]string{"1. Find all primes.\n", "2. Prove it.\n"})
+	if got[0] != "1. Find all primes.\n" {
+		t.Errorf("no cover: got %q", got)
+	}
+}
+
+func TestInfoSize(t *testing.T) {
+	out := []byte("Pages:          1\nPage size:      595.276 x 841.89 pts (A4)\nPage rot:       270\n")
+	if w, h, ok := infoSize(out); !ok || w != 841 || h != 595 {
+		t.Errorf("rot 270: got %d x %d %v", w, h, ok)
+	}
+	out = []byte("Page size:      595.276 x 841.89 pts (A4)\nPage rot:       0\n")
+	if w, h, ok := infoSize(out); !ok || w != 595 || h != 841 {
+		t.Errorf("rot 0: got %d x %d %v", w, h, ok)
+	}
+	if _, _, ok := infoSize([]byte("Pages: 1\n")); ok {
+		t.Errorf("no size: ok")
 	}
 }
