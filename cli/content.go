@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -82,6 +84,7 @@ func runSite(env Env, args []string) int {
 	base := fs.String("base", "/", "the path prefix of the links, for example /olymmath/ for the GitHub Pages mirror")
 	commit := fs.String("commit", "", "the commit of the content repository")
 	date := fs.String("date", "now", "the build date, now or YYYY-MM-DD. A fixed date gives the same output for the same input")
+	cache := fs.String("cache", defaultCache(), "the directory that keeps the rendered formulas from one build to the next, or off. The output is the same with and without it")
 	if err := fs.Parse(args[1:]); err != nil {
 		return ExitUsage
 	}
@@ -99,7 +102,10 @@ func runSite(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om site build: the content has %d findings. Run om check to see them.\n", len(findings))
 		return ExitFindings
 	}
-	stats, err := site.Build(corpus, site.Options{Out: *out, URL: *url, Base: *base, Commit: *commit, Version: env.Version, Date: when})
+	if *cache == "off" {
+		*cache = ""
+	}
+	stats, err := site.Build(corpus, site.Options{Out: *out, URL: *url, Base: *base, Commit: *commit, Version: env.Version, Date: when, Cache: *cache})
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om site build: %v\n", err)
 		return ExitFailure
@@ -109,4 +115,13 @@ func runSite(env Env, args []string) int {
 	}
 	fmt.Fprintf(env.Stdout, "%d pages, %d files, %d problems in %s\n", stats.Pages, stats.Files, stats.Problems, strings.TrimSuffix(*out, "/"))
 	return ExitOK
+}
+
+// defaultCache is the cache directory of om site build: olymmath/site in the cache directory of the user, or off when the system has none.
+func defaultCache() string {
+	dir, err := os.UserCacheDir()
+	if err != nil {
+		return "off"
+	}
+	return filepath.Join(dir, "olymmath", "site")
 }

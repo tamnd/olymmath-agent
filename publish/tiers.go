@@ -9,8 +9,11 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"go.yaml.in/yaml/v3"
 
@@ -54,13 +57,23 @@ func Split(dir, out string, corpus *content.Corpus, t Tiers) (deleted, moved int
 	if err := json.Unmarshal(b, &redirects); err != nil {
 		return 0, 0, fmt.Errorf("redirects.json: %w", err)
 	}
+	files := make([]string, 0, len(redirects))
 	for from := range redirects {
-		file := filepath.Join(dir, filepath.FromSlash(strings.TrimPrefix(from, "/")+".html"))
-		if err := os.Remove(file); err == nil {
-			deleted++
-		} else if !os.IsNotExist(err) {
-			return deleted, moved, err
+		files = append(files, filepath.Join(dir, filepath.FromSlash(strings.TrimPrefix(from, "/")+".html")))
+	}
+	var gone atomic.Int64
+	err = each(len(files), func(i int) error {
+		err := os.Remove(files[i])
+		if err == nil {
+			gone.Add(1)
+		} else if os.IsNotExist(err) {
+			err = nil
 		}
+		return err
+	})
+	deleted = int(gone.Load())
+	if err != nil {
+		return deleted, moved, err
 	}
 	for _, c := range corpus.Competitions {
 		n, err := moveFiles(dir, out, c.Code, !t.First(c))
@@ -76,22 +89,52 @@ func Split(dir, out string, corpus *content.Corpus, t Tiers) (deleted, moved int
 // moveFiles moves the files under dir/sub to out, at the same relative path. The index pages stay. When all is false, it moves only the machine copies of the pages.
 func moveFiles(dir, out, sub string, all bool) (int, error) {
 	moved := 0
-	err := filepath.WalkDir(filepath.Join(dir, sub), func(p string, d fs.DirEntry, err error) error {
+	made := map[string]bool{}
+	mkdir := func(d string) error {
+		if made[d] {
+			return nil
+		}
+		if err := os.MkdirAll(d, 0o755); err != nil { // #nosec G301 -- the site is public.
+			return err
+		}
+		made[d] = true
+		return nil
+	}
+	root := filepath.Join(dir, sub)
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if os.IsNotExist(err) {
 				return filepath.SkipDir
 			}
 			return err
 		}
-		if d.IsDir() || strings.HasPrefix(d.Name(), "index.") || (!all && !Copy(d.Name())) {
-			return nil
-		}
 		rel, err := filepath.Rel(dir, p)
 		if err != nil {
 			return err
 		}
 		to := filepath.Join(out, rel)
-		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil { // #nosec G301 -- the site is public.
+		if d.IsDir() {
+			if !all || p == root {
+				return nil
+			}
+			// A folder with no copy in out moves with one rename, and its index pages come back. Most files of a folder are pages, so this is much faster than a rename of each file.
+			if _, err := os.Lstat(to); !os.IsNotExist(err) {
+				return err
+			}
+			if err := mkdir(filepath.Dir(to)); err != nil {
+				return err
+			}
+			n, err := moveDir(p, to)
+			moved += n
+			if err != nil {
+				return err
+			}
+			return filepath.SkipDir
+		}
+		if strings.HasPrefix(d.Name(), "index.") || (!all && !Copy(d.Name())) {
+			return nil
+		}
+		if err := mkdir(filepath.Dir(to)); err != nil {
 			return err
 		}
 		if err := os.Rename(p, to); err != nil { // #nosec G122 -- the build directory is our own output.
@@ -101,6 +144,71 @@ func moveFiles(dir, out, sub string, all bool) (int, error) {
 		return nil
 	})
 	return moved, err
+}
+
+// moveDir renames the folder from to to, which does not exist. It then puts back the index pages and makes again each folder at from, and deletes the folders at to that have no file. Thus the result is the same as a move of each file that is not an index page. It gives the number of moved files.
+func moveDir(from, to string) (int, error) {
+	if err := os.Rename(from, to); err != nil { // #nosec G122 -- the build directory is our own output.
+		return 0, err
+	}
+	moved := 0
+	var dirs []string
+	err := filepath.WalkDir(to, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(to, p)
+		if err != nil {
+			return err
+		}
+		back := filepath.Join(from, rel)
+		if d.IsDir() {
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+			dirs = append(dirs, p)
+			return os.Mkdir(back, info.Mode().Perm())
+		}
+		if strings.HasPrefix(d.Name(), "index.") {
+			return os.Rename(p, back) // #nosec G122 -- the build directory is our own output.
+		}
+		moved++
+		return nil
+	})
+	// A folder with only index pages had no move, so it goes. os.Remove does not delete a folder with files.
+	for i := len(dirs) - 1; i >= 0; i-- {
+		_ = os.Remove(dirs[i])
+	}
+	return moved, err
+}
+
+// each calls f for each i from 0 to n-1, with one worker for each CPU, and gives the first error.
+func each(n int, f func(i int) error) error {
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	var first error
+	for range min(max(runtime.NumCPU(), 1), n) {
+		wg.Go(func() {
+			for {
+				i := int(next.Add(1)) - 1
+				if i >= n {
+					return
+				}
+				if err := f(i); err != nil {
+					mu.Lock()
+					if first == nil {
+						first = err
+					}
+					mu.Unlock()
+					return
+				}
+			}
+		})
+	}
+	wg.Wait()
+	return first
 }
 
 // Fit keeps the number of static assets in dir at most limit, because a Worker version can have a limited number of asset files. When there are more, it moves the problem pages of the tier 1 competitions to out, the competition with the most files first, until the rest fits. The index pages stay. It gives the number of moved files and the moved competitions.
