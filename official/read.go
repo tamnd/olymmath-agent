@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"golang.org/x/text/width"
 )
 
 // Reading tells how to read the text layer of the papers of one source.
@@ -21,17 +23,23 @@ type Reading struct {
 	End *regexp.Regexp
 	// Cover matches the instructions of the cover, up to their end. When the paper has more than one page, a first page that matches Cover is the cover, and it is dropped. When the paper has one page, the text of the page up to the end of the match is dropped.
 	Cover *regexp.Regexp
+	// Japanese is true for papers in Japanese. Their text is readable when it has enough letters, because most of its letters are not ASCII letters.
+	Japanese bool
 }
 
 // Readings are the rules to read the papers of the sources that need them. The other sources use Text.
 var Readings = map[string]Reading{
 	"om-sem":           {Halves: true, End: regexp.MustCompile(`(?m)^\s*Informacje dla uczestnika`)},
 	"bundeswettbewerb": {Raw: true},
+	"imojp":            {Japanese: true},
 	"ukmt":             {Halves: true, End: regexp.MustCompile(`(?m)^\s*© [0-9]{4} UK Mathematics Trust`), Cover: regexp.MustCompile(`(?s)\A.*Do not turn over until[^\n]*`)},
 }
 
-// Read gives the text of a paper of a source, with a form feed between pages. It uses the rules of Readings for the source.
+// Read gives the text of a paper of a source, with a form feed between pages. It uses the rules of Readings for the source. A file that is not a PDF, such as an HTML page that shows the scans of a paper, gives ErrNoText.
 func Read(ctx context.Context, source string, pdf []byte) (string, error) {
+	if !bytes.Contains(pdf[:min(len(pdf), 1024)], []byte("%PDF-")) {
+		return "", ErrNoText
+	}
 	r, ok := Readings[source]
 	if !ok {
 		return Text(ctx, pdf)
@@ -66,10 +74,24 @@ func Read(ctx context.Context, source string, pdf []byte) (string, error) {
 		}
 	}
 	text := strings.Join(pages, "\f")
-	if !readable(text) {
+	if r.Japanese && !hasLetters(text) || !r.Japanese && !readable(text) {
 		return "", ErrNoText
 	}
 	return text, nil
+}
+
+// leastLetters is the smallest number of letters of a readable paper in Japanese. A scan with no text layer gives none.
+const leastLetters = 100
+
+// hasLetters tells if a text has at least leastLetters letters.
+func hasLetters(text string) bool {
+	n := 0
+	for _, r := range text {
+		if unicode.IsLetter(r) {
+			n++
+		}
+	}
+	return n >= leastLetters
 }
 
 // cut removes the text of a page after the line that End matches.
@@ -178,12 +200,13 @@ var mathRE = regexp.MustCompile(`(?s)\$\$(.*?)\$\$|\$(.*?)\$|\\\((.*?)\\\)|\\\[(
 // commandRE matches a TeX command, such as \frac.
 var commandRE = regexp.MustCompile(`\\[A-Za-z]+`)
 
-// PaperFormulas gives the formula tokens of the text of a paper in the language lang: each number, each letter alone, such as the name of a number or a point, and each run of two to five capital ASCII letters, such as ABC. A word of one letter of the language is not a token. The text of a paper does not mark its formulas, so the words of the text give no tokens, except these.
+// PaperFormulas gives the formula tokens of the text of a paper in the language lang: each number, each letter alone, such as the name of a number or a point, and each run of two to five capital ASCII letters, such as ABC. A word of one letter of the language is not a token. The text of a paper does not mark its formulas, so the words of the text give no tokens, except these. A run of Japanese letters is a word, so it is not a token, and the full-width forms of letters and digits count as the ASCII forms.
 func PaperFormulas(text, lang string) map[string]bool {
 	stop := stopLetters[lang]
 	out := map[string]bool{}
-	for _, t := range runs(text) {
+	for _, t := range runs(width.Fold.String(text)) {
 		switch {
+		case japanese(t[0]):
 		case unicode.IsDigit(t[0]):
 			out[number(string(t))] = true
 		case len(t) == 1:
@@ -216,27 +239,32 @@ func TeXFormulas(text string) map[string]bool {
 	return out
 }
 
-// runs cuts a text into runs of letters and runs of digits.
+// runs cuts a text into runs of letters and runs of digits. A run of Japanese letters is apart from the letters of other scripts, as in "nを" of a Japanese paper.
 func runs(s string) [][]rune {
 	var out [][]rune
 	var cur []rune
-	digit := false
+	digit, ja := false, false
 	for _, r := range s {
 		l, d := unicode.IsLetter(r), unicode.IsDigit(r)
-		if (!l && !d) || (len(cur) > 0 && d != digit) {
+		if (!l && !d) || (len(cur) > 0 && (d != digit || (l && !digit && japanese(r) != ja))) {
 			if len(cur) > 0 {
 				out = append(out, cur)
 			}
 			cur = nil
 		}
 		if l || d {
-			cur, digit = append(cur, r), d
+			cur, digit, ja = append(cur, r), d, l && japanese(r)
 		}
 	}
 	if len(cur) > 0 {
 		out = append(out, cur)
 	}
 	return out
+}
+
+// japanese tells if a letter is a kanji, a hiragana or a katakana.
+func japanese(r rune) bool {
+	return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana)
 }
 
 func capitals(t []rune) bool {

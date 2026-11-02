@@ -244,3 +244,59 @@ func TestHBCSEPapers(t *testing.T) {
 		}
 	}
 }
+
+func TestIMOJPPapers(t *testing.T) {
+	page := `<a href="../archive/mo2026/jmo/problems/jmo36yqa.pdf"> 予選 </a>
+<a href="../archive/mo2026/jmo/problems/jmo36hq.pdf">本選</a>
+<a href="../archive/mo2026/selection_camp/problems/2026.pdf">代表選考合宿</a>
+<a href="../archive/mo2016/jmo2016/problems/jmo26mq.html">本選</a>
+<a href="../archive/mo2016/jmo2016/problems/jmo26mq.html">本選</a>
+<a href="../archive/mo2009/jjmo2009/problems/jjmo7mq.html">本選</a>
+<a href="../archive/mo2003/jjmo2003/problems/jjmo1q.html">問題</a>`
+	got := IMOJPPapers(page)
+	const u = "https://www.imojp.org/archive/"
+	want := []National{
+		{"jp-jjmo", 2009, "", u + "mo2009/jjmo2009/problems/jjmo7mq.html"},
+		{"jp-jmo", 2016, "", u + "mo2016/jmo2016/problems/jmo26mq.html"},
+		{"jp-jmo", 2026, "", u + "mo2026/jmo/problems/jmo36hq.pdf"},
+		{"jp-jmo", 2026, "prelim", u + "mo2026/jmo/problems/jmo36yqa.pdf"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("paper %d: got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestJapaneseFormulas(t *testing.T) {
+	got := PaperFormulas("1. nを2以上の整数とする. 三角形 ABC の外心を O とする. ａ＋ｂ＝１０", "ja")
+	for _, k := range []string{"n", "2", "ABC", "O", "a", "b", "10"} {
+		if !got[k] {
+			t.Errorf("no token %q in %v", k, got)
+		}
+	}
+	for k := range got {
+		if japanese([]rune(k)[0]) {
+			t.Errorf("a Japanese word is a token: %q", k)
+		}
+	}
+}
+
+func TestReadNotPDF(t *testing.T) {
+	if _, err := Read(t.Context(), "imojp", []byte(`<html><img src="./jmo26mq1.jpg"></html>`)); err != ErrNoText {
+		t.Errorf("an HTML page of scans: got %v, want ErrNoText", err)
+	}
+	if hasLetters("1. 2. 3.") || !hasLetters(strings.Repeat("問題", 60)) {
+		t.Errorf("hasLetters")
+	}
+}
+
+func TestSplitPageBreak(t *testing.T) {
+	segs := Split("1. a first problem\n2. a second problem\n\f3. a problem at the top of page 2\n")
+	if len(segs) != 3 || segs[2].Page != 2 {
+		t.Fatalf("got %+v, want p3 on page 2", segs)
+	}
+}

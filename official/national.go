@@ -262,3 +262,47 @@ func hbcsePaper(name, text, both string) string {
 	}
 	return ""
 }
+
+// IMOJPListings are the pages of the Mathematical Olympiad Foundation of Japan that list the past papers of the JMO and of the JJMO.
+var IMOJPListings = []string{
+	"https://www.imojp.org/domestic/jmo_overview.html",
+	"https://www.imojp.org/domestic/jjmo_overview.html",
+}
+
+// imojpRE matches the link to a paper of the JMO or the JJMO: jmo26mq.html is the final (honsen) of the 26th JMO, and jmo36yqa.pdf is the preliminary round (yosen) of the 36th JMO. The final is mq up to 2019 and hq after. The file jjmo1q.html is the one paper of the 1st JJMO.
+var imojpRE = regexp.MustCompile(`href="(?:\.\./|/|https://www\.imojp\.org/)((?:archive/)[^"]*/(j?jmo)([0-9]{1,2})(yqa|yq|hq|mq|q)\.(?:html|pdf))"`)
+
+// IMOJPPapers gives the papers of the Japan Mathematical Olympiad (jp-jmo) and of the Japan Junior Mathematical Olympiad (jp-jjmo) on the listing pages of imojp.org. The nth JMO is held in the year 1990 + n, and the nth JJMO in the year 2002 + n, in January and February. The final has the five problems of the edition, so its paper holds all the positions. The preliminary round has its own short-answer problems, which have no position in the content: its paper has the paper id prelim. The first six JJMO, from 2003 to 2008, had one paper of twelve short-answer problems and no final, so their papers are not used. The page of a paper is an HTML page before 2024 and a PDF file after.
+func IMOJPPapers(page string) []National {
+	var out []National
+	seen := map[string]bool{}
+	for _, m := range imojpRE.FindAllStringSubmatch(page, -1) {
+		n, _ := strconv.Atoi(m[3])
+		if n == 0 || seen[m[1]] {
+			continue
+		}
+		seen[m[1]] = true
+		comp, year := "jp-jmo", 1990+n
+		if m[2] == "jjmo" {
+			comp, year = "jp-jjmo", 2002+n
+		}
+		paper := ""
+		switch m[4] {
+		case "yq", "yqa":
+			paper = "prelim"
+		case "q":
+			continue
+		}
+		out = append(out, National{Competition: comp, Year: year, Paper: paper, URL: "https://www.imojp.org/" + m[1]})
+	}
+	slices.SortStableFunc(out, func(a, b National) int {
+		if a.Competition != b.Competition {
+			return strings.Compare(a.Competition, b.Competition)
+		}
+		if a.Year != b.Year {
+			return a.Year - b.Year
+		}
+		return strings.Compare(a.Paper, b.Paper)
+	})
+	return out
+}

@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse)", runPapers})
+	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp)", runPapers})
 }
 
 func runPapers(env Env, args []string) int {
@@ -31,8 +31,8 @@ func runPapers(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse"}, pos[0]) {
-		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt")
+	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp"}, pos[0]) {
+		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -55,7 +55,7 @@ func runPapers(env Env, args []string) int {
 	switch pos[0] {
 	case "usa-tst-archive":
 		return tstPapers(ctx, env, fc, corpus, *root, *from, *to)
-	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse":
+	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp":
 		return nationalPapers(ctx, env, fc, corpus, *root, pos[0], *from, *to)
 	}
 	comp := corpus.Competition("imo")
@@ -132,23 +132,28 @@ func tstPapers(ctx context.Context, env Env, fc *fetch.Client, corpus *content.C
 
 // nationals gives the listing page of each national source and the function that reads the papers from it.
 var nationals = map[string]struct {
-	listing string
-	lang    content.OfficialPaper
-	papers  func(string) []official.National
+	listings []string
+	lang     content.OfficialPaper
+	papers   func(string) []official.National
 }{
-	"om-sem":           {official.OMSemListing, content.OfficialPaper{Lang: "Polish", Code: "pl"}, official.OMSemPapers},
-	"bundeswettbewerb": {official.BWMListing, content.OfficialPaper{Lang: "German", Code: "de"}, official.BWMPapers},
-	"ukmt":             {official.UKMTListing, content.OfficialPaper{Lang: "English", Code: "en"}, official.UKMTPapers},
-	"hbcse":            {official.HBCSEListing, content.OfficialPaper{Lang: "English", Code: "en"}, official.HBCSEPapers},
+	"om-sem":           {[]string{official.OMSemListing}, content.OfficialPaper{Lang: "Polish", Code: "pl"}, official.OMSemPapers},
+	"bundeswettbewerb": {[]string{official.BWMListing}, content.OfficialPaper{Lang: "German", Code: "de"}, official.BWMPapers},
+	"ukmt":             {[]string{official.UKMTListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.UKMTPapers},
+	"hbcse":            {[]string{official.HBCSEListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.HBCSEPapers},
+	"imojp":            {official.IMOJPListings, content.OfficialPaper{Lang: "Japanese", Code: "ja"}, official.IMOJPPapers},
 }
 
 // nationalPapers records the papers of a national source from its listing page. It writes the edition file when the corpus does not have the edition. The papers of one edition replace the papers of the source in the edition file, and the papers of other sources stay. Then om fetch SOURCE gets the papers into the store.
 func nationalPapers(ctx context.Context, env Env, fc *fetch.Client, corpus *content.Corpus, root, source string, from, to int) int {
 	n := nationals[source]
-	listing, err := get(ctx, fc, source, n.listing)
-	if err != nil {
-		fmt.Fprintf(env.Stderr, "om papers: %v\n", err)
-		return ExitFailure
+	var listing string
+	for _, u := range n.listings {
+		page, err := get(ctx, fc, source, u)
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om papers: %v\n", err)
+			return ExitFailure
+		}
+		listing += page + "\n"
 	}
 	byEdition := map[string][]content.OfficialPaper{}
 	var keys []string
