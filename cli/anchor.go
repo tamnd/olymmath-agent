@@ -177,9 +177,9 @@ func anchorEditions(env Env, root string, corpus *content.Corpus, st *store.Stor
 				continue
 			}
 			name := fmt.Sprintf("%s %d official paper", c.Name, e.Year)
-			if len(papers[at]) == 0 {
-				// A paper with no text gives the pages of its problems in the pages file.
-				url := paperURL(e, src.ID)
+			if !slices.ContainsFunc(papers[at], func(sg official.Segment) bool { return sg.Position != "" }) {
+				// A paper with no text gives the pages of its problems in the pages file. The text of a paper of an earlier round, such as a preliminary round, gives no position.
+				url, lang := paperURL(e, src.ID)
 				if !o.missing || url == "" || len(scans[at]) == 0 {
 					continue
 				}
@@ -187,7 +187,7 @@ func anchorEditions(env Env, root string, corpus *content.Corpus, st *store.Stor
 				for i, pg := range scans[at] {
 					pos := fmt.Sprintf("%s/p%d", at, i+1)
 					if owners[pos] == nil {
-						news = append(news, newLink{pos, name, "en", url, pg})
+						news = append(news, newLink{pos, name, lang, url, pg})
 						n++
 					}
 				}
@@ -258,14 +258,16 @@ type newLink struct {
 	page                int
 }
 
-// paperURL gives the address of the official paper of the edition from the source, or "".
-func paperURL(e *content.Edition, source string) string {
-	for _, p := range e.Official {
-		if p.Source == source {
-			return p.URL
+// paperURL gives the address and the language code of the official paper of the edition from the source, or "". A paper with no paper id, which holds all the positions of the edition, wins over a paper of one round, such as a preliminary round. The code is "en" when the paper has none.
+func paperURL(e *content.Edition, source string) (url, lang string) {
+	for _, all := range []bool{true, false} {
+		for _, p := range e.Official {
+			if p.Source == source && (!all || p.Paper == "") {
+				return p.URL, cmpOr(p.Code, "en")
+			}
 		}
 	}
-	return ""
+	return "", ""
 }
 
 // readPages reads a pages file: an edition on each line, a tab, and the page of each problem from p1, such as "uk-bmo1/1975\t1 1 1 2 2". A line that starts with # is a comment.

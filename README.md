@@ -149,6 +149,17 @@ om anchor -content olymmath -missing -pages pages.tsv hbcse
 
 The `om papers` command reads the page of past papers of olympiads.hbcse.tifr.res.in and records each paper of the RMO and the INMO. The edition is the year in which the olympiad is held. Some years of the RMO have more than one paper. The CRMO papers of 2012 to 2016 are `paper1` to `paper4`, and the Mumbai paper is `mumbai`. The Kerala and Tamil Nadu paper of 2018 and the KV and JNV paper from 2023 are `paper2`. A question paper wins over a solutions file of the same paper. The command skips the files of PRMO, IOQM and the other olympiads, and the old links of the page, which give no file. The site gives no open licence, so the content only links to the papers.
 
+The Japanese olympiads work the same way, with the source `imojp`:
+
+```sh
+om papers -content olymmath imojp
+om fetch -content olymmath imojp
+om import -content olymmath -anchor -comp jp-jmo,jp-jjmo
+om anchor -content olymmath -missing -pages pages.tsv imojp
+```
+
+The `om papers` command reads the overview pages of the JMO and the JJMO on www.imojp.org. The edition of the JMO n is the year 1990 + n, and the edition of the JJMO n is the year 2002 + n. The final round is the paper of the edition. The preliminary round is the paper `prelim`, which has no positions. The command skips the single paper of the JJMO of 2003 to 2008. The papers are in Japanese, so the command compares the formulas. Most papers before 2024 are HTML pages of scans with no text, so the pages file gives their pages. The site forbids reproduction without permission, so the content only links to the papers.
+
 ### Link the human solutions
 
 ```sh

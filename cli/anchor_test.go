@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/tamnd/olymmath-agent/content"
 )
 
 func TestReadPages(t *testing.T) {
@@ -30,5 +32,22 @@ func TestReadPages(t *testing.T) {
 	}
 	if _, err := readPages(name); err == nil {
 		t.Errorf("a page that is not a number gives no error")
+	}
+}
+
+func TestPaperURL(t *testing.T) {
+	e := &content.Edition{Official: []content.OfficialPaper{
+		{URL: "prelim.pdf", Code: "ja", Paper: "prelim", Source: "imojp"},
+		{URL: "final.html", Code: "ja", Source: "imojp"},
+		{URL: "other.pdf", Source: "other"},
+	}}
+	if url, lang := paperURL(e, "imojp"); url != "final.html" || lang != "ja" {
+		t.Errorf("got %q %q, want the final paper in ja", url, lang)
+	}
+	if url, lang := paperURL(e, "other"); url != "other.pdf" || lang != "en" {
+		t.Errorf("got %q %q, want other.pdf in en", url, lang)
+	}
+	if url, _ := paperURL(e, "none"); url != "" {
+		t.Errorf("got %q, want none", url)
 	}
 }

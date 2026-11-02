@@ -126,7 +126,8 @@ func Split(text string) []Segment {
 			continue
 		}
 		seen[pos] = true
-		out = append(out, Segment{Position: pos, Page: strings.Count(text[:m[0]], "\f") + 1, Text: clean(text[m[1]:end])})
+		// The marker can start with the form feed of its page, so the page counts the form feeds up to the end of the marker.
+		out = append(out, Segment{Position: pos, Page: strings.Count(text[:m[1]], "\f") + 1, Text: clean(text[m[1]:end])})
 	}
 	return out
 }
