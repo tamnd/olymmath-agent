@@ -1,6 +1,7 @@
 package official
 
 import (
+	"html"
 	"regexp"
 	"slices"
 	"strconv"
@@ -116,4 +117,148 @@ func UKMTPapers(page string) []National {
 		return a.Year - b.Year
 	})
 	return out
+}
+
+// HBCSEListing is the page of the Homi Bhabha Centre for Science Education that lists the past papers of the Indian olympiads.
+const HBCSEListing = "https://olympiads.hbcse.tifr.res.in/how-to-prepare/past-papers/"
+
+var (
+	// hbcseLinkRE matches a link to a PDF file and its text.
+	hbcseLinkRE = regexp.MustCompile(`(?s)<a\s[^>]*?href="([^"]+\.pdf)"[^>]*>(.*?)</a>`)
+	// hbcseOldRE matches the old links of the page, to the address of the server or to the folder /olympiads/. They give no file.
+	hbcseOldRE = regexp.MustCompile(`^http://[0-9.]+/|/olympiads/wp-content/`)
+	// hbcseTagRE matches an HTML tag.
+	hbcseTagRE = regexp.MustCompile(`<[^>]+>`)
+	// hbcseOtherRE matches the files of the other olympiads and of the first round, and the files in Hindi only.
+	hbcseOtherRE = regexp.MustCompile(`prmo|prermo|ioqm|inao|inbo|incho|inpho|injso|ijso|answerkey|-key|_key`)
+	// hbcseRMORE matches the name of the regional olympiad, but not PRMO.
+	hbcseRMORE = regexp.MustCompile(`(?:^|[^p])c?rmo`)
+	// hbcseYearRE matches a year with four digits.
+	hbcseYearRE = regexp.MustCompile(`(?:19|20)[0-9]{2}`)
+	// hbcseShortRE matches a year with two digits after the name of the olympiad, as in crmo-14-2.pdf, inmo23_qp.pdf or RMO23-24.
+	hbcseShortRE = regexp.MustCompile(`(?:inmo|rmo)(?:sol)?[-_]?([0-9]{2})(?:[^0-9]|$)`)
+	// hbcsePaperRE matches the number of the paper of a year with several papers: crmo-14-2.pdf, crmo-2013-paper-2.pdf, RMO-2025-Paper-2.pdf, crmo-2013-solutions-2.pdf or the text "CRMO 2016 Paper 2".
+	hbcsePaperRE = regexp.MustCompile(`rmo(?:sol)?[-_][0-9]{2}[-_]([1-5])\.pdf|(?:paper|solutions?)[-_ ]?([1-5])(?:[^0-9]|$)`)
+)
+
+// HBCSEPapers gives the papers of the Regional Mathematical Olympiad (in-rmo) and of the Indian National Mathematical Olympiad (in-inmo) on the past papers page of HBCSE. The year of a paper is the year in which it was held: the INMO of January 2026 is INMO 2026.
+//
+// A year of the RMO can have several papers. From 2012 to 2016 the regions wrote CRMO papers 1 to 4, and the Mumbai region wrote its own paper (paper 5): their paper ids are paper1 to paper4 and mumbai. In 2018 the Kerala and Tamil Nadu regions wrote a later paper, and from 2023 the students of KV and JNV schools write their own paper: these papers have the id paper2, and the main paper has the id paper1. A file of a year with one paper has no paper id.
+//
+// A file of solutions holds the problems too, so it is used when the page has no question paper for the same paper. A file in Hindi only is not used, but a bilingual file is. The old links of the page give no file, so they are not used: the papers of RMO 2000, RMO 2003 and INMO 2008.
+func HBCSEPapers(page string) []National {
+	type key struct {
+		comp  string
+		year  int
+		paper string
+	}
+	type found struct {
+		National
+		solution bool
+	}
+	var keys []key
+	best := map[key]found{}
+	for _, m := range hbcseLinkRE.FindAllStringSubmatch(page, -1) {
+		url := m[1]
+		if hbcseOldRE.MatchString(url) {
+			continue
+		}
+		name := strings.ToLower(url[strings.LastIndex(url, "/")+1:])
+		text := strings.ToLower(strings.Join(strings.Fields(html.UnescapeString(hbcseTagRE.ReplaceAllString(m[2], " "))), " "))
+		both := name + " " + text
+		if hbcseOtherRE.MatchString(both) || (strings.Contains(both, "hindi") && !strings.Contains(both, "english") && !strings.Contains(both, "bilingual")) {
+			continue
+		}
+		comp := ""
+		switch {
+		case strings.Contains(both, "inmo"):
+			comp = "in-inmo"
+		case hbcseRMORE.MatchString(both):
+			comp = "in-rmo"
+		default:
+			continue
+		}
+		year := hbcseYear(name, text)
+		if year == 0 {
+			continue
+		}
+		paper := ""
+		if comp == "in-rmo" {
+			paper = hbcsePaper(name, text, both)
+		}
+		k := key{comp, year, paper}
+		f := found{National{Competition: comp, Year: year, Paper: paper, URL: url}, strings.Contains(name, "sol") || strings.Contains(text, "solution") || strings.Contains(text, "answer key")}
+		old, ok := best[k]
+		if !ok {
+			keys = append(keys, k)
+		}
+		if !ok || (old.solution && !f.solution) {
+			best[k] = f
+		}
+	}
+	out := make([]National, 0, len(keys))
+	for _, k := range keys {
+		n := best[k].National
+		if k.paper == "" {
+			// The file of a year with several papers that names no paper is the file of the main paper, or the solutions of the main paper when the page has its question paper.
+			_, first := best[key{k.comp, k.year, "paper1"}]
+			_, second := best[key{k.comp, k.year, "paper2"}]
+			if first {
+				continue
+			}
+			if second {
+				n.Paper = "paper1"
+			}
+		}
+		out = append(out, n)
+	}
+	slices.SortStableFunc(out, func(a, b National) int {
+		if a.Competition != b.Competition {
+			return strings.Compare(a.Competition, b.Competition)
+		}
+		if a.Year != b.Year {
+			return a.Year - b.Year
+		}
+		return strings.Compare(a.Paper, b.Paper)
+	})
+	return out
+}
+
+// hbcseYear gives the year of a file of HBCSE from its name, or else from the text of its link.
+func hbcseYear(name, text string) int {
+	for _, s := range []string{name, text} {
+		if y := hbcseYearRE.FindString(s); y != "" {
+			n, _ := strconv.Atoi(y)
+			return n
+		}
+		if m := hbcseShortRE.FindStringSubmatch(s); m != nil {
+			n, _ := strconv.Atoi(m[1])
+			return 2000 + n
+		}
+	}
+	return 0
+}
+
+// hbcsePaper gives the paper id of a file of the RMO, see HBCSEPapers.
+func hbcsePaper(name, text, both string) string {
+	switch {
+	case strings.Contains(both, "mumbai"):
+		return "mumbai"
+	case strings.Contains(both, "kl-tn"):
+		return "paper2"
+	case strings.Contains(both, "non kv") || strings.Contains(both, "non-kv") || strings.Contains(both, "nonkv"):
+		return "paper1"
+	case strings.Contains(both, "kv"):
+		return "paper2"
+	}
+	for _, s := range []string{name, text} {
+		if m := hbcsePaperRE.FindStringSubmatch(s); m != nil {
+			n := m[1] + m[2]
+			if n == "5" {
+				return "mumbai"
+			}
+			return "paper" + n
+		}
+	}
+	return ""
 }
