@@ -190,3 +190,25 @@ func TestSameNumbers(t *testing.T) {
 		t.Errorf("%v", d)
 	}
 }
+
+func TestDisagrees(t *testing.T) {
+	ps := Papers{
+		"au-amo/2017": {
+			{Position: "p1", Text: "For which integers n at least 2 is it possible to write the numbers 1, 2, 3, ..., n in a row in some order so that any two numbers written next to each other in the row differ by 2 or 3?"},
+			{Position: "p2", Text: "Given five distinct integers, consider the ten differences formed by pairs of these numbers. Determine the largest integer that is certain to divide the product of these ten differences."},
+		},
+		"pl-om/2018": {{Position: "p1", Lang: "pl", Text: "Wyznaczyć wszystkie funkcje f określone na zbiorze liczb rzeczywistych."}},
+	}
+	if !ps.Disagrees("au-amo/2017", "Determine all polynomials P with real coefficients such that P(2017) = 2016 and (P(x)+1)^2 = P(x^2+1) for all real numbers x.", "p1") {
+		t.Error("another problem at p1 does not disagree")
+	}
+	if ps.Disagrees("au-amo/2017", "For which integers n >= 2 can you write the numbers 1, 2, 3, ..., n in a row in some order so that any two numbers next to each other in the row differ by 2 or 3?", "p1") {
+		t.Error("the same problem disagrees")
+	}
+	if ps.Disagrees("au-amo/2017", "Any text at all.", "p5") {
+		t.Error("a position with no segment disagrees")
+	}
+	if ps.Disagrees("pl-om/2018", "Find the number of primes below 100.", "p1") {
+		t.Error("a paper in Polish disagrees")
+	}
+}

@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp)", runPapers})
+	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt)", runPapers})
 }
 
 func runPapers(env Env, args []string) int {
@@ -31,7 +31,7 @@ func runPapers(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp"}, pos[0]) {
+	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt"}, pos[0]) {
 		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp")
 		return ExitUsage
 	}
@@ -55,7 +55,7 @@ func runPapers(env Env, args []string) int {
 	switch pos[0] {
 	case "usa-tst-archive":
 		return tstPapers(ctx, env, fc, corpus, *root, *from, *to)
-	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp":
+	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt":
 		return nationalPapers(ctx, env, fc, corpus, *root, pos[0], *from, *to)
 	}
 	comp := corpus.Competition("imo")
@@ -141,6 +141,7 @@ var nationals = map[string]struct {
 	"ukmt":             {[]string{official.UKMTListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.UKMTPapers},
 	"hbcse":            {[]string{official.HBCSEListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.HBCSEPapers},
 	"imojp":            {official.IMOJPListings, content.OfficialPaper{Lang: "Japanese", Code: "ja"}, official.IMOJPPapers},
+	"amt":              {[]string{official.AMTListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.AMTPapers},
 }
 
 // nationalPapers records the papers of a national source from its listing page. It writes the edition file when the corpus does not have the edition. The papers of one edition replace the papers of the source in the edition file, and the papers of other sources stay. Then om fetch SOURCE gets the papers into the store.

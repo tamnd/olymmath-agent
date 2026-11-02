@@ -108,6 +108,9 @@ func runImport(env Env, args []string) int {
 			}
 			return keys.Locate(ed, text)
 		}
+		s.Confirm = func(code string, year int, text, pos string) bool {
+			return !papers.Disagrees(code+"/"+strconv.Itoa(year), text, pos)
+		}
 	}
 	if slices.Contains(sources, "hf-aops-wiki") {
 		s.Topics = &canon.Topics{Aliases: al, Corpus: corpus}

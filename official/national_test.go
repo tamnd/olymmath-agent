@@ -300,3 +300,25 @@ func TestSplitPageBreak(t *testing.T) {
 		t.Fatalf("got %+v, want p3 on page 2", segs)
 	}
 }
+
+func TestAMTPapers(t *testing.T) {
+	page := `<a href="https://amt.edu.au/wp-content/uploads/2020/05/AMO-2020-paper-and-solutions.pdf">here</a>
+<a href="https://amt.edu.au/wp-content/uploads/2019/04/2017-AIMO-paper-solutions-v2019.pdf">here</a>
+<a href="https://www.amt.edu.au/wp-content/uploads/2019/02/2016-AMO-Paper-and-Solutions.pdf">here</a>
+<a href="https://amt.edu.au/wp-content/uploads/2019/02/2016-AMO-Paper-and-Solutions.pdf">here</a>
+<a href="https://amt.edu.au/wp-content/uploads/2019/05/AMC-practice-problems-solutions-Set1-SEN.pdf">here</a>`
+	got := AMTPapers(page)
+	const u = "https://amt.edu.au/wp-content/uploads/"
+	want := []National{
+		{"au-amo", 2016, "", u + "2019/02/2016-AMO-Paper-and-Solutions.pdf"},
+		{"au-amo", 2020, "", u + "2020/05/AMO-2020-paper-and-solutions.pdf"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("paper %d: got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}

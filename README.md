@@ -162,6 +162,18 @@ om anchor -content olymmath -missing -pages pages.tsv imojp
 
 The `om papers` command reads the overview pages of the JMO and the JJMO on www.imojp.org. The edition of the JMO n is the year 1990 + n, and the edition of the JJMO n is the year 2002 + n. The final round is the paper of the edition. The preliminary round is the paper `prelim`, which has no positions. The command skips the single paper of the JJMO of 2003 to 2008. The papers are in Japanese, so the command compares the formulas. Most papers before 2024 are HTML pages of scans with no text, so the pages file gives their pages. The site forbids reproduction without permission, so the content only links to the papers.
 
+The Australian Mathematical Olympiad works the same way, with the source `amt`:
+
+```sh
+om papers -content olymmath amt
+om fetch -content olymmath amt
+om anchor -content olymmath -missing amt
+```
+
+The `om papers` command reads the past papers page of amt.edu.au and records the AMO paper of each year that it lists. Each file holds the eight problems and then the solutions. The page lists only the years 2016 to 2020. The papers say "© Australian Mathematics Trust" and give no open licence, so the content only links to the papers. The robots.txt of the site asks for 10 s between requests, and the fetcher waits that long.
+
+With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
+
 ### Link the human solutions
 
 ```sh
