@@ -208,3 +208,39 @@ func TestInfoSize(t *testing.T) {
 		t.Errorf("no size: ok")
 	}
 }
+
+func TestHBCSEPapers(t *testing.T) {
+	page := `<a href="https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/inmo-2025.pdf">INMO 2025</a>
+<a href="https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/inmosol-25.pdf">INMO 2025 Solutions</a>
+<a href="https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/rmo-2004.pdf">RMO 2004</a>
+<a href="https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/crmo-13-2.pdf">CRMO 2013 Paper 2</a>
+<a href="https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/crmo-15-5.pdf">CRMO 2015 Paper 5</a>
+<a href="https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/rmo-2018-kl-tn.pdf">RMO 2018 (Kerala and Tamil Nadu)</a>
+<a href="https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/rmo-2018.pdf">RMO 2018</a>
+<a href="https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/rmo-2023-kv.pdf">RMO 2023 KV and JNV</a>
+<a href="https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/rmo-2023-non-kv.pdf">RMO 2023 Non KV</a>
+<a href="https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/prmo-2019.pdf">PRMO 2019</a>
+<a href="https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/ioqm-2024.pdf">IOQM 2024</a>
+<a href="/olympiads/wp-content/uploads/2016/09/inmo-2008.pdf">INMO 2008</a>
+<a href="http://158.144.44.253/rmo-sol-2003.pdf">RMO 2003</a>`
+	got := HBCSEPapers(page)
+	const u = "https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/"
+	want := []National{
+		{"in-inmo", 2025, "", u + "inmo-2025.pdf"},
+		{"in-rmo", 2004, "", u + "rmo-2004.pdf"},
+		{"in-rmo", 2013, "paper2", u + "crmo-13-2.pdf"},
+		{"in-rmo", 2015, "mumbai", u + "crmo-15-5.pdf"},
+		{"in-rmo", 2018, "paper1", u + "rmo-2018.pdf"},
+		{"in-rmo", 2018, "paper2", u + "rmo-2018-kl-tn.pdf"},
+		{"in-rmo", 2023, "paper1", u + "rmo-2023-non-kv.pdf"},
+		{"in-rmo", 2023, "paper2", u + "rmo-2023-kv.pdf"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("paper %d: got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}

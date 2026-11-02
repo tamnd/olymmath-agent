@@ -138,6 +138,17 @@ The `om papers` command reads the BMO page of bmos.ukmt.org.uk. A file of BMO1 o
 
 With `-missing`, `om anchor` makes a new problem for each position of a paper that has no problem in the content. The problem has no text. Its only statement links to the paper and the page, and the site tells the reader to read the problem in the paper. Use this when the licence of the papers does not let the content hold their text. The papers before 1993 are scans with no text, so the command cannot read their positions. The file of `-pages` gives them: one edition on each line, a tab, and the page of each problem from p1, such as `uk-bmo1/1975<TAB>1 1 1 2 2 2 2 2`.
 
+The Indian olympiads work the same way, with the source `hbcse`:
+
+```sh
+om papers -content olymmath hbcse
+om fetch -content olymmath hbcse
+om import -content olymmath -anchor -comp in-rmo,in-inmo
+om anchor -content olymmath -missing -pages pages.tsv hbcse
+```
+
+The `om papers` command reads the page of past papers of olympiads.hbcse.tifr.res.in and records each paper of the RMO and the INMO. The edition is the year in which the olympiad is held. Some years of the RMO have more than one paper. The CRMO papers of 2012 to 2016 are `paper1` to `paper4`, and the Mumbai paper is `mumbai`. The Kerala and Tamil Nadu paper of 2018 and the KV and JNV paper from 2023 are `paper2`. A question paper wins over a solutions file of the same paper. The command skips the files of PRMO, IOQM and the other olympiads, and the old links of the page, which give no file. The site gives no open licence, so the content only links to the papers.
+
 ### Link the human solutions
 
 ```sh
