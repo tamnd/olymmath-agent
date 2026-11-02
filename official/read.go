@@ -19,12 +19,15 @@ type Reading struct {
 	Raw bool
 	// End matches the line where the problems of a page end, such as the start of the notes for the contestants.
 	End *regexp.Regexp
+	// Cover matches the instructions of the cover, up to their end. When the paper has more than one page, a first page that matches Cover is the cover, and it is dropped. When the paper has one page, the text of the page up to the end of the match is dropped.
+	Cover *regexp.Regexp
 }
 
 // Readings are the rules to read the papers of the sources that need them. The other sources use Text.
 var Readings = map[string]Reading{
 	"om-sem":           {Halves: true, End: regexp.MustCompile(`(?m)^\s*Informacje dla uczestnika`)},
 	"bundeswettbewerb": {Raw: true},
+	"ukmt":             {Halves: true, End: regexp.MustCompile(`(?m)^\s*© [0-9]{4} UK Mathematics Trust`), Cover: regexp.MustCompile(`(?s)\A.*Do not turn over until[^\n]*`)},
 }
 
 // Read gives the text of a paper of a source, with a form feed between pages. It uses the rules of Readings for the source.
@@ -44,6 +47,8 @@ func Read(ctx context.Context, source string, pdf []byte) (string, error) {
 			return "", err
 		}
 		ls, rs := strings.Split(left, "\f"), strings.Split(right, "\f")
+		n := min(len(ls), len(rs))
+		ls, rs = r.cover(ls[:n]), r.cover(rs[:n])
 		for i := range min(len(ls), len(rs)) {
 			pages = append(pages, r.cut(ls[i])+"\n"+r.cut(rs[i]))
 		}
@@ -56,7 +61,7 @@ func Read(ctx context.Context, source string, pdf []byte) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		for _, p := range strings.Split(text, "\f") {
+		for _, p := range r.cover(strings.Split(text, "\f")) {
 			pages = append(pages, r.cut(p))
 		}
 	}
@@ -78,6 +83,27 @@ func (r Reading) cut(page string) string {
 	return page
 }
 
+// cover drops the cover of a paper from its pages, see Cover. pdftotext ends the text with a form feed, so the last page can be empty, and it does not count.
+func (r Reading) cover(pages []string) []string {
+	if r.Cover == nil || len(pages) == 0 {
+		return pages
+	}
+	n := len(pages)
+	if n > 1 && strings.TrimSpace(pages[n-1]) == "" {
+		n--
+	}
+	m := r.Cover.FindStringIndex(pages[0])
+	switch {
+	case m == nil:
+		return pages
+	case n > 1:
+		return append([]string{""}, pages[1:]...)
+	}
+	out := append([]string{}, pages...)
+	out[0] = pages[0][m[1]:]
+	return out
+}
+
 // pdftotext runs pdftotext with the arguments on the bytes of a PDF.
 func pdftotext(ctx context.Context, pdf []byte, args ...string) (string, error) {
 	args = append(args, "-enc", "UTF-8", "-", "-")
@@ -92,9 +118,12 @@ func pdftotext(ctx context.Context, pdf []byte, args ...string) (string, error) 
 	return out.String(), nil
 }
 
-var pageSizeRE = regexp.MustCompile(`(?m)^Page size:\s+([0-9.]+) x ([0-9.]+)`)
+var (
+	pageSizeRE = regexp.MustCompile(`(?m)^Page size:\s+([0-9.]+) x ([0-9.]+)`)
+	pageRotRE  = regexp.MustCompile(`(?m)^Page rot:\s+([0-9]+)`)
+)
 
-// pageSize gives the width and the height of the first page of a PDF, in points.
+// pageSize gives the width and the height of the first page of a PDF, in points, as the page shows. A page that turns by 90 or 270 degrees swaps its width and height.
 func pageSize(ctx context.Context, pdf []byte) (w, h int, err error) {
 	cmd := exec.CommandContext(ctx, "pdfinfo", "-")
 	cmd.Stdin = bytes.NewReader(pdf)
@@ -102,13 +131,25 @@ func pageSize(ctx context.Context, pdf []byte) (w, h int, err error) {
 	if err != nil {
 		return 0, 0, fmt.Errorf("pdfinfo: %w", err)
 	}
+	w, h, ok := infoSize(out)
+	if !ok {
+		return 0, 0, fmt.Errorf("pdfinfo gives no page size")
+	}
+	return w, h, nil
+}
+
+// infoSize reads the page size from the output of pdfinfo, with the width and height swapped for a page that turns by 90 or 270 degrees.
+func infoSize(out []byte) (w, h int, ok bool) {
 	m := pageSizeRE.FindSubmatch(out)
 	if m == nil {
-		return 0, 0, fmt.Errorf("pdfinfo gives no page size")
+		return 0, 0, false
 	}
 	fw, _ := strconv.ParseFloat(string(m[1]), 64)
 	fh, _ := strconv.ParseFloat(string(m[2]), 64)
-	return int(fw), int(fh), nil
+	if r := pageRotRE.FindSubmatch(out); r != nil && (string(r[1]) == "90" || string(r[1]) == "270") {
+		fw, fh = fh, fw
+	}
+	return int(fw), int(fh), true
 }
 
 // readable tells if at least half of the letters of a text are ASCII letters.
