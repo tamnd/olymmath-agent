@@ -260,6 +260,17 @@ om anchor -content olymmath -missing elmo-official
 
 The problems page of the ELMO site, elmo.evanchen.cc, links the paper of each year from 2010, at web.evanchen.cc/exams/ELMO-YYYY.pdf. The paper of 2015 is only an attachment on AoPS, so `om papers` leaves it out. The files of the shortlist, the solutions and the ELSMO have other names. The papers number the problems 1 to 6, with or without the word Problem. The pages state no licence, so the content only links to the papers. The robots.txt of both hosts has no rule.
 
+The Serbian Mathematical Olympiad works the same way, with the source `dms-rs`:
+
+```
+om papers -content olymmath dms-rs
+om fetch -content olymmath dms-rs
+om import -content olymmath -anchor -comp rs-smo
+om anchor -content olymmath -missing dms-rs
+```
+
+The secondary school page of the Mathematical Society of Serbia, dms.rs/matematika-srednje-skole/, links the paper of the Serbian MO for 2008 to 2014, 2016 to 2019 and 2022 to 2024. The file names vary: zadaci_smo_2012.pdf, zadaci-smo-2014.pdf, 2017_smo.pdf, SMO2019.pdf, SMO_2022_ZADACI.pdf and SMO_2023_SVE.pdf. The files of the solutions (resenja) and the results (rezultati) are left out. The papers are in Serbian. The papers of 2008 to 2011 and 2013 number the problems of each day 1 to 3, so only the first day splits by number, and a row that AoPS places at a first-day position can be a second-day problem. Read each link against the paper. The pages state no licence, so the content only links to the papers. The robots.txt only disallows /wp-admin/.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Link the human solutions
