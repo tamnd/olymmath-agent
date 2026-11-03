@@ -604,3 +604,25 @@ func TestELMOPapers(t *testing.T) {
 		t.Errorf("ELMOPapers = %+v", got)
 	}
 }
+
+func TestDMSPapers(t *testing.T) {
+	u := "https://dms.rs/wp-content/uploads/"
+	page := `<a href="` + u + `2016/12/zadaci_smo_2008-1.pdf">Z</a><a href="` + u + `2016/12/resenja_smo_2008-1.pdf">R</a>` +
+		`<a href="` + u + `2016/12/zadaci-smo-2014.pdf">Z</a><a href="` + u + `2016/12/rezultati-smo-2014.pdf">R</a>` +
+		`<a href="` + u + `2016/12/zadaci_i_resenja_smo_2016.pdf">Z</a><a href="` + u + `2017/04/2017_smo.pdf">Z</a><a href="` + u + `2017/04/2017_smo_resenja.pdf">R</a>` +
+		`<a href="` + u + `2019/04/SMO2019.pdf">Z</a><a href="` + u + `2022/04/SMO_2022_ZADACI.pdf">Z</a><a href="` + u + `2022/04/SMO_2022_RESENJA.pdf">R</a>` +
+		`<a href="` + u + `2023/04/SMO_2023_SVE.pdf">Z</a><a href="` + u + `2023/04/SMO_2023_RESENJA_SVE.pdf">R</a><a href="` + u + `2021/05/2021_smo_rezultati.pdf">R</a>`
+	got := DMSPapers(page)
+	want := []National{
+		{Competition: "rs-smo", Year: 2008, URL: u + "2016/12/zadaci_smo_2008-1.pdf"},
+		{Competition: "rs-smo", Year: 2014, URL: u + "2016/12/zadaci-smo-2014.pdf"},
+		{Competition: "rs-smo", Year: 2016, URL: u + "2016/12/zadaci_i_resenja_smo_2016.pdf"},
+		{Competition: "rs-smo", Year: 2017, URL: u + "2017/04/2017_smo.pdf"},
+		{Competition: "rs-smo", Year: 2019, URL: u + "2019/04/SMO2019.pdf"},
+		{Competition: "rs-smo", Year: 2022, URL: u + "2022/04/SMO_2022_ZADACI.pdf"},
+		{Competition: "rs-smo", Year: 2023, URL: u + "2023/04/SMO_2023_SVE.pdf"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("DMSPapers = %+v", got)
+	}
+}

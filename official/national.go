@@ -768,3 +768,30 @@ func ELMOPapers(page string) []National {
 	slices.SortFunc(out, func(a, b National) int { return a.Year - b.Year })
 	return out
 }
+
+// DMSListing is the page of the Mathematical Society of Serbia (DMS) that lists the papers of its secondary school competitions.
+const DMSListing = "https://dms.rs/matematika-srednje-skole/"
+
+// dmsSMORE matches the link to the paper of one year of the Serbian Mathematical Olympiad: zadaci_smo_2012.pdf, zadaci-smo-2014.pdf, zadaci_i_resenja_smo_2016.pdf, 2017_smo.pdf, SMO2019.pdf, SMO_2022_ZADACI.pdf or SMO_2023_SVE.pdf. The files of the solutions (resenja) and the results (rezultati) have other names.
+var dmsSMORE = regexp.MustCompile(`href="(https://dms\.rs/wp-content/uploads/[0-9]{4}/[0-9]{2}/(?:zadaci(?:_i_resenja)?[_-]smo[_-]((?:19|20)[0-9]{2})(?:-1)?|((?:19|20)[0-9]{2})_smo|SMO((?:19|20)[0-9]{2})|SMO_((?:19|20)[0-9]{2})_(?:ZADACI|SVE))\.pdf)"`)
+
+// DMSPapers gives the paper of each year of the Serbian Mathematical Olympiad (rs-smo) on the secondary school page of the DMS. The paper holds the six problems of the two days, numbered 1 to 6, in Serbian. The paper of 2016 also holds the solutions after the problems.
+func DMSPapers(page string) []National {
+	var out []National
+	seen := map[int]bool{}
+	for _, m := range dmsSMORE.FindAllStringSubmatch(page, -1) {
+		y := 0
+		for _, g := range m[2:] {
+			if g != "" {
+				y, _ = strconv.Atoi(g)
+			}
+		}
+		if y == 0 || seen[y] {
+			continue
+		}
+		seen[y] = true
+		out = append(out, National{Competition: "rs-smo", Year: y, URL: m[1]})
+	}
+	slices.SortFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}
