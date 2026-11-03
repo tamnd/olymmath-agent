@@ -245,3 +245,11 @@ func TestParseChecksStopped(t *testing.T) {
 		t.Fatalf("flags %v checked %v", flags, checked)
 	}
 }
+
+func TestDeclsSectionModifiers(t *testing.T) {
+	src := "@[expose] public section\nnamespace Imo1962P4\nnoncomputable section\ndef f : Nat := 1\nend\nproblem imo1962_p4 : True := trivial\nend Imo1962P4\nend\n"
+	ds := Decls(src)
+	if len(ds) != 2 || ds[0].Name != "Imo1962P4.f" || ds[1].Name != "Imo1962P4.imo1962_p4" {
+		t.Fatalf("decls: %+v", ds)
+	}
+}
