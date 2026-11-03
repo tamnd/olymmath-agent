@@ -227,6 +227,17 @@ om anchor -content olymmath -missing georgmohr
 
 The page georgmohr.dk/gmopg/ lists the papers of the second round, which is the national olympiad, from 1991. A script on the page makes the links from the attributes of a table, so `om papers` reads those attributes. A year gets its paper in English when the page has one, from 2000, and its paper in Danish before that. The Danish papers number the problems "Opgave 1." and so on. The page says that the problems may not be used for commercial purposes, including the training of language models, so the content only links to the papers. The site has no robots.txt.
 
+The Portuguese Mathematical Olympiad works the same way, with the source `spm-opm`:
+
+```sh
+om papers -content olymmath spm-opm
+om fetch -content olymmath spm-opm
+om import -content olymmath -anchor -comp pt-opm
+om anchor -content olymmath -missing spm-opm
+```
+
+The archive page of olimpiadas.spm.pt links the papers of each olympiad, in a folder named by its school year, such as "XXXI OPM(2012-13)". The year of an edition is the year in which the school year ends. The positions of `pt-opm` are the problems of the final of category B, which has two days of three problems. The names of the files of that final change over the years, and `om papers` knows each form: XXXI_f1b.pdf, XXVIII_f2bp.pdf, XXIV_fdia1b.pdf, XX_fb2.pdf and catBfinaldia1.pdf for one day, and XXXIX_fb.pdf and XXVI_f12bps.pdf for both days. The papers number the problems with no word, and the second day starts at 4, so `om anchor` puts the word Problem before the numbers that follow each other. The pages state no licence, so the content only links to the papers. The site has no robots.txt.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Link the human solutions
