@@ -163,7 +163,8 @@ func partOf(name string, i int) string {
 	return string("abcdefghijklmnopqrstuvwxyz"[i%26])
 }
 
-var imoslRE = regexp.MustCompile(`^IMOSLLean4/Main/IMO(\d{4})/([ACGN]\d+)/`)
+// imoslRE matches both layouts of IMOSLLean4: Main/IMO2020/A4.lean and Main/IMO2020/A3/A3.lean.
+var imoslRE = regexp.MustCompile(`^IMOSLLean4/Main/IMO(\d{4})/([ACGN]\d+)(?:/[ACGN]\d+)?\.lean$`)
 
 func imoslItems(rel, src string) []Item {
 	m := imoslRE.FindStringSubmatch(rel)
