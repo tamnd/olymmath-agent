@@ -26,7 +26,8 @@ type Decl struct {
 
 var declRE = regexp.MustCompile(`(?m)^((?:@\[[^\]]*\]\s*)?(?:(?:private|protected|noncomputable|public)\s+)*)(theorem|lemma|problem|abbrev|def|determine)\s+([^\s(:{\[]+)`)
 
-var nsRE = regexp.MustCompile(`(?m)^(namespace|end|section)\b[ \t]*([^\s]*)`)
+// nsRE also reads the modifiers of a section, as in noncomputable section and @[expose] public section, so that its end does not close a namespace.
+var nsRE = regexp.MustCompile(`(?m)^(?:@\[[^\]]*\]\s*)?(?:(?:noncomputable|public|private)\s+)*(namespace|end|section)\b[ \t]*([^\s]*)`)
 
 // Decls returns the top-level declarations of a Lean file, in order. It reads the namespaces to give full names. It is a light reader for well-formatted files, not a Lean parser.
 func Decls(src string) []Decl {
