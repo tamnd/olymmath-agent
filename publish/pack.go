@@ -80,7 +80,6 @@ type PackResult struct {
 
 // Pack joins the files of the directory in into one pack for each top folder, such as aime, and into Shards packs for a folder with more than ShardFiles files. It writes the packs to out/pack and the index of each folder to index/FOLDER.json. A file that is not in a folder is an error. The packs and the indexes do not change when the files do not change, so an upload sends only the packs of the folders that changed.
 func Pack(in, out, index string) (PackResult, error) {
-	var res PackResult
 	groups := map[string][]string{}
 	err := filepath.WalkDir(in, func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
@@ -90,16 +89,40 @@ func Pack(in, out, index string) (PackResult, error) {
 		if err != nil {
 			return err
 		}
-		folder, rest, ok := strings.Cut(Key(rel), "/")
-		if !ok {
-			return fmt.Errorf("pack: %s is not in a folder", rel)
-		}
-		groups[folder] = append(groups[folder], rest)
-		return nil
+		return group(groups, Key(rel))
 	})
 	if err != nil {
-		return res, err
+		return PackResult{}, err
 	}
+	return packGroups(groups, out, index, func(f string) ([]byte, error) {
+		return os.ReadFile(filepath.Join(in, filepath.FromSlash(f))) // #nosec G304 -- the path comes from the walk of the directory.
+	})
+}
+
+// PackFiles packs files, by their slash paths, as Pack packs a directory with these files. It gives the same packs and indexes, and it reads no file.
+func PackFiles(files map[string][]byte, out, index string) (PackResult, error) {
+	groups := map[string][]string{}
+	for rel := range files {
+		if err := group(groups, rel); err != nil {
+			return PackResult{}, err
+		}
+	}
+	return packGroups(groups, out, index, func(f string) ([]byte, error) { return files[f], nil })
+}
+
+// group adds the file at the slash path rel to the files of its top folder.
+func group(groups map[string][]string, rel string) error {
+	folder, rest, ok := strings.Cut(rel, "/")
+	if !ok {
+		return fmt.Errorf("pack: %s is not in a folder", rel)
+	}
+	groups[folder] = append(groups[folder], rest)
+	return nil
+}
+
+// packGroups writes the packs of each folder of groups and their indexes. read gives the data of a file by its slash path.
+func packGroups(groups map[string][]string, out, index string, read func(f string) ([]byte, error)) (PackResult, error) {
+	var res PackResult
 	for _, d := range []string{filepath.Join(out, PackDir), index} {
 		if err := os.MkdirAll(d, 0o755); err != nil { // #nosec G301 -- the site is public.
 			return res, err
@@ -111,8 +134,8 @@ func Pack(in, out, index string) (PackResult, error) {
 	}
 	sort.Strings(folders)
 	// Each folder gives its own pack, so the workers share the folders.
-	err = each(len(folders), func(i int) error {
-		return packFolder(in, out, index, folders[i], groups[folders[i]])
+	err := each(len(folders), func(i int) error {
+		return packFolder(out, index, folders[i], groups[folders[i]], read)
 	})
 	if err != nil {
 		return res, err
@@ -140,13 +163,13 @@ func shardOf(f string) int {
 }
 
 // packFolder writes the packs of one folder and its index.
-func packFolder(in, out, index, folder string, files []string) error {
+func packFolder(out, index, folder string, files []string, read func(f string) ([]byte, error)) error {
 	sort.Strings(files)
 	n := shards(len(files))
 	bufs := make([]bytes.Buffer, n)
 	ix := PackIndex{Files: make(map[string]PackEntry, len(files))}
 	for _, f := range files {
-		b, err := os.ReadFile(filepath.Join(in, folder, filepath.FromSlash(f))) // #nosec G304 -- the path comes from the walk of the directory.
+		b, err := read(folder + "/" + f)
 		if err != nil {
 			return err
 		}

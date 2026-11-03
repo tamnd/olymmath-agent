@@ -10,6 +10,7 @@ import (
 
 	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/publish"
+	"github.com/tamnd/olymmath-agent/site"
 )
 
 func runSiteSplit(env Env, args []string) int {
@@ -45,6 +46,57 @@ func runSiteSplit(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om site split: %v\n", err)
 		return ExitFailure
 	}
+	return ExitOK
+}
+
+// runSiteRelease builds the site in memory and writes the result of om site build, om site split and om site pack: the static assets with the index of each pack in -out, and the packs in -pack. The files that go to R2 and the redirect pages never touch the disk.
+func runSiteRelease(env Env, args []string) int {
+	fs := newFlags("site release", env.Stderr)
+	root := fs.String("content", ".", "the root of the content repository")
+	out := fs.String("out", "build/site", "the directory for the static assets. The release replaces it")
+	pack := fs.String("pack", "build/pack", "the directory for the packs. The release replaces it, and om site upload sends it")
+	maxAssets := fs.Int("max-assets", 19000, "the most static asset files, as in om site split")
+	opts := siteFlags(fs)
+	if err := fs.Parse(args); err != nil {
+		return ExitUsage
+	}
+	fail := func(err error) int {
+		fmt.Fprintf(env.Stderr, "om site release: %v\n", err)
+		return ExitFailure
+	}
+	o, code := opts(env, "om site release")
+	if code != ExitOK {
+		return code
+	}
+	tiers, err := publish.LoadTiers(filepath.Join(*root, "registers", "site-tiers.yaml"))
+	if err != nil {
+		return fail(err)
+	}
+	corpus, code := loadForSite(env, "om site release", *root)
+	if code != ExitOK {
+		return code
+	}
+	files, stats, err := site.Render(corpus, o)
+	if err != nil {
+		return fail(err)
+	}
+	for _, e := range stats.Errors {
+		fmt.Fprintf(env.Stderr, "warning: %v\n", e)
+	}
+	fmt.Fprintf(env.Stdout, "%d pages, %d files, %d problems\n", stats.Pages, stats.Files, stats.Problems)
+	plan, err := publish.PlanSplit(files, corpus, tiers, *maxAssets)
+	fmt.Fprintf(env.Stdout, "%d redirect pages dropped, %d files to R2\n", plan.Deleted, plan.Moved)
+	if len(plan.Fit) > 0 {
+		fmt.Fprintf(env.Stdout, "%d more files to R2 to keep the static assets at most %d: %s\n", plan.Fitted, *maxAssets, strings.Join(plan.Fit, ", "))
+	}
+	if err != nil {
+		return fail(err)
+	}
+	res, err := publish.Release(files, plan, *out, *pack)
+	if err != nil {
+		return fail(err)
+	}
+	fmt.Fprintf(env.Stdout, "%d static files in %s, %d files in %d packs in %s\n", len(files)-plan.Deleted-res.Files, strings.TrimSuffix(*out, "/"), res.Files, res.Packs, strings.TrimSuffix(*pack, "/"))
 	return ExitOK
 }
 

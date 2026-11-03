@@ -327,7 +327,7 @@ func TestMoveFolders(t *testing.T) {
 		write(t, dir, rel, rel)
 	}
 	write(t, out, "nz/2022/p0.md", "before")
-	n, err := moveFiles(dir, out, "nz", true)
+	n, err := moveFiles(dir, out, "nz", All)
 	if err != nil || n != 6 {
 		t.Fatalf("%d files moved, %v, want 6", n, err)
 	}

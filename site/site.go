@@ -68,20 +68,56 @@ func Build(corpus *content.Corpus, opts Options) (Stats, error) {
 	if err := os.RemoveAll(opts.Out); err != nil {
 		return Stats{}, err
 	}
-	if opts.Cache != "" {
-		b.markup.tex.LoadCache(opts.Cache)
+	w := newWriter(b.opts.Workers)
+	b.out = func(rel string, data []byte) error {
+		return w.write(filepath.Join(b.opts.Out, filepath.FromSlash(rel)), data)
 	}
-	b.out = newWriter(b.opts.Workers)
-	err = b.all()
-	if werr := b.out.close(); err == nil {
+	err = b.run()
+	if werr := w.close(); err == nil {
 		err = werr
 	}
-	if err == nil && opts.Cache != "" {
-		if cerr := b.markup.tex.SaveCache(opts.Cache); cerr != nil {
+	return b.stats, err
+}
+
+// Render builds the site of corpus in memory and writes no file. It gives the data of each file by its slash path, for example imo/2024/p1.html. The files are the same as the files of Build, and opts.Out is not used. A release takes the files that stay static assets and packs the rest, so the files that go to R2 never touch the disk.
+func Render(corpus *content.Corpus, opts Options) (map[string][]byte, Stats, error) {
+	b, err := newBuilder(corpus, opts)
+	if err != nil {
+		return nil, Stats{}, err
+	}
+	files := map[string][]byte{}
+	// A path that a build writes twice keeps its last data, as on disk.
+	b.out = func(rel string, data []byte) error {
+		files[rel] = data
+		return nil
+	}
+	err = b.run()
+	return files, b.stats, err
+}
+
+// Write writes files to dir, by their slash paths, with one worker for each CPU. The files and the folders have the same modes as the files of Build. dir must be empty or missing.
+func Write(dir string, files map[string][]byte) error {
+	w := newWriter(max(runtime.NumCPU(), 1))
+	for rel, data := range files {
+		if err := w.write(filepath.Join(dir, filepath.FromSlash(rel)), data); err != nil {
+			break
+		}
+	}
+	return w.close()
+}
+
+// run builds the site and hands each file to b.out. It loads and saves the formula cache.
+func (b *builder) run() error {
+	if b.opts.Cache != "" {
+		b.markup.tex.LoadCache(b.opts.Cache)
+	}
+	err := b.all()
+	if err == nil && b.opts.Cache != "" {
+		if cerr := b.markup.tex.SaveCache(b.opts.Cache); cerr != nil {
 			b.stats.Errors = append(b.stats.Errors, fmt.Errorf("site: the formula cache is not saved: %w", cerr))
 		}
 	}
-	return b.stats, err
+	return err
 }
 
 type builder struct {
@@ -100,7 +136,10 @@ type builder struct {
 	rendered map[string]renderedText
 	// records gives the records of the API and of the machine copies.
 	records *API
-	out     *writer
+	// out takes each file of the build by its slash path. data must not change after the call.
+	out func(rel string, data []byte) error
+	// buf is the buffer of render.
+	buf bytes.Buffer
 }
 
 // renderedText is the HTML of a Markdown text and the errors of its formulas and figures.
@@ -329,8 +368,10 @@ func (b *builder) Corpus() *content.Corpus { return b.corpus }
 func (b *builder) render(name string, pg page) error {
 	pg.Site = b
 	pg.Canonical = b.opts.URL + "/" + strings.TrimPrefix(pg.Path, "/")
-	var buf bytes.Buffer
-	if err := b.tmpl.ExecuteTemplate(&buf, name, pg); err != nil {
+	// The pages render one at a time, so they share one buffer, and each file gets a copy of its exact size.
+	buf := &b.buf
+	buf.Reset()
+	if err := b.tmpl.ExecuteTemplate(buf, name, pg); err != nil {
 		return fmt.Errorf("site: page %s: %w", pg.Path, err)
 	}
 	file := strings.TrimPrefix(pg.Path, "/")
@@ -340,7 +381,7 @@ func (b *builder) render(name string, pg page) error {
 	case !strings.Contains(path.Base(file), "."):
 		file += ".html"
 	}
-	if err := b.write(file, buf.Bytes()); err != nil {
+	if err := b.write(file, bytes.Clone(buf.Bytes())); err != nil {
 		return err
 	}
 	b.stats.Pages++
@@ -350,10 +391,10 @@ func (b *builder) render(name string, pg page) error {
 	return nil
 }
 
-// write hands the file to the writer, which writes it in the background. data must not change after the call.
+// write hands the file to b.out. With Build the writer writes it in the background. data must not change after the call.
 func (b *builder) write(rel string, data []byte) error {
 	b.stats.Files++
-	return b.out.write(filepath.Join(b.opts.Out, filepath.FromSlash(rel)), data)
+	return b.out(rel, data)
 }
 
 func (b *builder) html(src, where string) template.HTML {
