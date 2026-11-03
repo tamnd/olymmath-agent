@@ -15,6 +15,8 @@ type National struct {
 	// Paper is the id of the paper of the layout of the competition, or "" when the file holds all the positions of the edition.
 	Paper string
 	URL   string
+	// Lang is the language of the paper when it is not the language of the source, or the zero Lang.
+	Lang Lang
 }
 
 // OMSemListing is the page of the Polish Mathematical Olympiad that lists the papers of each olympiad.
@@ -563,4 +565,74 @@ func tuymaadaNumber(text string) string {
 	}
 	b.WriteString(text[last:])
 	return b.String()
+}
+
+// GeorgMohrListing is the page of the Georg Mohr Contest that lists the papers of the second round.
+const GeorgMohrListing = "https://georgmohr.dk/gmopg/"
+
+var (
+	// georgMohrTableRE matches the table of papers of the page, which a script fills: the pattern of the name of each column, with $$ for the last two digits of the year, and the first and the last year of each column.
+	georgMohrTableRE = regexp.MustCompile(`paths="([^"]+)"\s+from="([0-9 ]+)"\s+to="([0-9 ]+)"`)
+	// Danish is the language of the papers in Danish.
+	Danish = Lang{Lang: "Danish", Code: "da"}
+)
+
+// Lang is the language of a paper when it is not the language of its source.
+type Lang struct{ Lang, Code string }
+
+// GeorgMohrPapers gives the paper of each year of the second round of the Georg Mohr Contest (dk-georgmohr), which is the national olympiad of Denmark. The page has no links: a script makes them from the attributes of its table. The column gm$$opg.pdf has the problems in Danish, and the column gm$$pb.pdf has them in English, with brief solutions after them. A year gets the English paper when the page has it, and the Danish paper when it does not. The year of a paper is the year of the round, which is held in January.
+func GeorgMohrPapers(page string) []National {
+	m := georgMohrTableRE.FindStringSubmatch(page)
+	if m == nil {
+		return nil
+	}
+	paths, from, to := strings.Fields(m[1]), years(m[2]), years(m[3])
+	if len(from) == 0 || len(to) == 0 {
+		return nil
+	}
+	span := func(k int) (int, int) {
+		f, t := from[0], to[0]
+		if k < len(from) {
+			f = from[k]
+		}
+		if k < len(to) {
+			t = to[k]
+		}
+		return f, t
+	}
+	col := func(suffix string) int {
+		return slices.IndexFunc(paths, func(p string) bool { return strings.HasSuffix(p, suffix) })
+	}
+	da, en := col("opg.pdf"), col("pb.pdf")
+	byYear := map[int]National{}
+	for _, k := range []int{da, en} {
+		if k < 0 {
+			continue
+		}
+		f, t := span(k)
+		for y := f; y <= t; y++ {
+			n := National{Competition: "dk-georgmohr", Year: y, URL: GeorgMohrListing + strings.Replace(paths[k], "$$", strconv.Itoa(y)[2:], 1)}
+			if k == da {
+				n.Lang = Danish
+			}
+			byYear[y] = n
+		}
+	}
+	out := make([]National, 0, len(byYear))
+	for _, n := range byYear {
+		out = append(out, n)
+	}
+	slices.SortStableFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}
+
+// years reads a list of years separated by spaces.
+func years(s string) []int {
+	var out []int
+	for _, f := range strings.Fields(s) {
+		if y, err := strconv.Atoi(f); err == nil && y >= 1900 {
+			out = append(out, y)
+		}
+	}
+	return out
 }

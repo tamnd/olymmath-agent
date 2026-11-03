@@ -90,8 +90,8 @@ func Text(ctx context.Context, pdf []byte) (string, error) {
 	return text, nil
 }
 
-// markerRE finds the start of a problem: "Problem 3." or "1959/3." at the start of a line. The German word Aufgabe and the Polish word Zadanie are markers too, and a marker with a word can be alone on its line, as in "Aufgabe 3".
-var markerRE = regexp.MustCompile(`(?m)^\s*(?:(?:Problem|Aufgabe|Zadanie)\s+([0-9]{1,2})(?:\s*[.:]|[ \t]*$)|(?:19|20)[0-9]{2}\s*/\s*([0-9]{1,2})\s*\.)`)
+// markerRE finds the start of a problem: "Problem 3." or "1959/3." at the start of a line. The German word Aufgabe, the Polish word Zadanie and the Danish word Opgave are markers too, and a marker with a word can be alone on its line, as in "Aufgabe 3".
+var markerRE = regexp.MustCompile(`(?m)^\s*(?:(?:Problem|Aufgabe|Zadanie|Opgave)\s+([0-9]{1,2})(?:\s*[.:]|[ \t]*$)|(?:19|20)[0-9]{2}\s*/\s*([0-9]{1,2})\s*\.)`)
 
 // bareRE finds the start of a problem in a paper with no word before the number: "3." at the start of a line.
 var bareRE = regexp.MustCompile(`(?m)^\s*()([0-9]{1,2})\.\s`)
