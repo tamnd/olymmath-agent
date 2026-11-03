@@ -563,3 +563,27 @@ func TestOPMPart(t *testing.T) {
 		t.Errorf("segments = %+v", segs)
 	}
 }
+
+func TestMOPapers(t *testing.T) {
+	page := `<a href="/media/1/a57i.pdf">A</a><a href="/media/2/a57iii.pdf">A</a><a href="/media/3/a57iiiv.pdf">list</a>` +
+		`<a href="/media/4/a73iii.pdf">A</a><a href="/media/5/a73iv.pdf">A</a><a href="/media/6/b73iv.pdf">B</a>`
+	got := MOPapers(page)
+	want := []National{
+		{Competition: "cz-sk-mo", Year: 2008, URL: "https://www.matematickaolympiada.cz/media/2/a57iii.pdf"},
+		{Competition: "cz-sk-mo", Year: 2024, URL: "https://www.matematickaolympiada.cz/media/5/a73iv.pdf"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("MOPapers = %+v", got)
+	}
+	if l := MOListings(1996); len(l) != 2 || !strings.HasSuffix(l[1], "/44-rocnik") {
+		t.Errorf("MOListings = %v", l)
+	}
+}
+
+func TestMOPart(t *testing.T) {
+	text := "\f50. ročník matematické olympiády, III. kolo kategorie A\n\n\f 1. Určete P. (P. Calábek)\nŘešení. Je-li\n     2. jinak.\n 2. V rovině je dán bod. (J. Šimša)\nŘešení. Označme\n     1. Každé slovo.\n 3. Najděte čísla.\n"
+	segs := Split(MOPart(text, ""))
+	if len(segs) != 3 || segs[0].Text != "Určete P. (P. Calábek)" || segs[1].Text != "V rovině je dán bod. (J. Šimša)" || segs[2].Position != "p3" {
+		t.Errorf("segments = %+v", segs)
+	}
+}

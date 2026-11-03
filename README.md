@@ -238,6 +238,17 @@ om anchor -content olymmath -missing spm-opm
 
 The archive page of olimpiadas.spm.pt links the papers of each olympiad, in a folder named by its school year, such as "XXXI OPM(2012-13)". The year of an edition is the year in which the school year ends. The positions of `pt-opm` are the problems of the final of category B, which has two days of three problems. The names of the files of that final change over the years, and `om papers` knows each form: XXXI_f1b.pdf, XXVIII_f2bp.pdf, XXIV_fdia1b.pdf, XX_fb2.pdf and catBfinaldia1.pdf for one day, and XXXIX_fb.pdf and XXVI_f12bps.pdf for both days. The papers number the problems with no word, and the second day starts at 4, so `om anchor` puts the word Problem before the numbers that follow each other. The pages state no licence, so the content only links to the papers. The site has no robots.txt.
 
+The Czech Mathematical Olympiad works the same way, with the source `mo-cz`:
+
+```sh
+om papers -content olymmath mo-cz
+om fetch -content olymmath mo-cz
+om import -content olymmath -anchor -comp cz-sk-mo
+om anchor -content olymmath -missing mo-cz
+```
+
+The site matematickaolympiada.cz has a page for each olympiad from the 43rd, which ended in 1994, but none for the 45th and the 46th. The nth olympiad ends in the year 1951 + n. The positions of `cz-sk-mo` are the problems of the final round of category A. Its file is a57iii.pdf, the third round, up to the 72nd olympiad, and a73iv.pdf, the fourth round, from the 73rd. The file is in Czech and has the solutions too. A solution or the header of a page hides the text up to the line with the next number, and a number with more than two spaces before it is part of a list. The pages state no licence, so the content only links to the papers. The robots.txt allows all paths.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Link the human solutions
