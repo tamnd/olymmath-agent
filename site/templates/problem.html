@@ -35,6 +35,20 @@
     {{end}}
   </section>
 
+  {{with .Formal}}
+  <section class="block formal" id="formal">
+    <h2>Formal statement</h2>
+    <div class="card formal-card">
+      <p class="card-kicker"><span class="badge badge-fid-{{.Fidelity}}">{{.Badge}}</span> Lean 4 · {{.SourceName}} <code>{{.Origin.NativeName}}</code></p>
+      <pre class="lean"><code>{{.Text}}</code></pre>
+      {{with .Answer}}{{if .Decl}}<p class="source">The answer is the definition <code>{{.Decl}}</code>.</p>{{end}}{{end}}
+      <p class="source">{{if .Proved}}<span class="badge badge-sol-official">proved</span>{{end}}{{.Proof}}.{{if .NativeDecide}} The proof uses <code>native_decide</code>, so it trusts the compiler.{{end}}</p>
+      {{if not .Faithful}}<p class="source muted">A statement that compiles can still say something else than the problem. The site calls a statement faithful only after two people check it.</p>{{end}}
+      <p class="source"><a href="{{.File}}" rel="noopener">View in Lean on GitHub</a> · <a href="{{.Live}}" rel="noopener">Open in the Lean web editor</a>{{if .Upstream}} · <a href="{{.Upstream}}" rel="noopener">Source file</a>{{end}}{{if .Others}} · {{.Others}} more formal statements{{end}}. {{.Licence}}.</p>
+    </div>
+  </section>
+  {{end}}
+
   {{with .Similar}}
   <section class="block">
     <h2>Similar problems</h2>
