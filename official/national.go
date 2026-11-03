@@ -328,3 +328,45 @@ func AMTPapers(page string) []National {
 	slices.SortStableFunc(out, func(a, b National) int { return a.Year - b.Year })
 	return out
 }
+
+// VTRMCListing is the page of the Virginia Tech Regional Mathematics Contest that lists its past exams and their solutions.
+const VTRMCListing = "https://math.vt.edu/undergrad-math/vtrmc.html"
+
+// vtrmcRE matches the link to the exam of one year, with the year as the text of the link: <a href="http://intranet.math.vt.edu/vtrmc/exams/42nd%20VTRMC.pdf">2022</a>.
+var vtrmcRE = regexp.MustCompile(`href="https?://intranet\.math\.vt\.edu/vtrmc/exams/[^"]+\.pdf"[^>]*>\s*((?:19|20)[0-9]{2})`)
+
+// VTRMCPapers gives the exam of each year of the Virginia Tech Regional Mathematics Contest (vtrmc) on its page. The year is the text of the link. The file of an exam is named by the number of the contest: the nth contest was held in the year 1978 + n up to 2019, and the 42nd in 2022, because the contest was not held in 2020 and 2021. Two links of the page are wrong: the link of 2009 goes to the exam of 2010, and the link of 2011 names the file 33th, which does not exist. So the URL is made from the number of the contest of the year, and the file of each year exists.
+func VTRMCPapers(page string) []National {
+	var out []National
+	seen := map[int]bool{}
+	for _, m := range vtrmcRE.FindAllStringSubmatch(page, -1) {
+		y, _ := strconv.Atoi(m[1])
+		n := y - 1978
+		if y >= 2022 {
+			n = y - 1980
+		}
+		if n < 1 || seen[y] {
+			continue
+		}
+		seen[y] = true
+		out = append(out, National{Competition: "vtrmc", Year: y, URL: "https://intranet.math.vt.edu/vtrmc/exams/" + ordinal(n) + "%20VTRMC.pdf"})
+	}
+	slices.SortStableFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}
+
+// ordinal gives the English ordinal of n: 1st, 2nd, 3rd, 4th, 11th, 22nd.
+func ordinal(n int) string {
+	suffix := "th"
+	if n%100 < 11 || n%100 > 13 {
+		switch n % 10 {
+		case 1:
+			suffix = "st"
+		case 2:
+			suffix = "nd"
+		case 3:
+			suffix = "rd"
+		}
+	}
+	return strconv.Itoa(n) + suffix
+}

@@ -172,6 +172,17 @@ om anchor -content olymmath -missing amt
 
 The `om papers` command reads the past papers page of amt.edu.au and records the AMO paper of each year that it lists. Each file holds the eight problems and then the solutions. The page lists only the years 2016 to 2020. The papers say "© Australian Mathematics Trust" and give no open licence, so the content only links to the papers. The robots.txt of the site asks for 10 s between requests, and the fetcher waits that long.
 
+The Virginia Tech Regional Mathematics Contest works the same way, with the source `vtrmc-official`:
+
+```sh
+om papers -content olymmath vtrmc-official
+om fetch -content olymmath vtrmc-official
+om import -content olymmath -anchor -comp vtrmc
+om anchor -content olymmath -missing vtrmc-official
+```
+
+The `om papers` command reads the VTRMC page of math.vt.edu and records the exam of each year that it lists. The year is the text of the link. The file of an exam is named by the number of the contest, so the command makes the URL from that number. Two links of the page are wrong: the link of 2009 goes to the exam of 2010, and the link of 2011 names a file that does not exist. The contest ran from 1979 to 2022 and was not held in 2020 and 2021. The page states no licence, so the content only links to the papers. The robots.txt of the site asks for 10 s between requests.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Link the human solutions
