@@ -85,10 +85,14 @@ var errLineRE = regexp.MustCompile(`(?m)^[^\s:]+\.lean:(\d+):\d+: error`)
 // ParseChecks reads the file of static checks and its output. A check whose line has no error proved the statement, so it is a flag.
 func ParseChecks(src, out string) (flags map[string][]string, checked map[string]bool) {
 	bad := map[int]bool{}
+	last := 0
 	for _, m := range errLineRE.FindAllStringSubmatch(out, -1) {
 		n, _ := strconv.Atoi(m[1])
 		bad[n] = true
+		last = max(last, n)
 	}
+	// Lean stops at its limit of errors. Then the checks after the last error did not run, and they count as not checked.
+	stopped := strings.Contains(out, "maximum number of errors")
 	flags, checked = map[string][]string{}, map[string]bool{}
 	sc := bufio.NewScanner(strings.NewReader(src))
 	sc.Buffer(make([]byte, 1<<20), 1<<20)
@@ -97,6 +101,9 @@ func ParseChecks(src, out string) (flags map[string][]string, checked map[string
 		n++
 		m := checkLineRE.FindStringSubmatch(sc.Text())
 		if m == nil {
+			continue
+		}
+		if stopped && n >= last {
 			continue
 		}
 		checked[m[1]] = true

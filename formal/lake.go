@@ -95,8 +95,9 @@ rev = "` + Mathlib + `"
 		for _, r := range v.Roots {
 			roots = append(roots, fmt.Sprintf("%q", r))
 		}
+		// The glob X.* takes the module X and its submodules. X.+ would leave out X, so a file that imports X, as Compfiles imports ProblemExtraction, would not find it.
 		for _, r := range s.Roots {
-			globs = append(globs, fmt.Sprintf("%q", r+".+"))
+			globs = append(globs, fmt.Sprintf("%q", r+".*"))
 		}
 		fmt.Fprintf(&b, "roots = [%s]\nglobs = [%s]\n", strings.Join(roots, ", "), strings.Join(globs, ", "))
 		if len(s.Options) > 0 {

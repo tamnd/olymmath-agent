@@ -58,6 +58,14 @@ type Report struct {
 	NewTags int
 }
 
+// PortPath is the diff of the port of a source at a commit, relative to the content root.
+func PortPath(source, commit string) string {
+	if len(commit) > ShortCommit {
+		commit = commit[:ShortCommit]
+	}
+	return path.Join(content.LeanDir, "ports", source, commit+".diff")
+}
+
 // ReportPath is the import report of a source in the content.
 func ReportPath(source string) string { return path.Join("reports", "formal", source+".tsv") }
 
@@ -75,16 +83,33 @@ func Import(root string, s *Source, dir, commit string, records bool) (*Report, 
 		return nil, err
 	}
 	vendor := VendorDir(s.ID, commit)
+	var diff strings.Builder
 	for _, rel := range files {
 		b, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(rel))) // #nosec G304 -- the path is inside the clone of the source.
 		if err != nil {
 			return nil, err
+		}
+		if patch := s.Patches[rel]; patch != nil {
+			nb := []byte(patch(string(b)))
+			diff.WriteString(Diff(path.Join(vendor, rel), string(b), string(nb)))
+			b = nb
 		}
 		out := filepath.Join(root, filepath.FromSlash(vendor), filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(out), 0o750); err != nil {
 			return nil, err
 		}
 		if err := os.WriteFile(out, b, 0o600); err != nil { // #nosec G703 -- rel comes from a walk of the clone, so it has no .. element.
+			return nil, err
+		}
+	}
+	port := ""
+	if diff.Len() > 0 {
+		port = PortPath(s.ID, commit)
+		out := filepath.Join(root, filepath.FromSlash(port))
+		if err := os.MkdirAll(filepath.Dir(out), 0o750); err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(out, []byte(diff.String()), 0o600); err != nil {
 			return nil, err
 		}
 	}
@@ -145,6 +170,7 @@ func Import(root string, s *Source, dir, commit string, records bool) (*Report, 
 			f = &content.Formal{Tag: t, Fidelity: content.Fidelity{Status: content.Unreviewed}}
 		}
 		fillFormal(f, s, it, p, vendor, commit)
+		f.PortDiff = port
 		if it.Proved {
 			pr := oldProof[f.Tag]
 			if pr == nil {
@@ -196,6 +222,32 @@ func fillFormal(f *content.Formal, s *Source, it Item, p *content.Problem, vendo
 	f.Text = Standalone(strings.TrimSpace(text))
 	f.Rank = s.Rank
 	f.Proofs = nil
+}
+
+// Diff gives a unified diff of the lines that differ between a and b, for the file name. It compares line by line, which is enough for a port that replaces lines and keeps their number. When the number of lines differs, the hunk replaces the whole file.
+func Diff(name, a, b string) string {
+	if a == b {
+		return ""
+	}
+	al, bl := strings.SplitAfter(a, "\n"), strings.SplitAfter(b, "\n")
+	var out strings.Builder
+	fmt.Fprintf(&out, "--- a/%s\n+++ b/%s\n", name, name)
+	if len(al) != len(bl) {
+		fmt.Fprintf(&out, "@@ -1,%d +1,%d @@\n", len(al), len(bl))
+		for _, l := range al {
+			out.WriteString("-" + strings.TrimSuffix(l, "\n") + "\n")
+		}
+		for _, l := range bl {
+			out.WriteString("+" + strings.TrimSuffix(l, "\n") + "\n")
+		}
+		return out.String()
+	}
+	for i := range al {
+		if al[i] != bl[i] {
+			fmt.Fprintf(&out, "@@ -%d +%d @@\n-%s\n+%s\n", i+1, i+1, strings.TrimSuffix(al[i], "\n"), strings.TrimSuffix(bl[i], "\n"))
+		}
+	}
+	return out.String()
 }
 
 func upstreamURL(s *Source, commit, rel string) string {
