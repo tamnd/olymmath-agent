@@ -44,6 +44,7 @@ var Sections = map[string]func(page, id string) string{
 var Parts = map[string]func(text, paper string) string{
 	"tuymaada-official": TuymaadaPart,
 	"spm-opm":           OPMPart,
+	"mo-cz":             MOPart,
 }
 
 // Read gives the text of a paper of a source, with a form feed between pages. It uses the rules of Readings for the source. A file that is not a PDF, such as an HTML page that shows the scans of a paper, gives ErrNoText.

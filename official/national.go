@@ -683,3 +683,66 @@ func OPMPapers(page string) []National {
 
 // OPMPart gives the problems of a paper of the OPM, with the word Problem before their numbers. The papers number the problems with no word, and the second day starts at 4.
 func OPMPart(text, _ string) string { return numberRun(text, opmBareRE) }
+
+// MOFirst is the first olympiad of the Czech Mathematical Olympiad that has a page of its papers on matematickaolympiada.cz.
+const MOFirst = 43
+
+// MOListings gives the page of each olympiad of the Czech Mathematical Olympiad from the 43rd to the olympiad that starts in the year last. The site has no page for the 45th and the 46th olympiad.
+func MOListings(last int) []string {
+	var out []string
+	for n := MOFirst; n <= last-1950; n++ {
+		if n == 45 || n == 46 {
+			continue
+		}
+		out = append(out, "https://www.matematickaolympiada.cz/mo-pro-ss/rocnik/"+strconv.Itoa(n)+"-rocnik")
+	}
+	return out
+}
+
+var (
+	// moFinalRE matches the link to the file of the final round of category A of one olympiad, with the problems and their solutions in Czech: a57iii.pdf is the third round of the 57th olympiad, which was the final. From the 73rd olympiad the final is the fourth round, a73iv.pdf, and a73iii.pdf is the regional round.
+	moFinalRE = regexp.MustCompile(`href="(/media/[0-9]+/a([0-9]{2})(iii|iv)\.pdf)"`)
+	// moNumberRE matches the number at the start of a problem: "3." at the start of a line, with at most two spaces before it. A numbered list in a solution has more.
+	moNumberRE = regexp.MustCompile(`^\f*[ \t]{0,2}([1-9])\.\s`)
+	// moSkipRE matches a line that starts a part of the file with no problem: a solution, or the header of a page.
+	moSkipRE = regexp.MustCompile(`^[ \t\f]*(?:Řešení|[0-9]{2}\. ročník)`)
+)
+
+// MOPapers gives the paper of the final round of category A of each olympiad on the pages of matematickaolympiada.cz. That round is the national olympiad of the Czech Republic (cz-sk-mo). The nth olympiad ends in the year 1951 + n, which is the year of the final. A page with the fourth round gives that file, and a page with no fourth round gives the third round.
+func MOPapers(page string) []National {
+	best := map[int]string{}
+	for _, m := range moFinalRE.FindAllStringSubmatch(page, -1) {
+		n, _ := strconv.Atoi(m[2])
+		if m[3] == "iv" || best[n] == "" {
+			best[n] = "https://www.matematickaolympiada.cz" + m[1]
+		}
+	}
+	var out []National
+	for n, u := range best {
+		out = append(out, National{Competition: "cz-sk-mo", Year: 1951 + n, URL: u})
+	}
+	slices.SortFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}
+
+// MOPart gives the problems of a file of the final of the Czech Mathematical Olympiad, with the word Problem before their numbers. The file numbers the problems with no word, and it has the solutions, which can have numbered lists, and a header on each page. A file of a late olympiad states the six problems first and then states each one again with its solution. So a line with the next number and little indent starts a problem, and a solution or a page header hides the text up to the line with the next number.
+func MOPart(text, _ string) string {
+	var b strings.Builder
+	next, skip := 1, false
+	for _, line := range strings.SplitAfter(text, "\n") {
+		if m := moNumberRE.FindStringSubmatchIndex(line); m != nil {
+			if n, _ := strconv.Atoi(line[m[2]:m[3]]); n == next {
+				b.WriteString(line[:m[2]] + "Problem " + line[m[2]:])
+				next, skip = n+1, false
+				continue
+			}
+		}
+		if moSkipRE.MatchString(line) {
+			skip = true
+		}
+		if !skip {
+			b.WriteString(line)
+		}
+	}
+	return b.String()
+}
