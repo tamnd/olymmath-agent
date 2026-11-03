@@ -302,6 +302,8 @@ type Problem struct {
 	Edition   *Edition    `yaml:"-"`
 	Paper     *Paper      `yaml:"-"`
 	Solutions []*Solution `yaml:"-"`
+	// Formals are the formal statements of the problem, the best rank first.
+	Formals []*Formal `yaml:"-"`
 }
 
 // Status is the state of the records of a problem (spec 09.1).
@@ -429,6 +431,11 @@ type Corpus struct {
 	Aliases map[string]string
 	// Tags maps each tag that was ever given to its kind (registers/tags.tsv).
 	Tags map[string]string
+	// Formals and Proofs are all the formal and proof records, in the order of their files.
+	Formals []*Formal
+	Proofs  []*Proof
+	// FidelityReviews are the review records of kind fidelity, by id.
+	FidelityReviews map[string]*FidelityReview
 
 	byCode   map[string]*Competition
 	bySource map[string]*SourceRecord
@@ -438,12 +445,13 @@ type Corpus struct {
 
 func newCorpus() *Corpus {
 	return &Corpus{
-		Redirects: map[string]string{},
-		Aliases:   map[string]string{},
-		Tags:      map[string]string{},
-		byCode:    map[string]*Competition{},
-		bySource:  map[string]*SourceRecord{},
-		byTag:     map[string]*Problem{},
+		Redirects:       map[string]string{},
+		Aliases:         map[string]string{},
+		Tags:            map[string]string{},
+		FidelityReviews: map[string]*FidelityReview{},
+		byCode:          map[string]*Competition{},
+		bySource:        map[string]*SourceRecord{},
+		byTag:           map[string]*Problem{},
 	}
 }
 

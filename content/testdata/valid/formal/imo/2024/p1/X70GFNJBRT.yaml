@@ -1,0 +1,30 @@
+tag: X70GFNJBRT
+kind: formal
+problem: 0HVHSDNNMY
+system: lean4
+toolchain: leanprover/lean4:v4.35.0
+mathlib: v4.35.0
+path: lean/vendor/compfiles/1745e6ced3e6/Compfiles/Imo2024P1.lean
+module: Compfiles.Imo2024P1
+decl: Imo2024P1.imo2024_p1
+answer:
+  style: separate-def
+  decl: Imo2024P1.solutionSet
+origin:
+  kind: human
+  source: compfiles
+  url: https://github.com/dwrensha/compfiles/blob/1745e6ced3e671bd74417548494b034eb2c87da8/Compfiles/Imo2024P1.lean
+  commit: 1745e6ced3e671bd74417548494b034eb2c87da8
+  native_name: Imo2024P1
+licence: Apache-2.0
+text: "theorem imo2024_p1 : True"
+check:
+  result: pass
+  toolchain: leanprover/lean4:v4.35.0
+  mathlib: v4.35.0
+  at: "2026-11-03"
+fidelity:
+  status: checker-clean
+  reviews: [0a1b2c3d4e5f]
+rank: 1
+proofs: [9BH0CCQ1QX]

@@ -31,3 +31,15 @@
   ai_train: unknown
   wave: 1
   state: planned
+- id: compfiles
+  name: Compfiles
+  kind: formal
+  origin: H2
+  url: https://github.com/dwrensha/compfiles
+  access: git
+  licence: Apache-2.0
+  terms: Apache-2.0.
+  zone: {statement: Z1, solution: Z1}
+  ai_train: allowed
+  wave: 0
+  state: active

@@ -1,0 +1,18 @@
+tag: 9BH0CCQ1QX
+kind: proof
+formal: X70GFNJBRT
+origin:
+  kind: human
+  source: compfiles
+  url: https://github.com/dwrensha/compfiles/blob/1745e6ced3e671bd74417548494b034eb2c87da8/Compfiles/Imo2024P1.lean
+  commit: 1745e6ced3e671bd74417548494b034eb2c87da8
+  native_name: Imo2024P1
+path: lean/vendor/compfiles/1745e6ced3e6/Compfiles/Imo2024P1.lean
+module: Compfiles.Imo2024P1
+decl: Imo2024P1.imo2024_p1
+check:
+  result: pass
+  toolchain: leanprover/lean4:v4.35.0
+  mathlib: v4.35.0
+  at: "2026-11-03"
+  axioms: [propext, Classical.choice, Quot.sound]

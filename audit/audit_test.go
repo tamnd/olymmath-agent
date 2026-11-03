@@ -79,6 +79,39 @@ func TestValidHasNoFindings(t *testing.T) {
 const p2 = "problems/imo/2024/p2.md"
 const sol = "solutions/imo/2024/p1/006SZE6NAS.md"
 
+const (
+	formal      = "formal/imo/2024/p1/X70GFNJBRT.yaml"
+	proof       = "formal/imo/2024/p1/9BH0CCQ1QX.yaml"
+	agentReview = "reviews/2026/11/0a1b2c3d4e5f.yaml"
+)
+
+// TestFaithfulNeedsTwoPeople checks spec 08.4 step 6: two people make two-human, one person makes one-human, and an agent never counts.
+func TestFaithfulNeedsTwoPeople(t *testing.T) {
+	person := func(id, by string) string {
+		return "id: " + id + "\nkind: fidelity\nrecords: [X70GFNJBRT]\ndecision: faithful\nby: " + by + "\ndate: \"2026-11-03\"\nnote: compared with the official text\n"
+	}
+	edits := map[string][][2]string{
+		formal:                              {{"status: checker-clean\n  reviews: [0a1b2c3d4e5f]", "status: two-human\n  reviews: [0a1b2c3d4e5f, 111111111111, 222222222222]"}},
+		"reviews/2026/11/111111111111.yaml": {{"", person("111111111111", "human:reviewer/ann")}},
+		"reviews/2026/11/222222222222.yaml": {{"", person("222222222222", "human:reviewer/bob")}},
+	}
+	corpus, fs, err := Run(fixture(t, edits))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fs) != 0 {
+		t.Fatalf("two people: want no finding, got %v", fs)
+	}
+	if f := corpus.Formals[0]; !corpus.Faithful(f) {
+		t.Errorf("two people: want faithful, got %s", corpus.ShownFidelity(f))
+	}
+	edits["reviews/2026/11/222222222222.yaml"] = [][2]string{{"", person("222222222222", "human:reviewer/ann")}}
+	corpus, fs, _ = Run(fixture(t, edits))
+	if f := corpus.Formals[0]; corpus.Faithful(f) || corpus.ShownFidelity(f) != "one-human" || !rules(fs)["F03"] {
+		t.Errorf("one person two times: want one-human and F03, got %s and %v", corpus.ShownFidelity(f), fs)
+	}
+}
+
 func TestRules(t *testing.T) {
 	cases := []struct {
 		rule  string
@@ -107,6 +140,18 @@ func TestRules(t *testing.T) {
 		{"L02", map[string][][2]string{sol: {{"origin: human", "origin: ai"}}}},
 		{"L03", map[string][][2]string{sol: {{"complete: true", "complete: true\nrun:\n  model: claude-opus-5-5"}}}},
 		{"L04", map[string][][2]string{sol: {{"zone: Z1", "zone: Z3"}}}},
+		{"F01", map[string][][2]string{formal: {{"  result: pass", "  result: fail"}}}},
+		{"F01", map[string][][2]string{formal: {{"toolchain: leanprover/lean4:v4.35.0\nmathlib", "toolchain: leanprover/lean4:v4.34.0\nmathlib"}}}},
+		{"F01", map[string][][2]string{formal: {{"path: lean/vendor/compfiles/1745e6ced3e6/Compfiles/Imo2024P1.lean", "path: lean/Missing.lean"}}}},
+		{"F02", map[string][][2]string{proof: {{"axioms: [propext,", "axioms: [sorryAx, propext,"}}}},
+		{"F02", map[string][][2]string{proof: {{"axioms: [propext,", "axioms: [Lean.ofReduceBool, propext,"}}}},
+		{"F02", map[string][][2]string{proof: {{"axioms: [propext,", "axioms: [Foo.bar, propext,"}}}},
+		{"F03", map[string][][2]string{formal: {{"status: checker-clean", "status: two-human"}}}},
+		{"F03", map[string][][2]string{formal: {{"status: checker-clean", "status: known-wrong"}}}},
+		{"F03", map[string][][2]string{formal: {{"reviews: [0a1b2c3d4e5f]", "reviews: [ffffffffffff]"}}}},
+		{"F03", map[string][][2]string{agentReview: {{"decision: clean", "decision: faithful"}}}},
+		{"F03", map[string][][2]string{agentReview: {{"note: \"Agent decision, not a person's review. ", "note: \""}}}},
+		{"T02", map[string][][2]string{"registers/tags.tsv": {{"X70GFNJBRT\tformal\n", ""}}}},
 		{"X01", map[string][][2]string{"registers/sources.yaml": {{"  terms: Copyright of the International Mathematical Olympiad. No licence is stated.\n", ""}}}},
 		{"X02", map[string][][2]string{"registers/sources.yaml": {{"  state: active", "  state: active\n  do_not_republish: true"}}}},
 	}
