@@ -62,6 +62,9 @@ func TestOtherSources(t *testing.T) {
 	if len(its) != 2 || its[0].Locator != "isl/2018/a2" || its[0].Part != "1" || its[1].Decl.Name != "IMOSL.IMO2018A2.final_solution_part2" {
 		t.Fatalf("imosl: %+v", its)
 	}
+	if its := imoslItems("IMOSLLean4/Main/IMO2020/A4.lean", "theorem final_solution : True := trivial\n"); len(its) != 1 || its[0].Locator != "isl/2020/a4" {
+		t.Fatalf("imosl flat layout: %+v", its)
+	}
 	its = archiveItems("Archive/Imo/Imo2024Q1.lean", "namespace Imo2024Q1\n\ntheorem helper : True := trivial\n\nend Imo2024Q1\n\ntheorem result : True := trivial\n")
 	if len(its) != 1 || its[0].Decl.Name != "result" || its[0].Locator != "imo/2024/p1" {
 		t.Fatalf("archive: %+v", its)
