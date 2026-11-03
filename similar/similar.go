@@ -47,6 +47,30 @@ type posting struct {
 
 // Find gives, for each text, at most n other texts with a score of at least least, the best first. A word that is in more than a tenth of the texts does not count, because it is too common to tell texts apart.
 func Find(texts []string, n int, least float64) [][]Match {
+	sorted, vecs, index := weigh(texts)
+	out := make([][]Match, len(texts))
+	// The scores of one text do not depend on the other scores, so the workers share the texts.
+	var next atomic.Int64
+	var wg sync.WaitGroup
+	for range min(max(runtime.NumCPU(), 1), max(len(texts), 1)) {
+		wg.Go(func() {
+			// Each worker keeps one score buffer for all its texts, so a text does not make a new map.
+			s := newScores(len(texts))
+			for {
+				i := int(next.Add(1)) - 1
+				if i >= len(texts) {
+					return
+				}
+				out[i] = best(i, sorted[i], vecs[i], index, n, least, s)
+			}
+		})
+	}
+	wg.Wait()
+	return out
+}
+
+// weigh gives the words of each text that count, in order, the weight of each word in each text, and the index of the texts of each word.
+func weigh(texts []string) ([][]string, []map[string]float64, map[string][]posting) {
 	tf := make([]map[string]float64, len(texts))
 	df := map[string]int{}
 	for i, t := range texts {
@@ -83,42 +107,42 @@ func Find(texts []string, n int, least float64) [][]Match {
 			index[w] = append(index[w], posting{i, vecs[i][w]})
 		}
 	}
-	out := make([][]Match, len(texts))
-	// The scores of one text do not depend on the other scores, so the workers share the texts.
-	var next atomic.Int64
-	var wg sync.WaitGroup
-	for range min(max(runtime.NumCPU(), 1), max(len(texts), 1)) {
-		wg.Go(func() {
-			for {
-				i := int(next.Add(1)) - 1
-				if i >= len(texts) {
-					return
-				}
-				out[i] = best(i, sorted[i], vecs[i], index, n, least)
-			}
-		})
-	}
-	wg.Wait()
-	return out
+	return sorted, vecs, index
 }
 
-// best gives the n best matches of text i.
-func best(i int, words []string, vec map[string]float64, index map[string][]posting, n int, least float64) []Match {
-	score := map[int]float64{}
+// scores are the sums of the scores of one text with each other text. score has one entry for each text, and hit lists the texts with a sum, in the order of their first sum. A text with a sum of 0 is in hit too, as in a map.
+type scores struct {
+	score []float64
+	seen  []bool
+	hit   []int
+}
+
+func newScores(n int) *scores {
+	return &scores{score: make([]float64, n), seen: make([]bool, n)}
+}
+
+// best gives the n best matches of text i. It uses s for the sums and leaves it empty for the next text.
+func best(i int, words []string, vec map[string]float64, index map[string][]posting, n int, least float64, s *scores) []Match {
 	for _, w := range words {
 		x := vec[w]
 		for _, p := range index[w] {
 			if p.doc != i {
-				score[p.doc] += x * p.w
+				if !s.seen[p.doc] {
+					s.seen[p.doc] = true
+					s.hit = append(s.hit, p.doc)
+				}
+				s.score[p.doc] += x * p.w
 			}
 		}
 	}
 	var ms []Match
-	for d, s := range score {
-		if s >= least {
-			ms = append(ms, Match{d, s})
+	for _, d := range s.hit {
+		if s.score[d] >= least {
+			ms = append(ms, Match{d, s.score[d]})
 		}
+		s.score[d], s.seen[d] = 0, false
 	}
+	s.hit = s.hit[:0]
 	sort.Slice(ms, func(a, b int) bool {
 		if ms[a].Score != ms[b].Score {
 			return ms[a].Score > ms[b].Score
