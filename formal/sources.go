@@ -103,9 +103,15 @@ func Order() []*Source {
 	return out
 }
 
-// moduleOf gives the module of a Lean file, for example Compfiles.Imo2024P1 for Compfiles/Imo2024P1.lean.
+// moduleOf gives the module of a Lean file, for example Compfiles.Imo2024P1 for Compfiles/Imo2024P1.lean. A part that does not start with a letter or _ goes in « and », as in Imo.«2005».P3.
 func moduleOf(rel string) string {
-	return strings.ReplaceAll(strings.TrimSuffix(rel, ".lean"), "/", ".")
+	parts := strings.Split(strings.TrimSuffix(rel, ".lean"), "/")
+	for i, p := range parts {
+		if p != "" && !strings.ContainsRune("_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", rune(p[0])) {
+			parts[i] = "«" + p + "»"
+		}
+	}
+	return strings.Join(parts, ".")
 }
 
 // compfilesComps maps the prefix of a Compfiles name to a competition code. Only the prefixes whose numbers are the positions of the papers are here.

@@ -70,7 +70,7 @@ func TestOtherSources(t *testing.T) {
 		t.Fatalf("archive: %+v", its)
 	}
 	its = formalImoItems("Imo/2005/P3.lean", "theorem imo_2005_p3.parts.a : True := by\n  sorry\n\ntheorem imo_2005_p3.parts.b : True := by\n  sorry\n")
-	if len(its) != 2 || its[1].Part != "b" || its[0].Proved {
+	if len(its) != 2 || its[1].Part != "b" || its[0].Proved || its[0].Module != "Imo.«2005».P3" {
 		t.Fatalf("formal-imo: %+v", its)
 	}
 }
