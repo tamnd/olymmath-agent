@@ -4,6 +4,7 @@ package similar
 import (
 	"math"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -115,6 +116,8 @@ type scores struct {
 	score []float64
 	seen  []bool
 	hit   []int
+	// ms keeps the matches of one text before the sort. best gives a copy of the n best.
+	ms []Match
 }
 
 func newScores(n int) *scores {
@@ -135,7 +138,7 @@ func best(i int, words []string, vec map[string]float64, index map[string][]post
 			}
 		}
 	}
-	var ms []Match
+	ms := s.ms[:0]
 	for _, d := range s.hit {
 		if s.score[d] >= least {
 			ms = append(ms, Match{d, s.score[d]})
@@ -149,10 +152,11 @@ func best(i int, words []string, vec map[string]float64, index map[string][]post
 		}
 		return ms[a].Doc < ms[b].Doc
 	})
-	if len(ms) > n {
-		ms = ms[:n]
+	s.ms = ms
+	if len(ms) == 0 {
+		return nil
 	}
-	return ms
+	return slices.Clone(ms[:min(n, len(ms))])
 }
 
 // Nearest gives, for each query, the doc with the best score, or a Match with Doc -1 when no doc shares a word with the query. The weights of the words come from the docs only, so that a large set of queries does not change them, and only the docs are indexed.

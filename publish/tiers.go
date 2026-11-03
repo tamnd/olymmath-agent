@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -53,13 +54,13 @@ func Split(dir, out string, corpus *content.Corpus, t Tiers) (deleted, moved int
 	if err != nil {
 		return 0, 0, err
 	}
-	var redirects map[string]string
-	if err := json.Unmarshal(b, &redirects); err != nil {
-		return 0, 0, fmt.Errorf("redirects.json: %w", err)
+	redirects, err := redirectFiles(b)
+	if err != nil {
+		return 0, 0, err
 	}
 	files := make([]string, 0, len(redirects))
-	for from := range redirects {
-		files = append(files, filepath.Join(dir, filepath.FromSlash(strings.TrimPrefix(from, "/")+".html")))
+	for _, f := range redirects {
+		files = append(files, filepath.Join(dir, filepath.FromSlash(f)))
 	}
 	var gone atomic.Int64
 	err = each(len(files), func(i int) error {
@@ -75,25 +76,76 @@ func Split(dir, out string, corpus *content.Corpus, t Tiers) (deleted, moved int
 	if err != nil {
 		return deleted, moved, err
 	}
-	for _, c := range corpus.Competitions {
-		n, err := moveFiles(dir, out, c.Code, !t.First(c))
+	rules := Rules(corpus, t)
+	for _, f := range slices.Sorted(maps.Keys(rules)) {
+		n, err := moveFiles(dir, out, f, rules[f])
 		moved += n
 		if err != nil {
 			return deleted, moved, err
 		}
 	}
-	n, err := moveFiles(dir, out, "p", false)
-	moved += n
-	if err != nil {
-		return deleted, moved, err
-	}
-	// The API records go to R2 too, but the index of the API stays.
-	n, err = moveFiles(dir, out, "api", true)
-	return deleted, moved + n, err
+	return deleted, moved, nil
 }
 
-// moveFiles moves the files under dir/sub to out, at the same relative path. The index pages stay. When all is false, it moves only the machine copies of the pages.
-func moveFiles(dir, out, sub string, all bool) (int, error) {
+// redirectFiles gives the slash path of the page of each redirect in redirects.json.
+func redirectFiles(b []byte) ([]string, error) {
+	var redirects map[string]string
+	if err := json.Unmarshal(b, &redirects); err != nil {
+		return nil, fmt.Errorf("redirects.json: %w", err)
+	}
+	files := make([]string, 0, len(redirects))
+	for from := range redirects {
+		files = append(files, strings.TrimPrefix(from, "/")+".html")
+	}
+	return files, nil
+}
+
+// Rule tells which files of one top folder of the site go to R2.
+type Rule int
+
+const (
+	// Keep moves no file.
+	Keep Rule = iota
+	// Copies moves the machine copies of the pages.
+	Copies
+	// All moves each file.
+	All
+)
+
+// Moves tells if the rule moves the file with the base name name. An index page never moves.
+func (r Rule) Moves(name string) bool {
+	if strings.HasPrefix(name, "index.") {
+		return false
+	}
+	switch r {
+	case All:
+		return true
+	case Copies:
+		return Copy(name)
+	}
+	return false
+}
+
+// Rules gives the rule of Split for each top folder: All for a competition that is not in tier 1 and for the API records, and Copies for a competition in tier 1 and for the tag pages under p. The other folders keep their files.
+func Rules(corpus *content.Corpus, t Tiers) map[string]Rule {
+	rules := map[string]Rule{}
+	add := func(f string, r Rule) { rules[f] = max(rules[f], r) }
+	for _, c := range corpus.Competitions {
+		if t.First(c) {
+			add(c.Code, Copies)
+		} else {
+			add(c.Code, All)
+		}
+	}
+	add("p", Copies)
+	// The API records go to R2 too, but the index of the API stays.
+	add("api", All)
+	return rules
+}
+
+// moveFiles moves the files under dir/sub that the rule moves to out, at the same relative path.
+func moveFiles(dir, out, sub string, rule Rule) (int, error) {
+	all := rule == All
 	moved := 0
 	made := map[string]bool{}
 	mkdir := func(d string) error {
@@ -137,7 +189,7 @@ func moveFiles(dir, out, sub string, all bool) (int, error) {
 			}
 			return filepath.SkipDir
 		}
-		if strings.HasPrefix(d.Name(), "index.") || (!all && !Copy(d.Name())) {
+		if !rule.Moves(d.Name()) {
 			return nil
 		}
 		if err := mkdir(filepath.Dir(to)); err != nil {
@@ -176,7 +228,7 @@ func moveDir(from, to string) (int, error) {
 			dirs = append(dirs, p)
 			return os.Mkdir(back, info.Mode().Perm())
 		}
-		if strings.HasPrefix(d.Name(), "index.") {
+		if !All.Moves(d.Name()) {
 			return os.Rename(p, back) // #nosec G122 -- the build directory is our own output.
 		}
 		moved++
@@ -219,53 +271,72 @@ func each(n int, f func(i int) error) error {
 
 // Fit keeps the number of static assets in dir at most limit, because a Worker version can have a limited number of asset files. When there are more, it moves the problem pages of the tier 1 competitions to out, the competition with the most files first, until the rest fits. The index pages stay. It gives the number of moved files and the moved competitions.
 func Fit(dir, out string, corpus *content.Corpus, limit int) (int, []string, error) {
-	total, err := countFiles(dir)
+	total, _, err := countFiles(dir)
 	if err != nil || total <= limit {
 		return 0, nil, err
 	}
-	type comp struct {
-		code string
-		n    int
-	}
-	var comps []comp
+	var folders []Folder
 	for _, c := range corpus.Competitions {
-		n, err := countFiles(filepath.Join(dir, c.Code))
+		n, m, err := countFiles(filepath.Join(dir, c.Code))
 		if err != nil {
 			return 0, nil, err
 		}
-		if n > 0 {
-			comps = append(comps, comp{c.Code, n})
-		}
+		folders = append(folders, Folder{c.Code, n, m})
 	}
-	slices.SortFunc(comps, func(a, b comp) int {
-		if a.n != b.n {
-			return b.n - a.n
-		}
-		return strings.Compare(a.code, b.code)
-	})
+	codes, ferr := FitOrder(total, folders, limit)
 	moved := 0
-	var codes []string
-	for _, c := range comps {
-		if total-moved <= limit {
-			break
-		}
-		n, err := moveFiles(dir, out, c.code, true)
+	for _, code := range codes {
+		n, err := moveFiles(dir, out, code, All)
 		moved += n
 		if err != nil {
 			return moved, codes, err
 		}
-		codes = append(codes, c.code)
 	}
-	if total-moved > limit {
-		return moved, codes, fmt.Errorf("the site has %d static files after the move, more than %d", total-moved, limit)
-	}
-	return moved, codes, nil
+	return moved, codes, ferr
 }
 
-// countFiles counts the files under dir. A missing dir has 0 files.
-func countFiles(dir string) (int, error) {
-	n := 0
-	err := filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
+// Folder is the folder of a competition in the site after Split, for Fit.
+type Folder struct {
+	Code string
+	// Files is the number of files in the folder, and Moves the number of files that All moves.
+	Files, Moves int
+}
+
+// FitOrder gives the competitions that Fit moves to R2, so that at most limit of the total files stay. It takes the folder with the most files first, and it skips the empty folders. It gives an error when the files do not fit after the move of all the folders.
+func FitOrder(total int, folders []Folder, limit int) ([]string, error) {
+	if total <= limit {
+		return nil, nil
+	}
+	var fs []Folder
+	for _, f := range folders {
+		if f.Files > 0 {
+			fs = append(fs, f)
+		}
+	}
+	slices.SortFunc(fs, func(a, b Folder) int {
+		if a.Files != b.Files {
+			return b.Files - a.Files
+		}
+		return strings.Compare(a.Code, b.Code)
+	})
+	moved := 0
+	var codes []string
+	for _, f := range fs {
+		if total-moved <= limit {
+			break
+		}
+		moved += f.Moves
+		codes = append(codes, f.Code)
+	}
+	if total-moved > limit {
+		return codes, fmt.Errorf("the site has %d static files after the move, more than %d", total-moved, limit)
+	}
+	return codes, nil
+}
+
+// countFiles counts the files under dir, and the files under dir that All moves. A missing dir has 0 files.
+func countFiles(dir string) (files, moves int, err error) {
+	err = filepath.WalkDir(dir, func(_ string, d fs.DirEntry, err error) error {
 		if err != nil {
 			if os.IsNotExist(err) {
 				return filepath.SkipDir
@@ -273,11 +344,14 @@ func countFiles(dir string) (int, error) {
 			return err
 		}
 		if !d.IsDir() {
-			n++
+			files++
+			if All.Moves(d.Name()) {
+				moves++
+			}
 		}
 		return nil
 	})
-	return n, err
+	return files, moves, err
 }
 
 // Copy tells if a file is a machine copy of a page: a .md or a .json file.
