@@ -43,6 +43,8 @@ type Source struct {
 	Items func(rel, src string) []Item
 	// Options are the Lean options of the library that differ from the package defaults.
 	Options map[string]string
+	// InMathlib means that the files are part of the pinned Mathlib, so the package builds them from the Mathlib dependency and the lakefile has no library for them. The vendored copy keeps the text that the records quote.
+	InMathlib bool
 }
 
 // Sources are the Lean sources that om imports, by id.
@@ -70,7 +72,8 @@ var Sources = map[string]*Source{
 		Keep: func(rel string) bool {
 			return rel == "LICENSE" || (strings.HasPrefix(rel, "Archive/Imo/") && strings.HasSuffix(rel, ".lean"))
 		},
-		Items: archiveItems,
+		Items:     archiveItems,
+		InMathlib: true,
 	},
 	"formal-imo": {
 		ID: "formal-imo", Name: "formal-imo", Repo: "https://github.com/google-deepmind/formal-imo", Licence: "Apache-2.0", Rank: 4,

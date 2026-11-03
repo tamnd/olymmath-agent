@@ -1,5 +1,5 @@
 #!/bin/bash
-# check.sh LIB TARGETS OUT builds the library LIB of the Lake package in the current directory and runs the checks of spec 08.4 and 08.5 on the declarations in TARGETS. TARGETS has lines of module, declaration and kind, separated by tabs. The outputs go to the directory OUT. om formal record reads them.
+# check.sh LIB TARGETS OUT builds the library LIB (Archive is the library of the Mathlib dependency) of the Lake package in the current directory and runs the checks of spec 08.4 and 08.5 on the declarations in TARGETS. TARGETS has lines of module, declaration and kind, separated by tabs. The outputs go to the directory OUT. om formal record reads them.
 set -u
 lib=$1
 targets=$2
@@ -12,8 +12,8 @@ echo "exit $?" >> "$out/$lib.build.log"
 # The modules that compiled are the modules that have an .olean file.
 : > "$out/$lib.built"
 cut -f1 "$targets" | sort -u | while read -r m; do
-  f=".lake/build/lib/lean/$(echo "$m" | tr . /).olean"
-  [ -f "$f" ] && echo "$m" >> "$out/$lib.built"
+  f="lib/lean/$(echo "$m" | tr . /).olean"
+  if [ -f ".lake/build/$f" ] || [ -f ".lake/packages/mathlib/.lake/build/$f" ]; then echo "$m" >> "$out/$lib.built"; fi
 done
 
 # The axioms of each declaration in a module that compiled (spec 08.5).

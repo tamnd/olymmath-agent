@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -62,7 +63,8 @@ func FindVendored(root string) ([]Vendored, error) {
 // Lakefile gives the lakefile.toml of the package Olymmath for the vendored sources. The package pins Mathlib, and each source is one library whose srcDir is its vendor directory.
 func Lakefile(vs []Vendored, extra []string) string {
 	var b strings.Builder
-	b.WriteString(`# The Lake package Olymmath (spec 08.3). om formal lakefile writes this file. Do not edit it by hand.
+	vs = slices.DeleteFunc(slices.Clone(vs), func(v Vendored) bool { return v.Source.InMathlib })
+	b.WriteString(`# The Lake package Olymmath (spec 08.3). om formal lakefile writes this file. Do not edit it by hand. The Mathlib Archive files are built from the Mathlib dependency.
 name = "Olymmath"
 defaultTargets = [`)
 	for i, v := range vs {

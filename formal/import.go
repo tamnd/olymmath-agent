@@ -47,6 +47,8 @@ type Row struct {
 
 // Report is the result of an import.
 type Report struct {
+	// Records is false when the import wrote no record.
+	Records bool
 	Source  string
 	Commit  string
 	Files   int
@@ -110,7 +112,7 @@ func Import(root string, s *Source, dir, commit string, records bool) (*Report, 
 		corpus.Tags[t] = kind
 		return t, nil
 	}
-	rep := &Report{Source: s.ID, Commit: commit, Files: len(files)}
+	rep := &Report{Source: s.ID, Commit: commit, Files: len(files), Records: records}
 	var newTags []string
 	for _, it := range items {
 		row := Row{Native: it.Native, Decl: it.Decl.Name, Part: it.Part, Locator: it.Locator, Proved: it.Proved}
@@ -237,6 +239,9 @@ func appendTags(root string, lines []string) error {
 func writeReport(root string, rep *Report) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# The import of %s at %s: %d statements, %d mapped to a problem, %d with a proof.\n", rep.Source, rep.Commit, len(rep.Rows), rep.Mapped, rep.Proofs)
+	if !rep.Records {
+		b.WriteString("# The import wrote no formal record, because the files have not passed a compile check at the pin yet. Rule F01 needs one.\n")
+	}
 	b.WriteString("# native\tdecl\tpart\tlocator\tstatus\ttag\tproved\n")
 	rows := append([]Row(nil), rep.Rows...)
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].Native < rows[j].Native })
