@@ -107,7 +107,7 @@ func Order() []*Source {
 func moduleOf(rel string) string {
 	parts := strings.Split(strings.TrimSuffix(rel, ".lean"), "/")
 	for i, p := range parts {
-		if p != "" && !(p[0] == '_' || (p[0] >= 'a' && p[0] <= 'z') || (p[0] >= 'A' && p[0] <= 'Z')) {
+		if p != "" && !strings.ContainsRune("_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ", rune(p[0])) {
 			parts[i] = "«" + p + "»"
 		}
 	}
