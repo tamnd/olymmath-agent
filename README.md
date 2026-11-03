@@ -61,6 +61,16 @@ curl 'http://127.0.0.1:8080/api/random?competition=imo&topic=N&band_min=4'
 
 The same server runs the MCP server at `/mcp`. `om serve -mcp` runs it on stdin and stdout instead, for an MCP client that starts the command. Its tools are `get_problem`, `get_solutions`, `search_problems`, `list_edition` and `random_problem`.
 
+## Export to Hugging Face
+
+`om export hf` writes the corpus as Parquet, with one config for each licence zone: `z1-text`, `z2-facts` and `z3-links`. It also writes the dataset card. A source with `ai-train=no` keeps its facts and links in the export, but none of its text.
+
+```sh
+om export hf -content olymmath -out build/hf
+```
+
+`om publish hf` pushes the export to the dataset `tamnd/olymmath` with the `hf` program of `huggingface_hub`. It runs only with `-confirm` and a token in `HF_TOKEN`.
+
 ## Edit the content
 
 To add a problem, a solution or a tag, use these commands:
