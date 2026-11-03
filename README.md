@@ -46,6 +46,21 @@ Each competition page has a year grid. A row is a year and a cell is a position.
 
 Use `om help` to see all the commands.
 
+## API and MCP
+
+The build writes the read records of the API as JSON under `build/site/api/`: `/api/index.json`, `/api/problem/<tag>.json`, `/api/solutions/<tag>.json` and `/api/edition/<competition>/<edition>.json`. A problem record has no answer and no solution, so that a practice tool can hide them.
+
+`om serve` answers the same records over HTTP, and adds search and a random pick:
+
+```sh
+om serve -content olymmath -addr 127.0.0.1:8080
+curl 'http://127.0.0.1:8080/api/problem/0JY6M52386'
+curl 'http://127.0.0.1:8080/api/search?q=floor&limit=5'
+curl 'http://127.0.0.1:8080/api/random?competition=imo&topic=N&band_min=4'
+```
+
+The same server runs the MCP server at `/mcp`. `om serve -mcp` runs it on stdin and stdout instead, for an MCP client that starts the command. Its tools are `get_problem`, `get_solutions`, `search_problems`, `list_edition` and `random_problem`.
+
 ## Edit the content
 
 To add a problem, a solution or a tag, use these commands:
