@@ -199,6 +199,14 @@ func measure(c *content.Competition, cand map[int]map[string]bool, seen map[int]
 			for _, p := range e.Problems {
 				have[p.Position] = p
 			}
+			// A problem whose primary appearance is in another edition also fills its position here, as a shortlist problem that was chosen for the contest does.
+			for _, p := range e.Also {
+				for _, a := range p.Appearances {
+					if a.Locator.Comp == c.Code && a.Locator.Edition == e.ID && have[a.Locator.Position] == nil {
+						have[a.Locator.Position] = p
+					}
+				}
+			}
 		}
 		set := map[string]bool{}
 		for _, p := range expected {

@@ -121,3 +121,37 @@ func TestBuild(t *testing.T) {
 		t.Errorf("tsv %v %q", err, tsv.String())
 	}
 }
+
+// A problem that also appears in another edition fills its position there, so the position is not counted as missing.
+func TestBuildAlso(t *testing.T) {
+	root := t.TempDir()
+	if err := os.CopyFS(root, os.DirFS("../content/testdata/valid")); err != nil {
+		t.Fatal(err)
+	}
+	ed := "year: 2023\npapers:\n  - name: Day 1\n    problems: [p1, p2, p3]\n"
+	if err := os.WriteFile(filepath.Join(root, "editions/imo/2023.yaml"), []byte(ed), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	p := filepath.Join(root, "problems/imo/2024/p1.md")
+	b, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b = []byte(strings.Replace(string(b), "    primary: true\n", "    primary: true\n  - at: imo/2023/p3\n", 1))
+	if err := os.WriteFile(p, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, fs := content.Load(root)
+	if len(fs) > 0 {
+		t.Fatalf("load: %v", fs)
+	}
+	rep, err := Build(c, aliases(t, c, ""), 2026, func(func(seed.Row) error) error { return nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, y := range rep.Competitions[0].Years {
+		if y.Year == 2023 && (len(y.Record) != 1 || y.Record[0] != "p3") {
+			t.Errorf("2023 %+v", y)
+		}
+	}
+}
