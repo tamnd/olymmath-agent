@@ -35,6 +35,11 @@ var Readings = map[string]Reading{
 	"ukmt":             {Halves: true, End: regexp.MustCompile(`(?m)^\s*© [0-9]{4} UK Mathematics Trust`), Cover: regexp.MustCompile(`(?s)\A.*Do not turn over until[^\n]*`)},
 }
 
+// Sections are the readers of the sources whose papers are sections of an HTML page. A reader gives the text of the section with the id that is the fragment of the URL of the paper, or "" when the page has no such section.
+var Sections = map[string]func(page, id string) string{
+	"pamo-official": PAMOText,
+}
+
 // Read gives the text of a paper of a source, with a form feed between pages. It uses the rules of Readings for the source. A file that is not a PDF, such as an HTML page that shows the scans of a paper, gives ErrNoText.
 func Read(ctx context.Context, source string, pdf []byte) (string, error) {
 	if !bytes.Contains(pdf[:min(len(pdf), 1024)], []byte("%PDF-")) {

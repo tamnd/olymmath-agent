@@ -75,6 +75,12 @@ func LoadEditions(ctx context.Context, st *store.Store, corpus *content.Corpus, 
 					if err != nil {
 						return nil, 0, err
 					}
+					if base, _, cut := strings.Cut(o.URL, "#"); !ok && cut {
+						// A paper that is one section of a page has the URL of the page with the id of the section as the fragment. The store has the page under its URL with no fragment.
+						if c, ok, err = latest(src, base); err != nil {
+							return nil, 0, err
+						}
+					}
 					if !ok {
 						continue
 					}
@@ -103,8 +109,13 @@ func segments(ctx context.Context, st *store.Store, source, hash string, shape c
 	if err != nil {
 		return nil, err
 	}
-	text, err := Read(ctx, source, b)
-	if err != nil {
+	var text string
+	if section, ok := Sections[source]; ok {
+		_, id, _ := strings.Cut(o.URL, "#")
+		if text = section(string(b), id); text == "" {
+			return nil, ErrNoText
+		}
+	} else if text, err = Read(ctx, source, b); err != nil {
 		return nil, err
 	}
 	segs := Split(text)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/tamnd/olymmath-agent/content"
@@ -91,14 +92,17 @@ func runFetch(env Env, args []string) int {
 	return code
 }
 
-// officialPapers gives the URLs of the official papers of the editions that come from a source, in the order of the editions.
+// officialPapers gives the URLs of the official papers of the editions that come from a source, in the order of the editions. A paper that is one section of a page gives the URL of the page with no fragment, once for all its sections.
 func officialPapers(corpus *content.Corpus, source string) []string {
 	var out []string
+	seen := map[string]bool{}
 	for _, c := range corpus.Competitions {
 		for _, e := range c.Editions {
 			for _, o := range e.Official {
-				if o.Source == source {
-					out = append(out, o.URL)
+				u, _, _ := strings.Cut(o.URL, "#")
+				if o.Source == source && !seen[u] {
+					seen[u] = true
+					out = append(out, u)
 				}
 			}
 		}
