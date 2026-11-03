@@ -421,3 +421,68 @@ func IMCPapers(page string) []National {
 	})
 	return out
 }
+
+// PAMOListing is the page of the Pan-African Mathematics Olympiad that shows the problems of each year.
+const PAMOListing = "https://pamoofficial.org/problems/"
+
+var (
+	// pamoSectionRE matches the start of the section of one year on the problems page of PAMO: <section class="paper" id="pamo-2025" ...>.
+	pamoSectionRE = regexp.MustCompile(`<section class="paper" id="pamo-((?:19|20)[0-9]{2})"`)
+	// pamoProblemRE matches the start of one problem of a section: <li class="problem" data-n="4">.
+	pamoProblemRE = regexp.MustCompile(`<li class="problem" data-n="([0-9]{1,2})">`)
+	// tagRE matches an HTML tag.
+	tagRE = regexp.MustCompile(`<[^>]*>`)
+)
+
+// PAMOPapers gives the paper of each year of the Pan-African Mathematics Olympiad (pamo) on its problems page. The page holds all the years, and the section of a year holds the six problems of its two days, numbered 1 to 6. So the paper of a year is the section with the id pamo-YEAR, and its URL is the URL of the page with that id as the fragment. A section with no problem gives no paper.
+func PAMOPapers(page string) []National {
+	var out []National
+	seen := map[int]bool{}
+	for _, m := range pamoSectionRE.FindAllStringSubmatch(page, -1) {
+		y, _ := strconv.Atoi(m[1])
+		if seen[y] || len(pamoProblemRE.FindAllString(PAMOSection(page, "pamo-"+m[1]), -1)) == 0 {
+			continue
+		}
+		seen[y] = true
+		out = append(out, National{Competition: "pamo", Year: y, URL: PAMOListing + "#pamo-" + m[1]})
+	}
+	slices.SortStableFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}
+
+// PAMOSection gives the HTML of the section with the id id of the problems page of PAMO, up to the next section. It gives "" when the page has no such section.
+func PAMOSection(page, id string) string {
+	i := strings.Index(page, `<section class="paper" id="`+id+`"`)
+	if i < 0 {
+		return ""
+	}
+	s := page[i+1:]
+	if j := strings.Index(s, `<section class="paper"`); j >= 0 {
+		s = s[:j]
+	}
+	return s
+}
+
+// PAMOText gives the text of the section with the id id of the problems page of PAMO, with each problem as "Problem N." and its statement. The statements keep their TeX. It gives "" when the section has no problem.
+func PAMOText(page, id string) string {
+	s := PAMOSection(page, id)
+	ms := pamoProblemRE.FindAllStringSubmatchIndex(s, -1)
+	var b strings.Builder
+	for i, m := range ms {
+		end := len(s)
+		if i+1 < len(ms) {
+			end = ms[i+1][0]
+		}
+		body := strings.ReplaceAll(s[m[1]:end], "<br>", "\n")
+		body = strings.ReplaceAll(body, "</p>", "\n")
+		body = html.UnescapeString(tagRE.ReplaceAllString(body, " "))
+		var lines []string
+		for _, l := range strings.Split(body, "\n") {
+			if l = strings.Join(strings.Fields(l), " "); l != "" {
+				lines = append(lines, l)
+			}
+		}
+		b.WriteString("Problem " + s[m[2]:m[3]] + ". " + strings.Join(lines, "\n") + "\n\n")
+	}
+	return b.String()
+}

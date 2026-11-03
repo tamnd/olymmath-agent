@@ -409,3 +409,51 @@ func TestIMCPapers(t *testing.T) {
 		t.Errorf("listings: %v", l)
 	}
 }
+
+const pamoPage = `<main id="main">
+<section class="paper" id="pamo-2026" aria-label="PAMO 2026">
+<h2 class="paper-title">PAMO 2026 Problems</h2>
+<div class="paper-day"><h3>Day 1 <span>30 June 2026</span></h3>
+<ol class="problem-list" start="1">
+<li class="problem" data-n="1"><p>Let $ABC$ be a triangle.<br>Show that <span class="nobr">$P(n)&gt;0$.</span></p><p>Find all $n$.</p></li>
+<li class="problem" data-n="2"><p>Find all primes $p$.</p></li>
+</ol></div>
+</section>
+<section class="paper" id="pamo-2011" aria-label="PAMO 2011">
+<h2 class="paper-title">PAMO 2011 Problems</h2>
+</section>
+<section class="paper" id="pamo-2000" aria-label="PAMO 2000">
+<li class="problem" data-n="1"><p>Solve $x^2 = 1$.</p></li>
+</section>
+</main>`
+
+func TestPAMOPapers(t *testing.T) {
+	got := PAMOPapers(pamoPage)
+	want := []National{
+		{"pamo", 2000, "", "https://pamoofficial.org/problems/#pamo-2000"},
+		{"pamo", 2026, "", "https://pamoofficial.org/problems/#pamo-2026"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("paper %d: got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestPAMOText(t *testing.T) {
+	text := PAMOText(pamoPage, "pamo-2026")
+	want := "Problem 1. Let $ABC$ be a triangle.\nShow that $P(n)>0$.\nFind all $n$.\n\nProblem 2. Find all primes $p$.\n\n"
+	if text != want {
+		t.Errorf("got %q, want %q", text, want)
+	}
+	segs := Split(text)
+	if len(segs) != 2 || segs[0].Position != "p1" || segs[1].Position != "p2" || !strings.Contains(segs[1].Text, "primes") {
+		t.Errorf("segments: %+v", segs)
+	}
+	if PAMOText(pamoPage, "pamo-2011") != "" || PAMOText(pamoPage, "pamo-1999") != "" {
+		t.Error("a section with no problem gives text")
+	}
+}
