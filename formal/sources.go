@@ -105,6 +105,15 @@ var Sources = map[string]*Source{
 		Keep: func(rel string) bool { return formalConjecturesFiles[rel] },
 		// The files are support for formal-imo and have no statement.
 		Items: func(string, string) []Item { return nil },
+		Patches: map[string]func(string) string{
+			// Mathlib v4.35.0 has the two lemmas, so the copies here clash with them.
+			"FormalConjecturesForMathlib/Data/Sym/Sym2.lean": func(src string) string {
+				for _, n := range []string{"fst", "snd"} {
+					src = regexp.MustCompile(`(?m)^@\[simp\] lemma `+n+`_out_mk_self .*$`).ReplaceAllString(src, "-- Mathlib "+Mathlib+" has Sym2."+n+"_out_mk_self.")
+				}
+				return src
+			},
+		},
 	},
 }
 
