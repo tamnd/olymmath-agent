@@ -460,6 +460,8 @@ type problemView struct {
 	Label string
 	// Primary is the title of the primary appearance when the view shows the problem in another edition.
 	Primary string
+	// Formal is the formal section, or nil when the problem has no formal statement.
+	Formal *formalView
 }
 
 // alsoView is one other appearance of a problem.
@@ -511,6 +513,7 @@ func (b *builder) view(p *content.Problem) *problemView {
 			v.Also = append(v.Also, alsoView{Title: appearanceTitle(c, a.Locator.Edition, a.Locator.Position), Link: b.link("/" + a.Locator.Comp + "/" + a.Locator.Edition + "/#" + a.Locator.Position)})
 		}
 	}
+	v.Formal = b.formalView(p)
 	for _, q := range b.similar[p] {
 		v.Similar = append(v.Similar, alsoView{Title: problemTitle(q), Link: b.link(problemPath(q))})
 	}

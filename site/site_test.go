@@ -58,10 +58,20 @@ func TestBuildPages(t *testing.T) {
 		"Show the answer",
 		"Day 1",
 		"Number theory",
+		`id="formal"`,
+		"Passed the checks, not reviewed by a person",
+		"Proof checked at Lean v4.35.0 and Mathlib v4.35.0",
+		"live.lean-lang.org/#code=",
 	} {
 		if !strings.Contains(p1, want) {
 			t.Errorf("imo/2024/p1.html has no %q", want)
 		}
+	}
+	if strings.Contains(p1, "Faithful: checked by two people") {
+		t.Error("an agent check shows the statement as faithful")
+	}
+	if strings.Contains(read(t, out, "imo/2024/p2.html"), `id="formal"`) {
+		t.Error("a problem with no formal statement has a formal section")
 	}
 	if !strings.Contains(read(t, out, "sitemap.xml"), "<loc>https://example.org/imo/2024/p1</loc>") {
 		t.Error("the sitemap has no problem page")
