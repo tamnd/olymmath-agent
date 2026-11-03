@@ -47,7 +47,7 @@ func (t Tiers) First(c *content.Competition) bool {
 	return slices.Contains(t.Groups, c.Group) || (c.Country != "" && slices.Contains(t.Countries, c.Country)) || slices.Contains(t.Codes, c.Code)
 }
 
-// Split takes out of the site directory dir the files that are not static assets. It deletes each redirect page of redirects.json, because the Worker answers these paths. It moves to out, at the same relative path, each file of a competition that is not in tier 1 and each machine copy of a problem page. The index pages stay. It gives the number of deleted and moved files.
+// Split takes out of the site directory dir the files that are not static assets. It deletes each redirect page of redirects.json, because the Worker answers these paths. It moves to out, at the same relative path, each file of a competition that is not in tier 1 and each machine copy of a problem page and each API record. The index pages stay. It gives the number of deleted and moved files.
 func Split(dir, out string, corpus *content.Corpus, t Tiers) (deleted, moved int, err error) {
 	b, err := os.ReadFile(filepath.Join(dir, "redirects.json")) // #nosec G304 -- the path is inside the site directory.
 	if err != nil {
@@ -83,6 +83,12 @@ func Split(dir, out string, corpus *content.Corpus, t Tiers) (deleted, moved int
 		}
 	}
 	n, err := moveFiles(dir, out, "p", false)
+	moved += n
+	if err != nil {
+		return deleted, moved, err
+	}
+	// The API records go to R2 too, but the index of the API stays.
+	n, err = moveFiles(dir, out, "api", true)
 	return deleted, moved + n, err
 }
 

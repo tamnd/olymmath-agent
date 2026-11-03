@@ -98,7 +98,9 @@ type builder struct {
 	similar map[*content.Problem][]*content.Problem
 	// rendered keeps the HTML of each Markdown text. A problem shows on its page and on the page of its edition, so each text renders once.
 	rendered map[string]renderedText
-	out      *writer
+	// records gives the records of the API and of the machine copies.
+	records *API
+	out     *writer
 }
 
 // renderedText is the HTML of a Markdown text and the errors of its formulas and figures.
@@ -128,7 +130,7 @@ func newBuilder(corpus *content.Corpus, opts Options) (*builder, error) {
 	if err != nil {
 		return nil, err
 	}
-	b := &builder{corpus: corpus, opts: opts, markup: m, rendered: map[string]renderedText{}}
+	b := &builder{corpus: corpus, opts: opts, markup: m, rendered: map[string]renderedText{}, records: NewAPI(corpus, opts.URL)}
 	if b.asset, err = assetHash(); err != nil {
 		return nil, err
 	}
@@ -185,6 +187,7 @@ func (b *builder) all() error {
 		b.facets,
 		b.searchIndex,
 		b.redirectsJSON,
+		b.api,
 		b.machine,
 	}
 	for _, step := range steps {
@@ -1103,7 +1106,7 @@ func (b *builder) machine() error {
 	for _, c := range b.corpus.Competitions {
 		fmt.Fprintf(&llms, "- [%s](%s/c/%s/): %s\n", c.Name, b.opts.URL, c.Code, c.Description)
 	}
-	fmt.Fprintf(&llms, "\n## Data\n\n- [Search index](%s/search.json): each problem with its locator and its text.\n- Each problem page has a Markdown copy and a JSON copy at the same path with .md and .json, for example [%s/imo/2024/p1.md](%s/imo/2024/p1.md).\n", b.opts.URL, b.opts.URL, b.opts.URL)
+	fmt.Fprintf(&llms, "\n## Data\n\n- [Search index](%s/search.json): each problem with its locator and its text.\n- [API index](%s/api/index.json): the JSON records of the problems, the solutions and the editions, at /api/problem/<tag>.json, /api/solutions/<tag>.json and /api/edition/<competition>/<edition>.json.\n- Each problem page has a Markdown copy and a JSON copy at the same path with .md and .json, for example [%s/imo/2024/p1.md](%s/imo/2024/p1.md).\n", b.opts.URL, b.opts.URL, b.opts.URL, b.opts.URL)
 	if err := b.write("llms.txt", []byte(llms.String())); err != nil {
 		return err
 	}
