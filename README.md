@@ -216,6 +216,17 @@ om anchor -content olymmath -missing tuymaada-official
 
 The archive page of tuymaada.lensky-kray.ru links one English booklet for each day of the mathematics olympiad, from 2018 and from 2020. A booklet holds the four problems of the senior league, then the four problems of the junior league, then the solutions. The first day has the problems 1 to 4 and the second day the problems 5 to 8. So a booklet is two papers with the same URL, `senior` and `junior`, and `om anchor` reads the part of each league from it. The booklets say "© Republic of Sakha (Yakutia) ministry of education and science" and give no licence, so the content only links to them.
 
+The Georg Mohr Contest of Denmark works the same way, with the source `georgmohr`:
+
+```sh
+om papers -content olymmath georgmohr
+om fetch -content olymmath georgmohr
+om import -content olymmath -anchor -comp dk-georgmohr
+om anchor -content olymmath -missing georgmohr
+```
+
+The page georgmohr.dk/gmopg/ lists the papers of the second round, which is the national olympiad, from 1991. A script on the page makes the links from the attributes of a table, so `om papers` reads those attributes. A year gets its paper in English when the page has one, from 2000, and its paper in Danish before that. The Danish papers number the problems "Opgave 1." and so on. The page says that the problems may not be used for commercial purposes, including the training of language models, so the content only links to the papers. The site has no robots.txt.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Link the human solutions

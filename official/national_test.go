@@ -17,10 +17,10 @@ func TestOMSemPapers(t *testing.T) {
 <a href="/static/app_main/problems/om47_3.pdf">III</a>`
 	got := OMSemPapers(page)
 	want := []National{
-		{"pl-om", 1996, "", "https://om.sem.edu.pl/static/app_main/problems/om47_3.pdf"},
-		{"pl-om", 2018, "", "https://om.sem.edu.pl/static/app_main/problems/om69_3.pdf"},
-		{"pl-om", 2018, "stage1", "https://om.sem.edu.pl/static/app_main/problems/om69_1.pdf"},
-		{"pl-om", 2018, "stage2", "https://om.sem.edu.pl/static/app_main/problems/om69_2.pdf"},
+		{"pl-om", 1996, "", "https://om.sem.edu.pl/static/app_main/problems/om47_3.pdf", Lang{}},
+		{"pl-om", 2018, "", "https://om.sem.edu.pl/static/app_main/problems/om69_3.pdf", Lang{}},
+		{"pl-om", 2018, "stage1", "https://om.sem.edu.pl/static/app_main/problems/om69_1.pdf", Lang{}},
+		{"pl-om", 2018, "stage2", "https://om.sem.edu.pl/static/app_main/problems/om69_2.pdf", Lang{}},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %+v, want %+v", got, want)
@@ -191,10 +191,10 @@ func TestUKMTPapers(t *testing.T) {
 <a href="/home/bmo1-2015-solutions.pdf">solutions</a>`
 	got := UKMTPapers(page)
 	want := []National{
-		{"uk-bmo1", 1975, "", "https://bmos.ukmt.org.uk/home/bmo-1975.pdf"},
-		{"uk-bmo1", 2015, "", "https://bmos.ukmt.org.uk/home/bmo1-2015.pdf"},
-		{"uk-bmo2", 1975, "", "https://bmos.ukmt.org.uk/home/fist-1975.pdf"},
-		{"uk-bmo2", 2015, "", "https://bmos.ukmt.org.uk/home/bmo2-2015.pdf"},
+		{"uk-bmo1", 1975, "", "https://bmos.ukmt.org.uk/home/bmo-1975.pdf", Lang{}},
+		{"uk-bmo1", 2015, "", "https://bmos.ukmt.org.uk/home/bmo1-2015.pdf", Lang{}},
+		{"uk-bmo2", 1975, "", "https://bmos.ukmt.org.uk/home/fist-1975.pdf", Lang{}},
+		{"uk-bmo2", 2015, "", "https://bmos.ukmt.org.uk/home/bmo2-2015.pdf", Lang{}},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %+v, want %+v", got, want)
@@ -254,14 +254,14 @@ func TestHBCSEPapers(t *testing.T) {
 	got := HBCSEPapers(page)
 	const u = "https://olympiads.hbcse.tifr.res.in/wp-content/uploads/2026/10/"
 	want := []National{
-		{"in-inmo", 2025, "", u + "inmo-2025.pdf"},
-		{"in-rmo", 2004, "", u + "rmo-2004.pdf"},
-		{"in-rmo", 2013, "paper2", u + "crmo-13-2.pdf"},
-		{"in-rmo", 2015, "mumbai", u + "crmo-15-5.pdf"},
-		{"in-rmo", 2018, "paper1", u + "rmo-2018.pdf"},
-		{"in-rmo", 2018, "paper2", u + "rmo-2018-kl-tn.pdf"},
-		{"in-rmo", 2023, "paper1", u + "rmo-2023-non-kv.pdf"},
-		{"in-rmo", 2023, "paper2", u + "rmo-2023-kv.pdf"},
+		{"in-inmo", 2025, "", u + "inmo-2025.pdf", Lang{}},
+		{"in-rmo", 2004, "", u + "rmo-2004.pdf", Lang{}},
+		{"in-rmo", 2013, "paper2", u + "crmo-13-2.pdf", Lang{}},
+		{"in-rmo", 2015, "mumbai", u + "crmo-15-5.pdf", Lang{}},
+		{"in-rmo", 2018, "paper1", u + "rmo-2018.pdf", Lang{}},
+		{"in-rmo", 2018, "paper2", u + "rmo-2018-kl-tn.pdf", Lang{}},
+		{"in-rmo", 2023, "paper1", u + "rmo-2023-non-kv.pdf", Lang{}},
+		{"in-rmo", 2023, "paper2", u + "rmo-2023-kv.pdf", Lang{}},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %+v, want %+v", got, want)
@@ -284,10 +284,10 @@ func TestIMOJPPapers(t *testing.T) {
 	got := IMOJPPapers(page)
 	const u = "https://www.imojp.org/archive/"
 	want := []National{
-		{"jp-jjmo", 2009, "", u + "mo2009/jjmo2009/problems/jjmo7mq.html"},
-		{"jp-jmo", 2016, "", u + "mo2016/jmo2016/problems/jmo26mq.html"},
-		{"jp-jmo", 2026, "", u + "mo2026/jmo/problems/jmo36hq.pdf"},
-		{"jp-jmo", 2026, "prelim", u + "mo2026/jmo/problems/jmo36yqa.pdf"},
+		{"jp-jjmo", 2009, "", u + "mo2009/jjmo2009/problems/jjmo7mq.html", Lang{}},
+		{"jp-jmo", 2016, "", u + "mo2016/jmo2016/problems/jmo26mq.html", Lang{}},
+		{"jp-jmo", 2026, "", u + "mo2026/jmo/problems/jmo36hq.pdf", Lang{}},
+		{"jp-jmo", 2026, "prelim", u + "mo2026/jmo/problems/jmo36yqa.pdf", Lang{}},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %+v, want %+v", got, want)
@@ -338,8 +338,8 @@ func TestAMTPapers(t *testing.T) {
 	got := AMTPapers(page)
 	const u = "https://amt.edu.au/wp-content/uploads/"
 	want := []National{
-		{"au-amo", 2016, "", u + "2019/02/2016-AMO-Paper-and-Solutions.pdf"},
-		{"au-amo", 2020, "", u + "2020/05/AMO-2020-paper-and-solutions.pdf"},
+		{"au-amo", 2016, "", u + "2019/02/2016-AMO-Paper-and-Solutions.pdf", Lang{}},
+		{"au-amo", 2020, "", u + "2020/05/AMO-2020-paper-and-solutions.pdf", Lang{}},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %+v, want %+v", got, want)
@@ -361,11 +361,11 @@ func TestVTRMCPapers(t *testing.T) {
 	got := VTRMCPapers(page)
 	const u = "https://intranet.math.vt.edu/vtrmc/exams/"
 	want := []National{
-		{"vtrmc", 1979, "", u + "1st%20VTRMC.pdf"},
-		{"vtrmc", 2009, "", u + "31st%20VTRMC.pdf"},
-		{"vtrmc", 2010, "", u + "32nd%20VTRMC.pdf"},
-		{"vtrmc", 2011, "", u + "33rd%20VTRMC.pdf"},
-		{"vtrmc", 2022, "", u + "42nd%20VTRMC.pdf"},
+		{"vtrmc", 1979, "", u + "1st%20VTRMC.pdf", Lang{}},
+		{"vtrmc", 2009, "", u + "31st%20VTRMC.pdf", Lang{}},
+		{"vtrmc", 2010, "", u + "32nd%20VTRMC.pdf", Lang{}},
+		{"vtrmc", 2011, "", u + "33rd%20VTRMC.pdf", Lang{}},
+		{"vtrmc", 2022, "", u + "42nd%20VTRMC.pdf", Lang{}},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %+v, want %+v", got, want)
@@ -393,10 +393,10 @@ func TestIMCPapers(t *testing.T) {
 	got := IMCPapers(page)
 	const u = "https://www.imc-math.org.uk/archive/problems/"
 	want := []National{
-		{"imc", 1994, "", u + "1994/IMC_1994_Problems_and_Solutions.pdf"},
-		{"imc", 2012, "day1", u + "2012/IMC_2012_Day_1_Problems.pdf"},
-		{"imc", 2016, "day2", u + "2016/IMC_2016_Day_2_Questions.pdf"},
-		{"imc", 2025, "day1", u + "2025/IMC_2025_Day_1_Solutions.pdf"},
+		{"imc", 1994, "", u + "1994/IMC_1994_Problems_and_Solutions.pdf", Lang{}},
+		{"imc", 2012, "day1", u + "2012/IMC_2012_Day_1_Problems.pdf", Lang{}},
+		{"imc", 2016, "day2", u + "2016/IMC_2016_Day_2_Questions.pdf", Lang{}},
+		{"imc", 2025, "day1", u + "2025/IMC_2025_Day_1_Solutions.pdf", Lang{}},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %+v, want %+v", got, want)
@@ -431,8 +431,8 @@ const pamoPage = `<main id="main">
 func TestPAMOPapers(t *testing.T) {
 	got := PAMOPapers(pamoPage)
 	want := []National{
-		{"pamo", 2000, "", "https://pamoofficial.org/problems/#pamo-2000"},
-		{"pamo", 2026, "", "https://pamoofficial.org/problems/#pamo-2026"},
+		{"pamo", 2000, "", "https://pamoofficial.org/problems/#pamo-2000", Lang{}},
+		{"pamo", 2026, "", "https://pamoofficial.org/problems/#pamo-2026", Lang{}},
 	}
 	if len(got) != len(want) {
 		t.Fatalf("got %+v, want %+v", got, want)
@@ -493,5 +493,36 @@ func TestTuymaadaPart(t *testing.T) {
 	}
 	if TuymaadaPart("no leagues", "senior") != "" {
 		t.Error("a text with no league gives a part")
+	}
+}
+
+func TestGeorgMohrPapers(t *testing.T) {
+	page := `<table class="table-gen" style="text-align:center"
+paths="gm$$opg.pdf gm$$pb.pdf gm$$loes.pdf gm$$retvejl.pdf"
+  from="1991 2000 1991 2008" to="2026"
+>`
+	got := GeorgMohrPapers(page)
+	if len(got) != 36 {
+		t.Fatalf("got %d papers, want 36", len(got))
+	}
+	first, en, last := got[0], got[9], got[35]
+	if first.Year != 1991 || first.URL != GeorgMohrListing+"gm91opg.pdf" || first.Lang != Danish {
+		t.Errorf("first = %+v", first)
+	}
+	if en.Year != 2000 || en.URL != GeorgMohrListing+"gm00pb.pdf" || en.Lang.Code != "" {
+		t.Errorf("2000 = %+v", en)
+	}
+	if last.Year != 2026 || last.URL != GeorgMohrListing+"gm26pb.pdf" || last.Competition != "dk-georgmohr" {
+		t.Errorf("last = %+v", last)
+	}
+	if GeorgMohrPapers("<table>") != nil {
+		t.Error("a page with no table gives papers")
+	}
+}
+
+func TestSplitOpgave(t *testing.T) {
+	segs := Split("Opgaver · 1991\n\nOpgave 1. Beskriv mængden.\n\nOpgave 2. Bevis at x > 0.\n")
+	if len(segs) != 2 || segs[1].Position != "p2" || segs[1].Text != "Bevis at x > 0." {
+		t.Errorf("segments = %+v", segs)
 	}
 }
