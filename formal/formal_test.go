@@ -228,6 +228,10 @@ func TestPortPatch(t *testing.T) {
 	if Diff("x", "a", "a") != "" {
 		t.Fatal("a diff of equal texts")
 	}
+	sym := "@[simp] lemma fst_out_mk_self : (Quot.out s(a, a)).1 = a := by simpa using out_fst_mem s(a, a)\n@[simp] lemma snd_out_mk_self : (Quot.out s(a, a)).2 = a := by simpa using out_snd_mem s(a, a)\n"
+	if got := Sources["formal-conjectures"].Patches["FormalConjecturesForMathlib/Data/Sym/Sym2.lean"](sym); got != "-- Mathlib v4.35.0 has Sym2.fst_out_mk_self.\n-- Mathlib v4.35.0 has Sym2.snd_out_mk_self.\n" {
+		t.Fatalf("sym2 patch: %q", got)
+	}
 	if !Sources["formal-conjectures"].Keep("FormalConjecturesForMathlib/Geometry/2d.lean") || Sources["formal-conjectures"].Keep("FormalConjectures/Paper/X.lean") {
 		t.Fatal("keep")
 	}
