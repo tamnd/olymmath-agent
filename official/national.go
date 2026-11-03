@@ -700,8 +700,8 @@ func MOListings(last int) []string {
 }
 
 var (
-	// moFinalRE matches the link to the file of the final round of category A of one olympiad, with the problems and their solutions in Czech: a57iii.pdf is the third round of the 57th olympiad, which was the final. From the 73rd olympiad the final is the fourth round, a73iv.pdf, and a73iii.pdf is the regional round.
-	moFinalRE = regexp.MustCompile(`href="(/media/[0-9]+/a([0-9]{2})(iii|iv)\.pdf)"`)
+	// moFinalRE matches the link to the file of the final round of category A of one olympiad, with the problems and their solutions in Czech: a57iii.pdf is the third round of the 57th olympiad, which was the final. From the 73rd olympiad the final is the fourth round, a73iv.pdf, and a73iii.pdf is the regional round. The finals of the 68th and 69th olympiads are named a68iii-web.pdf and a69iii-web.pdf.
+	moFinalRE = regexp.MustCompile(`href="(/media/[0-9]+/a([0-9]{2})(iii|iv)(?:-web)?\.pdf)"`)
 	// moNumberRE matches the number at the start of a problem: "3." at the start of a line, with at most two spaces before it. A numbered list in a solution has more.
 	moNumberRE = regexp.MustCompile(`^\f*[ \t]{0,2}([1-9])\.\s`)
 	// moSkipRE matches a line that starts a part of the file with no problem: a solution, or the header of a page.

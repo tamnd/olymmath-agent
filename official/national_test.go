@@ -566,10 +566,12 @@ func TestOPMPart(t *testing.T) {
 
 func TestMOPapers(t *testing.T) {
 	page := `<a href="/media/1/a57i.pdf">A</a><a href="/media/2/a57iii.pdf">A</a><a href="/media/3/a57iiiv.pdf">list</a>` +
-		`<a href="/media/4/a73iii.pdf">A</a><a href="/media/5/a73iv.pdf">A</a><a href="/media/6/b73iv.pdf">B</a>`
+		`<a href="/media/4/a73iii.pdf">A</a><a href="/media/5/a73iv.pdf">A</a><a href="/media/6/b73iv.pdf">B</a>` +
+		`<a href="/media/7/a68iii-web.pdf">A</a><a href="/media/8/a68list-cz.pdf">list</a>`
 	got := MOPapers(page)
 	want := []National{
 		{Competition: "cz-sk-mo", Year: 2008, URL: "https://www.matematickaolympiada.cz/media/2/a57iii.pdf"},
+		{Competition: "cz-sk-mo", Year: 2019, URL: "https://www.matematickaolympiada.cz/media/7/a68iii-web.pdf"},
 		{Competition: "cz-sk-mo", Year: 2024, URL: "https://www.matematickaolympiada.cz/media/5/a73iv.pdf"},
 	}
 	if !slices.Equal(got, want) {
