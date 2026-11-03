@@ -112,13 +112,33 @@ func segments(ctx context.Context, st *store.Store, source, hash string, shape c
 	if English(lang) {
 		lang = ""
 	}
+	through := o.Paper != "" && numberedThrough(shape, o.Paper, segs)
 	for i := range segs {
 		segs[i].Lang, segs[i].URL = lang, o.URL
-		if o.Paper != "" {
+		if o.Paper != "" && !through {
 			segs[i].Position = inPaper(shape, o.Paper, segs[i].Position)
 		}
 	}
 	return segs, nil
+}
+
+// numberedThrough reports whether a paper of the layout numbers its problems through the edition, as the second day of the IMC does with the problems 6 to 10. That is so when the first position of the paper is not p1 and the number of each segment is a position of the paper. Then each segment keeps its number as its position.
+func numberedThrough(shape content.Shape, id string, segs []Segment) bool {
+	for _, l := range shape.Layout {
+		if l.Paper != id {
+			continue
+		}
+		if len(l.Positions) == 0 || l.Positions[0] == "p1" || len(segs) == 0 {
+			return false
+		}
+		for _, sg := range segs {
+			if !slices.Contains(l.Positions, sg.Position) {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }
 
 // inPaper gives the position of the edition for the position pos, such as p2, of the paper id of the layout. It gives "" when the layout has no such paper or position.

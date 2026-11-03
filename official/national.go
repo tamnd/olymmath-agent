@@ -370,3 +370,54 @@ func ordinal(n int) string {
 	}
 	return strconv.Itoa(n) + suffix
 }
+
+// IMCFirst is the first year of the International Mathematics Competition for University Students.
+const IMCFirst = 1994
+
+// IMCListings gives the problems page of each year of the IMC from 1994 to the year last.
+func IMCListings(last int) []string {
+	var out []string
+	for y := IMCFirst; y <= last; y++ {
+		out = append(out, "https://www.imc-math.org.uk/?year="+strconv.Itoa(y)+"&item=problems")
+	}
+	return out
+}
+
+// imcRE matches the link to a file of the problems of one year or one day of the IMC: IMC_1994_Problems_and_Solutions.pdf, IMC_2012_Day_1_Problems.pdf, IMC_2016_Day_2_Questions.pdf or IMC_2025_Day_1_Solutions.pdf.
+var imcRE = regexp.MustCompile(`href="(?:https://www\.imc-math\.org\.uk)?(/archive/problems/((?:19|20)[0-9]{2})/IMC_[0-9]{4}_(?:Day_([12])_)?(Problems_and_Solutions|Problems|Questions|Solutions)\.pdf)"`)
+
+// imcRank gives the order of preference of the kinds of file of the IMC. A Questions file is the paper of the day, made with TeX. A Problems file of 2015 to 2017 is a print of the web page, and its text is cut at the right edge, so it comes second. The solutions come last, and they state the problems too.
+var imcRank = map[string]int{"Questions": 0, "Problems": 1, "Problems_and_Solutions": 2, "Solutions": 3}
+
+// IMCPapers gives the papers of the International Mathematics Competition for University Students (imc) on its problems pages. The IMC has two days, and the paper of day N has the id dayN. A year with one file for both days has a paper with no id, which holds all the positions.
+func IMCPapers(page string) []National {
+	type key struct {
+		year  int
+		paper string
+	}
+	best := map[key]string{}
+	rank := map[key]int{}
+	for _, m := range imcRE.FindAllStringSubmatch(page, -1) {
+		y, _ := strconv.Atoi(m[2])
+		k := key{y, ""}
+		if m[3] != "" {
+			k.paper = "day" + m[3]
+		}
+		if r, ok := rank[k]; ok && r <= imcRank[m[4]] {
+			continue
+		}
+		rank[k] = imcRank[m[4]]
+		best[k] = "https://www.imc-math.org.uk" + m[1]
+	}
+	out := make([]National, 0, len(best))
+	for k, u := range best {
+		out = append(out, National{Competition: "imc", Year: k.year, Paper: k.paper, URL: u})
+	}
+	slices.SortStableFunc(out, func(a, b National) int {
+		if a.Year != b.Year {
+			return a.Year - b.Year
+		}
+		return strings.Compare(a.Paper, b.Paper)
+	})
+	return out
+}

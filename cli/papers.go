@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official)", runPapers})
+	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official)", runPapers})
 }
 
 func runPapers(env Env, args []string) int {
@@ -31,8 +31,8 @@ func runPapers(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official"}, pos[0]) {
-		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official")
+	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official"}, pos[0]) {
+		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -55,7 +55,7 @@ func runPapers(env Env, args []string) int {
 	switch pos[0] {
 	case "usa-tst-archive":
 		return tstPapers(ctx, env, fc, corpus, *root, *from, *to)
-	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official":
+	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official":
 		return nationalPapers(ctx, env, fc, corpus, *root, pos[0], *from, *to)
 	}
 	comp := corpus.Competition("imo")
@@ -143,6 +143,7 @@ var nationals = map[string]struct {
 	"imojp":            {official.IMOJPListings, content.OfficialPaper{Lang: "Japanese", Code: "ja"}, official.IMOJPPapers},
 	"amt":              {[]string{official.AMTListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.AMTPapers},
 	"vtrmc-official":   {[]string{official.VTRMCListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.VTRMCPapers},
+	"imc-official":     {official.IMCListings(time.Now().Year()), content.OfficialPaper{Lang: "English", Code: "en"}, official.IMCPapers},
 }
 
 // nationalPapers records the papers of a national source from its listing page. It writes the edition file when the corpus does not have the edition. The papers of one edition replace the papers of the source in the edition file, and the papers of other sources stay. Then om fetch SOURCE gets the papers into the store.
