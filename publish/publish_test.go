@@ -133,6 +133,9 @@ func TestSplit(t *testing.T) {
 	write(t, dir, "nz/2020/index.html", "edition")
 	write(t, dir, "nz/2020/p1.html", "problem")
 	write(t, dir, "nz/2020/p1.json", "{}")
+	write(t, dir, "api/index.json", "{}")
+	write(t, dir, "api/problem/ABC.json", "{}")
+	write(t, dir, "api/edition/imo/2024.json", "{}")
 	corpus := &content.Corpus{Competitions: []*content.Competition{
 		{Code: "imo", Group: "international"},
 		{Code: "isl", Group: "international"},
@@ -140,15 +143,15 @@ func TestSplit(t *testing.T) {
 	}}
 	tiers := Tiers{Groups: []string{"international"}, Countries: []string{"US"}}
 	deleted, moved, err := Split(dir, out, corpus, tiers)
-	if err != nil || deleted != 2 || moved != 4 {
+	if err != nil || deleted != 2 || moved != 6 {
 		t.Fatalf("%d %d %v", deleted, moved, err)
 	}
-	for _, rel := range []string{"imo/2024/p1.html", "imo/2024/index.json", "nz/index.html", "nz/2020/index.html"} {
+	for _, rel := range []string{"imo/2024/p1.html", "imo/2024/index.json", "nz/index.html", "nz/2020/index.html", "api/index.json"} {
 		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
 			t.Errorf("%s: %v", rel, err)
 		}
 	}
-	for _, rel := range []string{"nz/2020/p1.html", "nz/2020/p1.json", "imo/2024/p1.md", "p/XYZ.json"} {
+	for _, rel := range []string{"nz/2020/p1.html", "nz/2020/p1.json", "imo/2024/p1.md", "p/XYZ.json", "api/problem/ABC.json", "api/edition/imo/2024.json"} {
 		if _, err := os.Stat(filepath.Join(out, rel)); err != nil {
 			t.Errorf("%s did not move: %v", rel, err)
 		}

@@ -4,68 +4,37 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-
-	"github.com/tamnd/olymmath-agent/content"
 )
-
-// copySource is the source of a text in a machine copy.
-type copySource struct {
-	Name   string `json:"name"`
-	URL    string `json:"url,omitempty"`
-	Page   int    `json:"page,omitempty"`
-	Origin string `json:"origin,omitempty"`
-	Zone   string `json:"zone,omitempty"`
-}
-
-// copySolution is one solution in a machine copy. Text is empty when the terms of the source allow only a link.
-type copySolution struct {
-	Origin string `json:"origin"`
-	Author string `json:"author,omitempty"`
-	Source string `json:"source,omitempty"`
-	URL    string `json:"url,omitempty"`
-	Zone   string `json:"zone,omitempty"`
-	Text   string `json:"text,omitempty"`
-}
 
 // problemCopy is the JSON copy of a problem page. It has the same facts and texts as the HTML page.
 type problemCopy struct {
-	Tag         string         `json:"tag"`
-	Locator     string         `json:"locator,omitempty"`
-	URL         string         `json:"url"`
-	Title       string         `json:"title"`
-	Competition string         `json:"competition,omitempty"`
-	Year        int            `json:"year,omitempty"`
-	Position    string         `json:"position,omitempty"`
-	Type        string         `json:"type,omitempty"`
-	Topics      []string       `json:"topics,omitempty"`
-	Band        int            `json:"band,omitempty"`
-	Statement   string         `json:"statement"`
-	Source      copySource     `json:"source"`
-	Official    *copySource    `json:"official,omitempty"`
-	Answer      string         `json:"answer,omitempty"`
-	Solutions   []copySolution `json:"solutions"`
-	Status      string         `json:"status,omitempty"`
+	Tag         string        `json:"tag"`
+	Locator     string        `json:"locator,omitempty"`
+	URL         string        `json:"url"`
+	Title       string        `json:"title"`
+	Competition string        `json:"competition,omitempty"`
+	Year        int           `json:"year,omitempty"`
+	Position    string        `json:"position,omitempty"`
+	Type        string        `json:"type,omitempty"`
+	Topics      []string      `json:"topics,omitempty"`
+	Band        int           `json:"band,omitempty"`
+	Statement   string        `json:"statement"`
+	Source      SourceRef     `json:"source"`
+	Official    *SourceRef    `json:"official,omitempty"`
+	Answer      string        `json:"answer,omitempty"`
+	Solutions   []SolutionRef `json:"solutions"`
+	Status      string        `json:"status,omitempty"`
 }
 
-func toCopySource(s content.Source) copySource {
-	return copySource{Name: s.Name, URL: s.URL, Page: s.Page, Origin: s.Origin, Zone: s.Zone}
-}
-
-// copies writes the machine copies of a problem page: the same path with .md and .json.
+// copies writes the machine copies of a problem page: the same path with .md and .json. The JSON copy has the fields of the API records of the problem.
 func (b *builder) copies(v *problemView, p string) error {
+	r, sol := b.records.Problem(v.Problem), b.records.Solutions(v.Problem)
 	c := problemCopy{
-		Tag: v.Tag, Locator: v.Locator(), URL: b.opts.URL + p, Title: v.Title,
-		Competition: v.Competition, Year: v.Year, Position: v.Position, Type: v.Type,
-		Topics: v.Topics, Band: v.Band(), Statement: v.Problem.Statement,
-		Source: toCopySource(v.Source), Answer: v.Problem.Answer, Status: v.Status.Statement,
-		Solutions: []copySolution{},
-	}
-	if v.Official != nil {
-		o := toCopySource(*v.Official)
-		c.Official = &o
-	}
-	for _, s := range v.Solutions {
-		c.Solutions = append(c.Solutions, copySolution{Origin: s.Origin, Author: s.Author.Display, Source: s.SourceName, URL: s.URL, Zone: s.Zone, Text: s.Solution.Body})
+		Tag: r.Tag, Locator: r.Locator, URL: r.URL, Title: r.Title,
+		Competition: r.Competition, Year: r.Year, Position: r.Position, Type: r.Type,
+		Topics: r.Topics, Band: r.Band, Statement: r.Statement,
+		Source: r.Source, Official: r.Official, Answer: sol.Answer, Status: r.Status,
+		Solutions: sol.Solutions,
 	}
 	data, err := json.MarshalIndent(c, "", "  ")
 	if err != nil {
@@ -129,7 +98,7 @@ func problemMarkdown(c problemCopy) string {
 	return m.String()
 }
 
-func sourceLine(s copySource) string {
+func sourceLine(s SourceRef) string {
 	line := s.Name
 	if s.URL != "" {
 		line = "[" + s.Name + "](" + s.URL + ")"
