@@ -71,6 +71,8 @@ om export hf -content olymmath -out build/hf
 
 `om publish hf` pushes the export to the dataset `tamnd/olymmath` with the `hf` program of `huggingface_hub`. It runs only with `-confirm` and a token in `HF_TOKEN`.
 
+The workflow `.github/workflows/export.yml` runs both commands. It is off for now. It has no schedule, and it does nothing until the secret `HF_TOKEN` exists. Its header says how to turn on the weekly run.
+
 ## Edit the content
 
 To add a problem, a solution or a tag, use these commands:

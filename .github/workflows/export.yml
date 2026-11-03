@@ -1,0 +1,62 @@
+name: export
+
+# Build the Parquet export of olymmath and push it to the dataset tamnd/olymmath on Hugging Face (spec 10.7 and 11.5).
+# The workflow is off. It has no schedule, so it runs only by hand. Each step after the checkout also needs the secret HF_TOKEN, so a run does nothing until the maintainer adds it.
+# To turn on the weekly export, add the secret HF_TOKEN and put back the schedule:
+#   schedule:
+#     - cron: "17 3 * * 1"
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: export-hf
+  cancel-in-progress: false
+
+jobs:
+  hf:
+    name: export to Hugging Face
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - name: check the token
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "The secret HF_TOKEN is not set, so the export does nothing."
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.HF_TOKEN != ''
+        with:
+          persist-credentials: false
+          repository: tamnd/olymmath
+          ref: main
+          path: content
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.HF_TOKEN != ''
+        with:
+          persist-credentials: false
+          path: toolchain
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        if: env.HF_TOKEN != ''
+        with:
+          go-version-file: toolchain/go.mod
+          cache-dependency-path: toolchain/go.sum
+      - name: build om
+        if: env.HF_TOKEN != ''
+        working-directory: toolchain
+        run: go build -trimpath -o "$RUNNER_TEMP/om" ./cmd/om
+      - name: build the export
+        if: env.HF_TOKEN != ''
+        working-directory: content
+        run: '"$RUNNER_TEMP/om" export hf -content . -out build/hf -commit "$(git rev-parse HEAD)"'
+      - name: install the hf program
+        if: env.HF_TOKEN != ''
+        run: pipx install "huggingface_hub==0.34.4"
+      - name: push the export
+        if: env.HF_TOKEN != ''
+        working-directory: content
+        run: '"$RUNNER_TEMP/om" publish hf -dir build/hf -repo tamnd/olymmath -confirm'
