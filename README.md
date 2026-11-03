@@ -249,6 +249,17 @@ om anchor -content olymmath -missing mo-cz
 
 The site matematickaolympiada.cz has a page for each olympiad from the 43rd, which ended in 1994, but none for the 45th and the 46th. The nth olympiad ends in the year 1951 + n. The positions of `cz-sk-mo` are the problems of the final round of category A. Its file is a57iii.pdf, the third round, up to the 72nd olympiad, and a73iv.pdf, the fourth round, from the 73rd. The file is in Czech and has the solutions too. A solution or the header of a page hides the text up to the line with the next number, and a number with more than two spaces before it is part of a list. The pages state no licence, so the content only links to the papers. The robots.txt allows all paths.
 
+The ELMO works the same way, with the source `elmo-official`:
+
+```sh
+om papers -content olymmath elmo-official
+om fetch -content olymmath elmo-official
+om import -content olymmath -anchor -comp elmo
+om anchor -content olymmath -missing elmo-official
+```
+
+The problems page of the ELMO site, elmo.evanchen.cc, links the paper of each year from 2010, at web.evanchen.cc/exams/ELMO-YYYY.pdf. The paper of 2015 is only an attachment on AoPS, so `om papers` leaves it out. The files of the shortlist, the solutions and the ELSMO have other names. The papers number the problems 1 to 6, with or without the word Problem. The pages state no licence, so the content only links to the papers. The robots.txt of both hosts has no rule.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Link the human solutions
