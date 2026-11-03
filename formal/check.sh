@@ -31,6 +31,7 @@ echo "built $(wc -l < "$out/$lib.built") of $(cut -f1 "$targets" | sort -u | wc 
   while read -r m; do echo "import $m"; done < "$out/$lib.built"
   echo
   echo "set_option maxHeartbeats 40000"
+  echo "set_option maxErrors 1000000"
   awk -F'\t' 'NR==FNR{ok[$1]=1;next} ok[$1] && $3=="statement"{print $2}' "$out/$lib.built" "$targets" | sort -u | while read -r d; do
     echo "example : type_of% @$d := by first | trivial | rfl | decide | simp -- om-check $d trivial-goal"
     echo "example : type_of% @$d := by intros; exfalso; first | contradiction | (simp_all; done) | omega | (norm_num at *; done) | linarith -- om-check $d contradictory"

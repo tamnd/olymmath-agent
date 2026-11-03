@@ -45,6 +45,8 @@ type Source struct {
 	Options map[string]string
 	// InMathlib means that the files are part of the pinned Mathlib, so the package builds them from the Mathlib dependency and the lakefile has no library for them. The vendored copy keeps the text that the records quote.
 	InMathlib bool
+	// Patches port files of the source to the pinned toolchain, by path relative to the clone. Each one gives the new text of the file. The import writes the diff of the port to PortPath, and each record of the source names it.
+	Patches map[string]func(src string) string
 }
 
 // Sources are the Lean sources that om imports, by id.
@@ -82,6 +84,12 @@ var Sources = map[string]*Source{
 			return rel == "LICENSE" || (strings.HasPrefix(rel, "Imo/") && strings.HasSuffix(rel, ".lean"))
 		},
 		Items: formalImoItems,
+		Patches: map[string]func(string) string{
+			// formal-imo imports Answer by its old module name. At the commit of formal-conjectures that the package vendors, the module is FormalConjecturesUtil.Answer.
+			"Imo/ProblemImports.lean": func(src string) string {
+				return strings.Replace(src, "import FormalConjectures.Util.Answer\n", "import FormalConjecturesUtil.Answer\n", 1)
+			},
+		},
 	},
 	"putnambench": {
 		ID: "putnambench", Name: "PutnamBench", Repo: "https://github.com/trishullab/PutnamBench", Licence: "Apache-2.0", Rank: 5,
@@ -91,6 +99,26 @@ var Sources = map[string]*Source{
 		},
 		Items: putnamItems,
 	},
+	"formal-conjectures": {
+		ID: "formal-conjectures", Name: "formal-conjectures (support files)", Repo: "https://github.com/google-deepmind/formal-conjectures", Licence: "Apache-2.0", Rank: 6,
+		Lib: "FormalConjectures", Roots: []string{"FormalConjecturesUtil", "FormalConjecturesForMathlib"},
+		Keep: func(rel string) bool { return formalConjecturesFiles[rel] },
+		// The files are support for formal-imo and have no statement.
+		Items: func(string, string) []Item { return nil },
+	},
+}
+
+// formalConjecturesFiles are the files of formal-conjectures that formal-imo needs, with the files that they import.
+var formalConjecturesFiles = map[string]bool{
+	"LICENSE":                                                 true,
+	"FormalConjecturesUtil/Answer.lean":                       true,
+	"FormalConjecturesUtil/Answer/Syntax.lean":                true,
+	"FormalConjecturesForMathlib/Data/Set/Triplewise.lean":    true,
+	"FormalConjecturesForMathlib/Data/Sym/Sym2.lean":          true,
+	"FormalConjecturesForMathlib/Geometry/Metric.lean":        true,
+	"FormalConjecturesForMathlib/Geometry/2d.lean":            true,
+	"FormalConjecturesForMathlib/Geometry/3d.lean":            true,
+	"FormalConjecturesForMathlib/Logic/Equiv/Fin/Rotate.lean": true,
 }
 
 // Order is the order of the sources by rank.

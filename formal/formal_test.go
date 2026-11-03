@@ -214,3 +214,30 @@ func TestRecordAndFidelity(t *testing.T) {
 		t.Fatalf("after a flag: %+v", fm.Fidelity)
 	}
 }
+
+func TestPortPatch(t *testing.T) {
+	src := "import Mathlib\nimport FormalConjectures.Util.Answer\nimport Imo.ProblemImports.Attributes\n"
+	got := Sources["formal-imo"].Patches["Imo/ProblemImports.lean"](src)
+	if !strings.Contains(got, "import FormalConjecturesUtil.Answer\n") || strings.Contains(got, "FormalConjectures.Util") {
+		t.Fatalf("patch: %q", got)
+	}
+	want := "--- a/x.lean\n+++ b/x.lean\n@@ -2 +2 @@\n-import FormalConjectures.Util.Answer\n+import FormalConjecturesUtil.Answer\n"
+	if d := Diff("x.lean", src, got); d != want {
+		t.Fatalf("diff:\n%s", d)
+	}
+	if Diff("x", "a", "a") != "" {
+		t.Fatal("a diff of equal texts")
+	}
+	if !Sources["formal-conjectures"].Keep("FormalConjecturesForMathlib/Geometry/2d.lean") || Sources["formal-conjectures"].Keep("FormalConjectures/Paper/X.lean") {
+		t.Fatal("keep")
+	}
+}
+
+func TestParseChecksStopped(t *testing.T) {
+	src := "import A\n\nexample : True := by trivial -- om-check A.x trivial-goal\nexample : True := by trivial -- om-check A.y trivial-goal\nexample : True := by trivial -- om-check A.z trivial-goal\n"
+	out := "f.lean:3:1: error: unsolved goals\nf.lean:4:1: error: maximum number of errors (100; from option `maxErrors`) reached, exiting\n"
+	flags, checked := ParseChecks(src, out)
+	if !checked["A.x"] || checked["A.y"] || checked["A.z"] || len(flags) != 0 {
+		t.Fatalf("flags %v checked %v", flags, checked)
+	}
+}
