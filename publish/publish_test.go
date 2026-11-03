@@ -3,6 +3,7 @@ package publish
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"maps"
 	"net/http"
@@ -340,5 +341,47 @@ func TestMoveFolders(t *testing.T) {
 	}
 	if !maps.Equal(gotOut, wantOut) {
 		t.Errorf("out has %v, want %v", gotOut, wantOut)
+	}
+}
+
+func TestPackShards(t *testing.T) {
+	in, out, index := t.TempDir(), t.TempDir(), t.TempDir()
+	for i := range ShardFiles + 1 {
+		write(t, in, fmt.Sprintf("api/problem/%d.json", i), fmt.Sprintf("{%d}", i))
+	}
+	res, err := Pack(in, out, index)
+	if err != nil || res.Packs != Shards {
+		t.Fatalf("%+v %v", res, err)
+	}
+	read := func() PackIndex {
+		var ix PackIndex
+		b, err := os.ReadFile(filepath.Join(index, "api.json"))
+		if err != nil || json.Unmarshal(b, &ix) != nil {
+			t.Fatal(err)
+		}
+		return ix
+	}
+	ix := read()
+	if ix.Pack != "" || len(ix.Packs) != Shards {
+		t.Fatalf("pack %q, %d shards", ix.Pack, len(ix.Packs))
+	}
+	e := ix.Files["problem/7.json"]
+	pack, err := os.ReadFile(filepath.Join(out, filepath.FromSlash(ix.Packs[e.Shard])))
+	if err != nil || string(pack[e.Offset:e.Offset+e.Length]) != "{7}" {
+		t.Fatalf("problem/7.json gives %q, %v", pack[e.Offset:e.Offset+e.Length], err)
+	}
+	// A change of one file changes only its own shard.
+	write(t, in, "api/problem/7.json", "{new}")
+	if _, err := Pack(in, t.TempDir(), index); err != nil {
+		t.Fatal(err)
+	}
+	changed := 0
+	for i, k := range read().Packs {
+		if k != ix.Packs[i] {
+			changed++
+		}
+	}
+	if changed != 1 {
+		t.Errorf("one changed file changes %d shards", changed)
 	}
 }
