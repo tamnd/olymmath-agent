@@ -746,3 +746,25 @@ func MOPart(text, _ string) string {
 	}
 	return b.String()
 }
+
+// ELMOListing is the page of the ELMO site that lists the papers of each year.
+const ELMOListing = "https://elmo.evanchen.cc/problems.html"
+
+// elmoRE matches the link to the paper of one year of the ELMO: ELMO-2019.pdf. The files of the shortlist, the solutions, the ELSMO and the awards have other names.
+var elmoRE = regexp.MustCompile(`href="(https://web\.evanchen\.cc/exams/ELMO-((?:19|20)[0-9]{2})\.pdf)"`)
+
+// ELMOPapers gives the paper of each year of the ELMO (elmo) on the problems page of its site. The paper holds the six problems of the two days, numbered 1 to 6. A year whose paper is only an attachment on AoPS gives no paper.
+func ELMOPapers(page string) []National {
+	var out []National
+	seen := map[int]bool{}
+	for _, m := range elmoRE.FindAllStringSubmatch(page, -1) {
+		y, _ := strconv.Atoi(m[2])
+		if seen[y] {
+			continue
+		}
+		seen[y] = true
+		out = append(out, National{Competition: "elmo", Year: y, URL: m[1]})
+	}
+	slices.SortFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}

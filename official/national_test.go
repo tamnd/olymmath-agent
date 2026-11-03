@@ -589,3 +589,18 @@ func TestMOPart(t *testing.T) {
 		t.Errorf("segments = %+v", segs)
 	}
 }
+
+func TestELMOPapers(t *testing.T) {
+	page := `<a href="https://web.evanchen.cc/exams/ELMO-2019.pdf">P</a><a href="https://web.evanchen.cc/exams/ELMO-2019-SL.pdf">SL</a>` +
+		`<a href="https://web.evanchen.cc/exams/ELMO-2010.pdf">P</a><a href="https://web.evanchen.cc/exams/ELMO-2010-sols.pdf">S</a>` +
+		`<a href="https://web.evanchen.cc/exams/ELSMO-2019.pdf">E</a><a href="https://web.evanchen.cc/exams/ELMO-blank-2024.pdf">B</a>` +
+		`<a href="https://services.artofproblemsolving.com/download.php?id=x&rn=RUxNT18yMDE1X0ZpbmFsLnBkZg==">2015</a><a href="https://web.evanchen.cc/exams/ELMO-2019.pdf">P</a>`
+	got := ELMOPapers(page)
+	want := []National{
+		{Competition: "elmo", Year: 2010, URL: "https://web.evanchen.cc/exams/ELMO-2010.pdf"},
+		{Competition: "elmo", Year: 2019, URL: "https://web.evanchen.cc/exams/ELMO-2019.pdf"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("ELMOPapers = %+v", got)
+	}
+}
