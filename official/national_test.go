@@ -126,6 +126,33 @@ func TestInPaper(t *testing.T) {
 	}
 }
 
+func TestNumberedThrough(t *testing.T) {
+	shape := content.Shape{Layout: []content.Layout{{Paper: "day1", Positions: []string{"p1", "p2"}}, {Paper: "day2", Positions: []string{"p3", "p4"}}}}
+	segs := func(pos ...string) []Segment {
+		var out []Segment
+		for _, p := range pos {
+			out = append(out, Segment{Position: p})
+		}
+		return out
+	}
+	for _, c := range []struct {
+		id   string
+		segs []Segment
+		want bool
+	}{
+		{"day2", segs("p3", "p4"), true},
+		{"day2", segs("p1", "p2"), false},
+		{"day2", segs("p3", "p5"), false},
+		{"day1", segs("p1", "p2"), false},
+		{"day3", segs("p3"), false},
+		{"day2", nil, false},
+	} {
+		if got := numberedThrough(shape, c.id, c.segs); got != c.want {
+			t.Errorf("numberedThrough(%s, %v) = %v, want %v", c.id, c.segs, got, c.want)
+		}
+	}
+}
+
 func TestAnchorEdition(t *testing.T) {
 	prob := func(at, text string) *content.Problem {
 		return &content.Problem{Appearances: []content.Appearance{{At: at}}, Canonical: content.Canonical{Statement: "S1"},
@@ -351,5 +378,34 @@ func TestVTRMCPapers(t *testing.T) {
 		if g := ordinal(n); g != w {
 			t.Errorf("ordinal(%d) = %s, want %s", n, g, w)
 		}
+	}
+}
+
+func TestIMCPapers(t *testing.T) {
+	page := `<a href="/archive/problems/1994/IMC_1994_Problems_and_Solutions.pdf">Open PDF</a>
+<a href="/archive/problems/2012/IMC_2012_Day_1_Problems_and_Solutions.pdf">Open PDF</a>
+<a href="/archive/problems/2012/IMC_2012_Day_1_Problems.pdf">Open PDF</a>
+<a href="/archive/problems/2016/IMC_2016_Day_2_Problems.pdf">Open PDF</a>
+<a href="/archive/problems/2016/IMC_2016_Day_2_Solutions.pdf">Open PDF</a>
+<a href="/archive/problems/2016/IMC_2016_Day_2_Questions.pdf">Open PDF</a>
+<a href="/archive/problems/2025/IMC_2025_Day_1_Solutions.pdf">Open PDF</a>`
+	got := IMCPapers(page)
+	const u = "https://www.imc-math.org.uk/archive/problems/"
+	want := []National{
+		{"imc", 1994, "", u + "1994/IMC_1994_Problems_and_Solutions.pdf"},
+		{"imc", 2012, "day1", u + "2012/IMC_2012_Day_1_Problems.pdf"},
+		{"imc", 2016, "day2", u + "2016/IMC_2016_Day_2_Questions.pdf"},
+		{"imc", 2025, "day1", u + "2025/IMC_2025_Day_1_Solutions.pdf"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("paper %d: got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+	if l := IMCListings(1995); len(l) != 2 || l[1] != "https://www.imc-math.org.uk/?year=1995&item=problems" {
+		t.Errorf("listings: %v", l)
 	}
 }
