@@ -486,3 +486,81 @@ func PAMOText(page, id string) string {
 	}
 	return b.String()
 }
+
+// TuymaadaListing is the archive page of the Tuymaada olympiad, which lists the booklets of each year.
+const TuymaadaListing = "https://tuymaada.lensky-kray.ru/en/arhiv/"
+
+// tuymaadaRE matches the link to the English booklet of one day of the mathematics olympiad, with the day and the year as the text of the link: <a href="http://tuymaada.lensky-kray.ru/wp-content/uploads/2026/07/T26-booklet-day1-eng.pdf" ...>Mathematics (first day) 2026</a>.
+var tuymaadaRE = regexp.MustCompile(`href="https?://tuymaada\.lensky-kray\.ru(/wp-content/uploads/[^"]+\.pdf)"[^>]*>\s*Mathematics \((first|second) day\) ((?:19|20)[0-9]{2})\s*<`)
+
+// TuymaadaPapers gives the papers of the Tuymaada olympiad (tuymaada) on its archive page. The booklet of a day holds the four problems of the senior league, then the four problems of the junior league, then the solutions. The first day has the problems 1 to 4 and the second day the problems 5 to 8. So each booklet gives two papers with the same URL: the paper senior and the paper junior of the layout. TuymaadaPart reads the part of each league.
+func TuymaadaPapers(page string) []National {
+	var out []National
+	seen := map[string]bool{}
+	for _, m := range tuymaadaRE.FindAllStringSubmatch(page, -1) {
+		y, _ := strconv.Atoi(m[3])
+		key := m[3] + m[2]
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		u := "https://tuymaada.lensky-kray.ru" + m[1]
+		out = append(out, National{Competition: "tuymaada", Year: y, Paper: "senior", URL: u}, National{Competition: "tuymaada", Year: y, Paper: "junior", URL: u})
+	}
+	slices.SortStableFunc(out, func(a, b National) int {
+		if a.Year != b.Year {
+			return a.Year - b.Year
+		}
+		if a.URL != b.URL {
+			return strings.Compare(a.URL, b.URL)
+		}
+		return strings.Compare(b.Paper, a.Paper)
+	})
+	return out
+}
+
+var (
+	// tuymaadaLeagueRE matches the heading of the problems of a league in a booklet of Tuymaada: "Senior league" or "Junior League".
+	tuymaadaLeagueRE = regexp.MustCompile(`(?im)^\s*(senior|junior) league\s*$`)
+	// tuymaadaEndRE matches the heading of the solutions of a booklet of Tuymaada.
+	tuymaadaEndRE = regexp.MustCompile(`(?m)^\s*SOLUTIONS\s*$`)
+)
+
+// TuymaadaPart gives the problems of the league paper ("senior" or "junior") from the text of a booklet of Tuymaada: the text from the heading of the league to the heading of the other league or of the solutions. It gives "" when the booklet has no such heading.
+func TuymaadaPart(text, paper string) string {
+	if loc := tuymaadaEndRE.FindStringIndex(text); loc != nil {
+		text = text[:loc[0]]
+	}
+	ms := tuymaadaLeagueRE.FindAllStringSubmatchIndex(text, -1)
+	for i, m := range ms {
+		if !strings.EqualFold(text[m[2]:m[3]], paper) {
+			continue
+		}
+		end := len(text)
+		if i+1 < len(ms) {
+			end = ms[i+1][0]
+		}
+		return tuymaadaNumber(text[m[1]:end])
+	}
+	return ""
+}
+
+// tuymaadaBareRE matches the number at the start of a problem of a booklet of Tuymaada: "5." at the start of a line.
+var tuymaadaBareRE = regexp.MustCompile(`(?m)^[ \t]*([1-8])\.\s`)
+
+// tuymaadaNumber puts the word Problem before the numbers of the problems of a league, so that Split keeps them. The problems of the second day start at 5, and Split only takes bare numbers from 1. The numbers of the problems follow each other from the first one, so a number out of the sequence, as in a list in a problem, stays as it is.
+func tuymaadaNumber(text string) string {
+	var b strings.Builder
+	last, next := 0, 0
+	for _, m := range tuymaadaBareRE.FindAllStringSubmatchIndex(text, -1) {
+		n, _ := strconv.Atoi(text[m[2]:m[3]])
+		if next != 0 && n != next {
+			continue
+		}
+		b.WriteString(text[last:m[2]])
+		b.WriteString("Problem ")
+		last, next = m[2], n+1
+	}
+	b.WriteString(text[last:])
+	return b.String()
+}

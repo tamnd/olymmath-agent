@@ -40,6 +40,11 @@ var Sections = map[string]func(page, id string) string{
 	"pamo-official": PAMOText,
 }
 
+// Parts are the readers of the sources whose files hold more than one paper of the layout. A reader gives the part of the text of a file that is the paper with the id paper, or "" when the file has no such part.
+var Parts = map[string]func(text, paper string) string{
+	"tuymaada-official": TuymaadaPart,
+}
+
 // Read gives the text of a paper of a source, with a form feed between pages. It uses the rules of Readings for the source. A file that is not a PDF, such as an HTML page that shows the scans of a paper, gives ErrNoText.
 func Read(ctx context.Context, source string, pdf []byte) (string, error) {
 	if !bytes.Contains(pdf[:min(len(pdf), 1024)], []byte("%PDF-")) {
