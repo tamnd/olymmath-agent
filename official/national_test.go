@@ -322,3 +322,34 @@ func TestAMTPapers(t *testing.T) {
 		}
 	}
 }
+
+func TestVTRMCPapers(t *testing.T) {
+	page := `<p><a href="http://intranet.math.vt.edu/vtrmc/exams/42nd%20VTRMC.pdf">2022</a></p>
+<p><a href="http://intranet.math.vt.edu/vtrmc/exams/33th%20VTRMC.pdf">2011</a></p>
+<p><a href="http://intranet.math.vt.edu/vtrmc/exams/32nd%20VTRMC.pdf">2010</a></p>
+<p><a href="http://intranet.math.vt.edu/vtrmc/exams/32nd%20VTRMC.pdf">2009</a></p>
+<p><a href="http://intranet.math.vt.edu/vtrmc/exams/1st%20VTRMC.pdf">1979&nbsp;</a></p>
+<p><a href="http://intranet.math.vt.edu/vtrmc/solutions/33th%20VTRMC,%202011,%20Solutions.pdf">2011</a></p>`
+	got := VTRMCPapers(page)
+	const u = "https://intranet.math.vt.edu/vtrmc/exams/"
+	want := []National{
+		{"vtrmc", 1979, "", u + "1st%20VTRMC.pdf"},
+		{"vtrmc", 2009, "", u + "31st%20VTRMC.pdf"},
+		{"vtrmc", 2010, "", u + "32nd%20VTRMC.pdf"},
+		{"vtrmc", 2011, "", u + "33rd%20VTRMC.pdf"},
+		{"vtrmc", 2022, "", u + "42nd%20VTRMC.pdf"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("paper %d: got %+v, want %+v", i, got[i], want[i])
+		}
+	}
+	for n, w := range map[int]string{1: "1st", 2: "2nd", 3: "3rd", 4: "4th", 11: "11th", 12: "12th", 13: "13th", 21: "21st", 33: "33rd", 42: "42nd"} {
+		if g := ordinal(n); g != w {
+			t.Errorf("ordinal(%d) = %s, want %s", n, g, w)
+		}
+	}
+}
