@@ -526,3 +526,40 @@ func TestSplitOpgave(t *testing.T) {
 		t.Errorf("segments = %+v", segs)
 	}
 }
+
+func TestOPMPapers(t *testing.T) {
+	page := `<a href="/Downloads/Ficheiros/Provas/XXXI%20OPM(2012-13)/XXXI_f1b.pdf" target="_blank">Enunciado</a>
+<a href="/Downloads/Ficheiros/Provas/XXXI%20OPM(2012-13)/XXXI_f1bs.pdf" target="_blank">Soluções</a>
+<a href="/Downloads/Ficheiros/Provas/XXXI%20OPM(2012-13)/XXXI_f2b.pdf" target="_blank">Enunciado</a>
+<a href="/Downloads/Ficheiros/Provas/XXXI%20OPM(2012-13)/XXXI_f1a.pdf" target="_blank">Enunciado</a>
+<a href="/Downloads/Ficheiros/Provas/XXXI%20OPM(2012-13)/XXXI_1b.pdf" target="_blank">Enunciado</a>
+<a href="/Downloads/Ficheiros/Provas/XXXIX%20OPM(2020-21)/XXXIX_fb.pdf" target="_blank">Enunciado</a>
+<a href="/Downloads/Ficheiros/Provas/XXVI%20OPM%20(2007-08)/XXVI_f12bps.pdf" target="_blank">Enunciado e Soluções</a>
+<a href="/Downloads/Ficheiros/Provas/XXIV%20OPM%20(2005-06)/XXIV_fdia2b.pdf" target="_blank">Enunciado</a>
+<a href="/Downloads/Ficheiros/Provas/XXI%20OPM%20(2002-03)/catBfinaldia1.pdf" target="_blank">Enunciado</a>
+<a href="/Downloads/Ficheiros/Provas/XXI%20OPM%20(2002-03)/catAfinaldia1.pdf" target="_blank">Enunciado</a>
+<a href="/Downloads/Ficheiros/Provas/XII%20OPM%20(1993-94)/XII_fb2.pdf" target="_blank">Final Nacional (Dia 2)</a>
+<a href="/Downloads/Ficheiros/Provas/XII%20OPM%20(1993-94)/XII_fb2s.pdf" target="_blank">Soluções.</a>
+<a href="/Downloads/Ficheiros/Provas/XLIV OPM(2025-26)/mopm2526prova3ano.pdf" target="_blank">Mini</a>`
+	const u = "https://olimpiadas.spm.pt/Downloads/Ficheiros/Provas/"
+	want := []National{
+		{"pt-opm", 1994, "day2", u + "XII%20OPM%20(1993-94)/XII_fb2.pdf", Lang{}},
+		{"pt-opm", 2003, "day1", u + "XXI%20OPM%20(2002-03)/catBfinaldia1.pdf", Lang{}},
+		{"pt-opm", 2006, "day2", u + "XXIV%20OPM%20(2005-06)/XXIV_fdia2b.pdf", Lang{}},
+		{"pt-opm", 2008, "", u + "XXVI%20OPM%20(2007-08)/XXVI_f12bps.pdf", Lang{}},
+		{"pt-opm", 2013, "day1", u + "XXXI%20OPM(2012-13)/XXXI_f1b.pdf", Lang{}},
+		{"pt-opm", 2013, "day2", u + "XXXI%20OPM(2012-13)/XXXI_f2b.pdf", Lang{}},
+		{"pt-opm", 2021, "", u + "XXXIX%20OPM(2020-21)/XXXIX_fb.pdf", Lang{}},
+	}
+	if got := OPMPapers(page); !slices.Equal(got, want) {
+		t.Errorf("OPMPapers =\n%v\nwant\n%v", got, want)
+	}
+}
+
+func TestOPMPart(t *testing.T) {
+	text := "XXXI OPM - Final - 2o Dia\n\n4. Qual é o menor n?\n\n5. A Liliana quer:\n 1. azul;\n 2. preto.\n\n6. Em cada lado.\n"
+	segs := Split(OPMPart(text, "day2"))
+	if len(segs) != 3 || segs[0].Position != "p4" || segs[2].Position != "p6" || segs[1].Text != "A Liliana quer: 1. azul; 2. preto." {
+		t.Errorf("segments = %+v", segs)
+	}
+}

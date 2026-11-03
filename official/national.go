@@ -550,11 +550,14 @@ func TuymaadaPart(text, paper string) string {
 // tuymaadaBareRE matches the number at the start of a problem of a booklet of Tuymaada: "5." at the start of a line.
 var tuymaadaBareRE = regexp.MustCompile(`(?m)^[ \t]*([1-8])\.\s`)
 
-// tuymaadaNumber puts the word Problem before the numbers of the problems of a league, so that Split keeps them. The problems of the second day start at 5, and Split only takes bare numbers from 1. The numbers of the problems follow each other from the first one, so a number out of the sequence, as in a list in a problem, stays as it is.
-func tuymaadaNumber(text string) string {
+// tuymaadaNumber puts the word Problem before the numbers of the problems of a league, so that Split keeps them. The problems of the second day start at 5, and Split only takes bare numbers from 1.
+func tuymaadaNumber(text string) string { return numberRun(text, tuymaadaBareRE) }
+
+// numberRun puts the word Problem before each number that re matches, from the first one, as long as the numbers follow each other. So a paper whose problems start at a number other than 1 keeps its numbers in Split. A number out of the sequence, as in a list in a problem, stays as it is.
+func numberRun(text string, re *regexp.Regexp) string {
 	var b strings.Builder
 	last, next := 0, 0
-	for _, m := range tuymaadaBareRE.FindAllStringSubmatchIndex(text, -1) {
+	for _, m := range re.FindAllStringSubmatchIndex(text, -1) {
 		n, _ := strconv.Atoi(text[m[2]:m[3]])
 		if next != 0 && n != next {
 			continue
@@ -636,3 +639,47 @@ func years(s string) []int {
 	}
 	return out
 }
+
+// OPMListing is the page of the Sociedade Portuguesa de Matemática that lists the papers of each Portuguese Mathematical Olympiad.
+const OPMListing = "https://olimpiadas.spm.pt/index.php?id=75&tipo=1"
+
+var (
+	// opmLinkRE matches the link to a file of one olympiad. The folder names the school year, such as "XXXI OPM(2012-13)".
+	opmLinkRE = regexp.MustCompile(`href="(/Downloads/Ficheiros/Provas/[^"]*\(((?:19|20)[0-9]{2})-[0-9]{2}\)/([^"/]+\.pdf))"`)
+	// opmFinalRE matches the name of a file with the problems of the final of category B: XXXI_f1b.pdf, XXVIII_f2bp.pdf, XXIV_fdia1b.pdf, XX_fb2.pdf or catBfinaldia1.pdf for one day, and XXXIX_fb.pdf or XXVI_f12bps.pdf for both days. A file of solutions ends in s, and category A and the juniors have the letters a and j.
+	opmFinalRE = regexp.MustCompile(`(?i)^(?:[XLVI]+_(?:f([12])?bp?|f12bps|fdia([12])b|fb([12]))|catBfinaldia([12]))\.pdf$`)
+	// opmBareRE matches the number at the start of a problem of a paper of the OPM: "4." at the start of a line.
+	opmBareRE = regexp.MustCompile(`(?m)^[ \t]*([1-9])\.\s`)
+)
+
+// OPMPapers gives the papers of the final of category B of the Portuguese Mathematical Olympiad (pt-opm) on the archive page of olimpiadas.spm.pt. The final has two days of three problems: the paper day1 has the problems 1 to 3 and the paper day2 the problems 4 to 6. A file for both days gives a paper with no id. The year of an olympiad is the year in which its school year ends, which is the year of the final.
+func OPMPapers(page string) []National {
+	var out []National
+	seen := map[string]bool{}
+	for _, m := range opmLinkRE.FindAllStringSubmatch(page, -1) {
+		f := opmFinalRE.FindStringSubmatch(m[3])
+		if f == nil {
+			continue
+		}
+		y, _ := strconv.Atoi(m[2])
+		paper := ""
+		if day := f[1] + f[2] + f[3] + f[4]; day != "" {
+			paper = "day" + day
+		}
+		u := "https://olimpiadas.spm.pt" + strings.ReplaceAll(m[1], " ", "%20")
+		if key := strconv.Itoa(y+1) + paper; !seen[key] {
+			seen[key] = true
+			out = append(out, National{Competition: "pt-opm", Year: y + 1, Paper: paper, URL: u})
+		}
+	}
+	slices.SortStableFunc(out, func(a, b National) int {
+		if a.Year != b.Year {
+			return a.Year - b.Year
+		}
+		return strings.Compare(a.Paper, b.Paper)
+	})
+	return out
+}
+
+// OPMPart gives the problems of a paper of the OPM, with the word Problem before their numbers. The papers number the problems with no word, and the second day starts at 4.
+func OPMPart(text, _ string) string { return numberRun(text, opmBareRE) }
