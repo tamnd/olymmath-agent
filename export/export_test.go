@@ -47,7 +47,7 @@ func TestConfigs(t *testing.T) {
 	if len(z2) != 2 || z2[0].Locator != "imo/2024/p1" || z2[0].Zone != "Z2" || z2[0].Licence != Reference || z2[0].Answer == "" || z2[0].Statement == "" {
 		t.Fatalf("z2-facts: %+v", z2)
 	}
-	if s := z2[0].Solutions; len(s) != 1 || s[0].Text == "" || s[0].Licence != "CC-BY-SA-4.0" {
+	if s := z2[0].Solutions; len(s) != 2 || s[0].Text == "" || s[0].Licence != "CC-BY-SA-4.0" || s[1].Origin != "ai" || s[1].Model != "claude-opus-5-5" {
 		t.Errorf("solution: %+v", s)
 	}
 	if got := readRows(t, dir, "z3-links"); len(got) != 0 {
@@ -85,6 +85,10 @@ func TestNoAITrainText(t *testing.T) {
 				t.Errorf("%s %s: the statement of an ai-train=no source: %+v", c.Name, r.Tag, r)
 			}
 			for _, s := range r.Solutions {
+				// An AI solution has no source, so the flag of a source does not apply to it.
+				if s.Origin == "ai" {
+					continue
+				}
 				if s.Text != "" || s.LeftOut != LeftAITrain {
 					t.Errorf("%s: the solution of an ai-train=no source: %+v", r.Tag, s)
 				}

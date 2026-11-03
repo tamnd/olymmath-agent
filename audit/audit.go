@@ -66,6 +66,11 @@ var Rules = []*Rule{
 	{ID: "L02", Level: content.Error, Summary: "each AI solution has a complete run block", check: l02},
 	{ID: "L03", Level: content.Error, Summary: "no AI solution says that a person wrote it", check: l03},
 	{ID: "L04", Level: content.Error, Summary: "each solution has a zone, and its text fits the zone", check: l04},
+	{ID: "L05", Level: content.Warning, Summary: "the answer of a solution of an answer-type problem matches the answer of the problem", check: l05},
+	{ID: "L06", Level: content.Warning, Summary: "no solution is a near copy of another solution of the same problem", check: l06},
+	{ID: "G01", Level: content.Error, Summary: "each grade names its grader, its rubric version and its date, and its score fits its scale", check: g01},
+	{ID: "G02", Level: content.Error, Summary: "each human grade is by a person with the role reviewer in registers/people.yaml", check: g02},
+	{ID: "G03", Level: content.Warning, Summary: "the model grades of a solution with no human grade differ by at most 2 points out of 7", check: g03},
 	{ID: "F01", Level: content.Error, Summary: "each formal statement is a complete record whose last check passed at the pinned toolchain", check: f01},
 	{ID: "F02", Level: content.Error, Summary: "each proof checks, uses no sorry, and uses only the allowed axioms", check: f02},
 	{ID: "F03", Level: content.Error, Summary: "each formal statement has a fidelity record, and the reviews back its status before the site shows it as faithful", check: f03},
@@ -368,6 +373,9 @@ func l02(c *Context) {
 				if f[1] == "" {
 					c.add(s.Path, "the run block has no %s", f[0])
 				}
+			}
+			if id := s.Run.RunID; id != "" && c.Corpus.Runs[id] == nil {
+				c.add(s.Path, "the run %s has no record in runs/", id)
 			}
 		}
 	}

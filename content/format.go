@@ -12,12 +12,14 @@ import (
 // keyOrder gives the order of the keys of each kind of front matter, and of the records inside it. A key that is not in the list goes after the known keys, in its old order. The loader reports such a key.
 var keyOrder = map[string][]string{
 	"problem":    {"tag", "kind", "appearances", "title", "type", "topics", "answer", "authors", "canonical", "statements", "xref", "links", "status"},
-	"solution":   {"tag", "kind", "problem", "origin", "author", "source", "url", "capture", "zone", "lang", "method", "complete", "answer_claimed", "run", "translated_by"},
+	"solution":   {"tag", "kind", "problem", "origin", "author", "source", "url", "capture", "zone", "lang", "method", "complete", "answer_claimed", "answer_check", "follows", "grades", "grade", "run", "translated_by"},
 	"appearance": {"at", "primary", "note"},
 	"statement":  {"id", "lang", "source", "name", "url", "page", "capture", "origin", "zone", "kind", "diff_from"},
 	"canonical":  {"statement", "rule"},
 	"author":     {"name", "person", "display", "role", "country"},
-	"run":        {"model", "prompt", "date", "run_id", "transcript", "cost"},
+	"run":        {"model", "prompt", "pipeline", "date", "run_id", "transcript", "tokens", "cost", "cutoff"},
+	"grade":      {"scale", "score", "bucket", "rubric", "at", "graders", "rule", "queue", "run_id"},
+	"judgement":  {"by", "score", "max", "rubric", "at", "notes_hash", "revised"},
 	"link":       {"type", "to"},
 }
 
@@ -30,6 +32,9 @@ var children = map[string]string{
 	"author":        "author",
 	"run":           "run",
 	"translated_by": "run",
+	"grade":         "grade",
+	"grades":        "judgement",
+	"graders":       "judgement",
 	"links":         "link",
 }
 

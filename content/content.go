@@ -304,6 +304,8 @@ type Problem struct {
 	Solutions []*Solution `yaml:"-"`
 	// Formals are the formal statements of the problem, the best rank first.
 	Formals []*Formal `yaml:"-"`
+	// Rubric is the grading rubric of the problem, or nil.
+	Rubric *Rubric `yaml:"-"`
 }
 
 // Status is the state of the records of a problem (spec 09.1).
@@ -398,7 +400,13 @@ type Solution struct {
 	Method   []string `yaml:"method"`
 	Complete bool     `yaml:"complete"`
 	Answer   string   `yaml:"answer_claimed"`
-	Run      *Run     `yaml:"run"`
+	// AnswerCheck is match, mismatch, none or n/a: the result of the comparison of the claimed answer with the answer of the problem.
+	AnswerCheck string `yaml:"answer_check"`
+	// Follows is the tag of a solution of the same problem that this solution closely follows (stage S5 of spec 07.3). Such a solution is not shown as a separate solution.
+	Follows string      `yaml:"follows"`
+	Grades  []Judgement `yaml:"grades"`
+	Grade   *Grade      `yaml:"grade"`
+	Run     *Run        `yaml:"run"`
 	// TranslatedBy names the model that translated a human solution.
 	TranslatedBy *Run `yaml:"translated_by"`
 
@@ -408,12 +416,18 @@ type Solution struct {
 
 // Run records how a model made a text (spec 07).
 type Run struct {
-	Model      string `yaml:"model"`
-	Prompt     string `yaml:"prompt"`
+	Model  string `yaml:"model"`
+	Prompt string `yaml:"prompt"`
+	// Pipeline is the version of the solver, for example solve/1.
+	Pipeline   string `yaml:"pipeline"`
 	Date       string `yaml:"date"`
 	RunID      string `yaml:"run_id"`
 	Transcript string `yaml:"transcript"`
-	Cost       string `yaml:"cost"`
+	Tokens     Tokens `yaml:"tokens"`
+	// Cost is the cost of the model calls for the solution, in US dollars.
+	Cost float64 `yaml:"cost"`
+	// Cutoff is the training cutoff of the model, as a year and a month. The site shows a note when the problem is older.
+	Cutoff string `yaml:"cutoff"`
 }
 
 // SolutionOrigins are the origins of a solution, in the order of the site (spec 07.1).
@@ -436,6 +450,12 @@ type Corpus struct {
 	Proofs  []*Proof
 	// FidelityReviews are the review records of kind fidelity, by id.
 	FidelityReviews map[string]*FidelityReview
+	// People are the persons of registers/people.yaml, by id.
+	People map[string]*Person
+	// Rubrics are the rubrics, by the locator of their problem.
+	Rubrics map[string]*Rubric
+	// Runs are the run records of runs/, by id.
+	Runs map[string]*RunRecord
 
 	byCode   map[string]*Competition
 	bySource map[string]*SourceRecord
@@ -449,6 +469,9 @@ func newCorpus() *Corpus {
 		Aliases:         map[string]string{},
 		Tags:            map[string]string{},
 		FidelityReviews: map[string]*FidelityReview{},
+		People:          map[string]*Person{},
+		Rubrics:         map[string]*Rubric{},
+		Runs:            map[string]*RunRecord{},
 		byCode:          map[string]*Competition{},
 		bySource:        map[string]*SourceRecord{},
 		byTag:           map[string]*Problem{},
