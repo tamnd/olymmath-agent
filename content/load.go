@@ -29,6 +29,8 @@ func Load(root string) (*Corpus, Findings) {
 	l.registers()
 	l.problems()
 	l.solutions()
+	l.formals()
+	l.fidelityReviews()
 	l.link()
 	return l.corpus, l.findings
 }
@@ -521,4 +523,12 @@ func layoutError(ls []Layout, perYear int) string {
 		}
 	}
 	return ""
+}
+
+// lenientYAML decodes YAML and ignores the fields that v does not have.
+func lenientYAML(b []byte, v any) error {
+	if err := yaml.Unmarshal(b, v); err != nil {
+		return fmt.Errorf("YAML: %w", err)
+	}
+	return nil
 }

@@ -38,6 +38,7 @@ type Context struct {
 	rule     *Rule
 	revs     map[string]*review.Review
 	revErrs  []error
+	pinned   *Pin
 }
 
 func (c *Context) add(p, format string, args ...any) {
@@ -65,6 +66,9 @@ var Rules = []*Rule{
 	{ID: "L02", Level: content.Error, Summary: "each AI solution has a complete run block", check: l02},
 	{ID: "L03", Level: content.Error, Summary: "no AI solution says that a person wrote it", check: l03},
 	{ID: "L04", Level: content.Error, Summary: "each solution has a zone, and its text fits the zone", check: l04},
+	{ID: "F01", Level: content.Error, Summary: "each formal statement is a complete record whose last check passed at the pinned toolchain", check: f01},
+	{ID: "F02", Level: content.Error, Summary: "each proof checks, uses no sorry, and uses only the allowed axioms", check: f02},
+	{ID: "F03", Level: content.Error, Summary: "each formal statement has a fidelity record, and the reviews back its status before the site shows it as faithful", check: f03},
 	{ID: "X01", Level: content.Error, Summary: "each source in use has a licence zone and a terms note", check: x01},
 	{ID: "X02", Level: content.Error, Summary: "no text from a do-not-republish source is in the published tree", check: x02},
 }
@@ -124,6 +128,14 @@ func t02(c *Context) {
 			} else if k != "solution" {
 				c.add(s.Path, "registers/tags.tsv gives the tag %s to a %s", s.Tag, k)
 			}
+		}
+	}
+	for _, r := range formalTags(c.Corpus) {
+		used[r[0]] = true
+		if k, ok := c.Corpus.Tags[r[0]]; !ok {
+			c.add(r[2], "the tag %s is not in registers/tags.tsv", r[0])
+		} else if k != r[1] {
+			c.add(r[2], "registers/tags.tsv gives the tag %s to a %s", r[0], k)
 		}
 	}
 	for _, t := range sortedKeys(c.Corpus.Tags) {

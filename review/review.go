@@ -27,8 +27,8 @@ const QueueFile = "reports/review/queue.jsonl"
 // MergesFile records each appearance that an import merged into a problem of another appearance, with its signals.
 const MergesFile = "registers/merges.tsv"
 
-// Decisions are the decisions of a review. For a pair: same (one problem), different (two problems) or variant (two problems with a variant_of edge). For a doubt or a dispute: keep (the canonical text stays), replace (the other text becomes canonical) or reject (the other text is wrong or is not this problem). For a merge: accept or split.
-var Decisions = []string{"same", "different", "variant", "keep", "replace", "reject", "accept", "split"}
+// Decisions are the decisions of a review. For a pair: same (one problem), different (two problems) or variant (two problems with a variant_of edge). For a doubt or a dispute: keep (the canonical text stays), replace (the other text becomes canonical) or reject (the other text is wrong or is not this problem). For a merge: accept or split. For the fidelity of a formal statement: faithful or wrong by a person, and clean or flagged by an agent check (spec 08.4).
+var Decisions = []string{"same", "different", "variant", "keep", "replace", "reject", "accept", "split", "faithful", "wrong", "clean", "flagged"}
 
 // Review is one decision of a person.
 type Review struct {
