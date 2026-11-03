@@ -205,6 +205,17 @@ om anchor -content olymmath -missing pamo-official
 
 The problems page of pamoofficial.org is HTML and holds all the years. The section of a year has the id `pamo-YEAR` and holds its six problems, numbered 1 to 6. So the paper of a year is the page with that id as the fragment, such as `https://pamoofficial.org/problems/#pamo-2025`. `om fetch` gets the page once, and `om anchor` reads the section of each paper from it. The page states no licence, so the content only links to it. The robots.txt of the site allows all paths for other agents and says `search=yes, ai-train=no, use=reference`.
 
+The Tuymaada olympiad works the same way, with the source `tuymaada-official`:
+
+```sh
+om papers -content olymmath tuymaada-official
+om fetch -content olymmath tuymaada-official
+om import -content olymmath -anchor -comp tuymaada
+om anchor -content olymmath -missing tuymaada-official
+```
+
+The archive page of tuymaada.lensky-kray.ru links one English booklet for each day of the mathematics olympiad, from 2018 and from 2020. A booklet holds the four problems of the senior league, then the four problems of the junior league, then the solutions. The first day has the problems 1 to 4 and the second day the problems 5 to 8. So a booklet is two papers with the same URL, `senior` and `junior`, and `om anchor` reads the part of each league from it. The booklets say "© Republic of Sakha (Yakutia) ministry of education and science" and give no licence, so the content only links to them.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Link the human solutions

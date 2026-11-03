@@ -1,6 +1,7 @@
 package official
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -455,5 +456,42 @@ func TestPAMOText(t *testing.T) {
 	}
 	if PAMOText(pamoPage, "pamo-2011") != "" || PAMOText(pamoPage, "pamo-1999") != "" {
 		t.Error("a section with no problem gives text")
+	}
+}
+
+func TestTuymaadaPapers(t *testing.T) {
+	page := `<li><a href="http://tuymaada.lensky-kray.ru/wp-content/uploads/2026/07/T26-booklet-day2-eng.pdf" class="mtli_attachment mtli_pdf">Mathematics (second day) 2026</a></li>
+<li><a href="http://tuymaada.lensky-kray.ru/wp-content/uploads/2026/07/T26-booklet-day1-eng.pdf" class="mtli_attachment mtli_pdf">Mathematics (first day) 2026</a></li>
+<li><a href="http://tuymaada.lensky-kray.ru/wp-content/uploads/2026/07/T26-physics.pdf">Physics (first day) 2026</a></li>
+<li><a href="http://tuymaada.lensky-kray.ru/wp-content/uploads/2017/07/Matematika.pdf">Математика 2017</a></li>`
+	got := TuymaadaPapers(page)
+	d1 := "https://tuymaada.lensky-kray.ru/wp-content/uploads/2026/07/T26-booklet-day1-eng.pdf"
+	d2 := "https://tuymaada.lensky-kray.ru/wp-content/uploads/2026/07/T26-booklet-day2-eng.pdf"
+	want := []National{
+		{Competition: "tuymaada", Year: 2026, Paper: "senior", URL: d1},
+		{Competition: "tuymaada", Year: 2026, Paper: "junior", URL: d1},
+		{Competition: "tuymaada", Year: 2026, Paper: "senior", URL: d2},
+		{Competition: "tuymaada", Year: 2026, Paper: "junior", URL: d2},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("TuymaadaPapers = %v, want %v", got, want)
+	}
+}
+
+func TestTuymaadaPart(t *testing.T) {
+	text := "XXXII Tuymaada\nSecond day\nSenior league\n5. Prove that 1. is not 2.\n6. Find all n.\n7. A square.\n8. A graph.\nJunior League\n5. Prove it.\n6. See problem 6 of Senior league.\n7. A board.\n8. A set.\nSOLUTIONS\n5. Solution.\n"
+	var got []string
+	for _, s := range Split(TuymaadaPart(text, "senior")) {
+		got = append(got, s.Position)
+	}
+	if want := []string{"p5", "p6", "p7", "p8"}; !slices.Equal(got, want) {
+		t.Errorf("senior positions = %v, want %v", got, want)
+	}
+	j := TuymaadaPart(text, "junior")
+	if strings.Contains(j, "Solution") || !strings.Contains(j, "A set.") {
+		t.Errorf("junior part = %q", j)
+	}
+	if TuymaadaPart("no leagues", "senior") != "" {
+		t.Error("a text with no league gives a part")
 	}
 }

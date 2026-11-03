@@ -118,6 +118,11 @@ func segments(ctx context.Context, st *store.Store, source, hash string, shape c
 	} else if text, err = Read(ctx, source, b); err != nil {
 		return nil, err
 	}
+	if part, ok := Parts[source]; ok {
+		if text = part(text, o.Paper); text == "" {
+			return nil, ErrNoText
+		}
+	}
 	segs := Split(text)
 	lang := o.Code
 	if English(lang) {
