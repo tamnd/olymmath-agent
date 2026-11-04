@@ -21,8 +21,8 @@ type Problem struct {
 // words are the words that can come before the number of a problem, in the languages of the papers.
 const words = `Problem|Problema|Problème|Probleme|Aufgabe|Zadanie|Zadatak|Задатак|Opgave|Uppgift|Oppgave|Úloha|Uloha|Задача|Feladat|Exercice|Question|Bài|Soru`
 
-// boldRE is a problem number in bold at the start of a line, as the prompt asks: **1.** or **Problem 1.**
-var boldRE = regexp.MustCompile(`^\*\*\s*(?:(?:` + words + `)\s+)?([0-9]{1,2})\s*[.:)]?\s*\*\*\s*[.:]?\s*`)
+// boldRE is a problem number in bold at the start of a line, as the prompt asks: **1.** or **Problem 1.** The label before the number can be any words, as in **IMO TST 4.**, because the number is in bold and the bold ends after it.
+var boldRE = regexp.MustCompile(`^\*\*\s*(?:\pL[\pL ]{0,23}\s)?([0-9]{1,2})\s*[.:)]?\s*\*\*\s*[.:]?\s*`)
 
 // wordRE is a problem number with a word and no bold: Problem 1. or Zadanie 1
 var wordRE = regexp.MustCompile(`^(?:` + words + `)\s+([0-9]{1,2})(?:\s*[.:)]\s*|\s*$)`)
