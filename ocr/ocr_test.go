@@ -76,6 +76,11 @@ func TestSplit(t *testing.T) {
 		t.Errorf("word markers: %+v", got)
 	}
 
+	labels := []Page{{N: 1, Text: "# Day II\n**IMO TST 4.** Let $n$ be a positive integer here.\n\n**IMO TST 5.** Let $m$ be a positive integer there."}}
+	if got := Split(labels); len(got) != 2 || got[0].Number != 4 || got[1].Text != "Let $m$ be a positive integer there." {
+		t.Errorf("labels: %+v", got)
+	}
+
 	days := []Page{{N: 1, Text: "# Day 1\n**1.** First problem of the first day.\n# Day 2\n**1.** First problem of the second day."}}
 	if got := Sequence(days); len(got) != 2 || got[1].Number != 2 || !strings.Contains(got[1].Text, "second day") {
 		t.Errorf("Sequence = %+v", got)
