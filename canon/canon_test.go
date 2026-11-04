@@ -202,3 +202,25 @@ func TestRenderLink(t *testing.T) {
 		t.Errorf("the body is not empty:\n%s", s)
 	}
 }
+
+func TestRenderScan(t *testing.T) {
+	c := &Candidate{Source: "om-sem", Origin: "H1", Zone: "Z2", Lang: "pl", Name: "Polish MO 1997 official paper", URL: "https://om.sem.edu.pl/static/app_main/problems/om48_3.pdf"}
+	s := Scan{Page: 1, Text: "Udowodnić, że $a^2 \\ge 0$.\n", Extraction: "vision/claude@2.1.318", Confidence: 0.904}
+	b, err := RenderScan("pl-om/1997/p2", "a1b2", c, s, "official-original")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(b)
+	for _, want := range []string{"statement: captured", "kind: official", "origin: H1", "page: 1", "    extraction: vision/claude@2.1.318\n    confidence: 0.9\n", "---\nUdowodnić, że $a^2 \\ge 0$.\n"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("render has no %q:\n%s", want, got)
+		}
+	}
+	s.Text = ""
+	if b, err = RenderScan("pl-om/1997/p2", "a1b2", c, s, "official-original"); err != nil || strings.Contains(string(b), "extraction") || !strings.Contains(string(b), "statement: sourced") {
+		t.Errorf("a scan with no text is not a link:\n%s %v", b, err)
+	}
+	if _, err := RenderScan("pl-om/1997/p2", "a1b2", c, Scan{Page: 1, Text: "x"}, "official-original"); err == nil {
+		t.Error("a text with no extraction gave no error")
+	}
+}

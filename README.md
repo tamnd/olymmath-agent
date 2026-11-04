@@ -300,6 +300,19 @@ The secondary school page of the Mathematical Society of Serbia, dms.rs/matemati
 
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
+### Scanned papers
+
+```sh
+om ocr -content olymmath -dry pl-om/1997
+om ocr -content olymmath -source dms-rs -lang sr rs-smo/2024 https://dms.rs/wp-content/uploads/2024/04/SMO_2024_ZADACI.pdf
+```
+
+Some official papers are scans, or their text layer is broken, so `pdftotext` cannot read them. The `om ocr` command reads such a paper with a vision model. It gets the PDF through the fetch client, which keeps robots.txt, and renders each page to a PNG image with `pdftoppm`. It asks a model for the text of each page as Markdown with TeX math. The model must copy the words and must not translate or change them. The command checks each answer: the `$` and the braces must have their pairs, and the model marks a word that it cannot read with `[?]`. A page with a flag is read again at 300 dpi. Then the command cuts the text into problems and makes a new problem for each position of the edition that has no problem.
+
+The command uses only the command-line clients of the models on the machine, with their own logins. It sends no API key. It asks `codex` first, then `gemini`, then `claude` (select them with `-lanes`). A client whose allowance is spent rests until the time that it gives, and the command remembers the rest between runs. When no client can answer, the command stops with exit code 3. Each answer goes into a cache under the hash of the page image (`$OLYMMATH_OCR`, or `olymmath/ocr` in the user cache directory), so a second run of the same pages asks no model.
+
+The words of the text are the words of the organizer, so the statement has the class H1 and the kind `official`. But a model read them, and no person checked them. So the statement records `extraction` (the client, its version and the model) and a `confidence`, the status is `captured`, and the site says that a model read the text by OCR. The confidence is a score of the checks, not a measured probability. A text below 0.8, a text that does not render, and a text of a source whose register entry says that the content holds no text give a problem that only links to its page. A new paper goes into the `official` list of the edition. Use `-paper` for a paper of the layout, such as `day2`, `-pages` to read some pages only, and `-sequence` for a paper whose days each start at problem 1.
+
 ### Link the human solutions
 
 ```sh

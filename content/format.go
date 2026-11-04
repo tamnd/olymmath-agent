@@ -14,7 +14,7 @@ var keyOrder = map[string][]string{
 	"problem":    {"tag", "kind", "appearances", "title", "type", "topics", "answer", "authors", "canonical", "statements", "xref", "links", "status"},
 	"solution":   {"tag", "kind", "problem", "origin", "author", "source", "url", "capture", "zone", "lang", "method", "complete", "answer_claimed", "answer_check", "follows", "grades", "grade", "run", "translated_by"},
 	"appearance": {"at", "primary", "note"},
-	"statement":  {"id", "lang", "source", "name", "url", "page", "capture", "origin", "zone", "kind", "diff_from"},
+	"statement":  {"id", "lang", "source", "name", "url", "page", "capture", "origin", "zone", "kind", "diff_from", "traced", "extraction", "confidence"},
 	"canonical":  {"statement", "rule"},
 	"author":     {"name", "person", "display", "role", "country"},
 	"run":        {"model", "prompt", "pipeline", "date", "run_id", "transcript", "tokens", "cost", "cutoff"},
