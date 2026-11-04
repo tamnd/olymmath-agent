@@ -237,3 +237,47 @@ func TestOrdinal(t *testing.T) {
 		}
 	}
 }
+
+func TestAISection(t *testing.T) {
+	out := build(t, "/")
+	p1 := read(t, out, "imo/2024/p1.html")
+	for _, want := range []string{
+		`data-origin="ai"`,
+		"Show 1 AI solution",
+		"AI-written",
+		"claude-opus-5-5 · 3 November 2026 · pipeline solve/1",
+		"model-graded",
+		"Grade 6 of 7, almost on 3 November 2026",
+		"blob/main/rubrics/imo/2024/p1.md",
+		"claude-sonnet-5-5 (agent grade): 7 of 7",
+		"claude-haiku-5-5 (agent grade): 6 of 7",
+		"older than the training cutoff of claude-opus-5-5 (2026-01)",
+		"Cost of the model calls $0.66",
+	} {
+		if !strings.Contains(p1, want) {
+			t.Errorf("imo/2024/p1.html has no %q", want)
+		}
+	}
+	if strings.Contains(p1, ">verified<") {
+		t.Error("a model grade shows as verified")
+	}
+	if i, j := strings.Index(p1, `id="s1"`), strings.Index(p1, `id="ai"`); i < 0 || j < i {
+		t.Error("the AI section does not come after the other solutions")
+	}
+	ai := read(t, out, "ai/index.html")
+	for _, want := range []string{"<h1>AI solutions</h1>", "solve-20261103-0001", "These are agent grades", "<th scope=\"row\">claude-opus-5-5</th><td>1</td><td>1</td><td>0</td><td>0</td><td>$0.66</td>"} {
+		if !strings.Contains(ai, want) {
+			t.Errorf("ai/index.html has no %q", want)
+		}
+	}
+}
+
+func TestOlderThan(t *testing.T) {
+	p := &content.Problem{Year: 2025}
+	if !olderThan(p, "2026-01") || olderThan(&content.Problem{Year: 2026, Edition: &content.Edition{Dates: "2026-07-10"}}, "2026-06") || olderThan(p, "") || olderThan(&content.Problem{}, "2026-01") {
+		t.Fatal("olderThan is wrong")
+	}
+	if !olderThan(&content.Problem{Year: 2026}, "2026-06") {
+		t.Fatal("a problem of the year of the cutoff with no dates is not older")
+	}
+}

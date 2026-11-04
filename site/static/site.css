@@ -197,6 +197,10 @@ pre.lean { overflow-x: auto; font-size: 0.82rem; line-height: 1.45; background: 
 .reveal[open] summary::before { content: "\2212"; }
 .reveal summary:hover { color: var(--ink); }
 .reveal .statement { padding: 0 1.4rem 1.2rem 2.8rem; }
+.ai-reveal > .source { margin: 0 1.4rem 1rem 2.8rem; }
+.ai-solution { padding: 1rem 1.4rem 1.2rem 2.8rem; border-top: 1px solid var(--rule); }
+.ai-solution .statement { padding: 0; }
+.contamination { color: var(--plum); }
 
 .empty { background: var(--surface); padding: 1.2rem 1.5rem; color: var(--ink-2); max-width: var(--measure); font-size: 1rem; }
 .empty p { margin: 0 0 0.5rem; }

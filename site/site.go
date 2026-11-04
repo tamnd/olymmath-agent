@@ -222,6 +222,7 @@ func (b *builder) all() error {
 		b.static,
 		b.coverage,
 		b.sources,
+		b.ai,
 		b.topics,
 		b.facets,
 		b.searchIndex,
@@ -493,6 +494,8 @@ type problemView struct {
 	Prev      *problemView
 	Next      *problemView
 	Solutions []solutionView
+	// AI are the AI solutions, shown after the others in a section of their own (spec 07.5).
+	AI []aiView
 	// Also lists the other appearances of the problem, with links to their editions.
 	Also []alsoView
 	// Similar are the problems with the most similar statements.
@@ -546,6 +549,7 @@ func (b *builder) view(p *content.Problem) *problemView {
 		}
 		v.Solutions = append(v.Solutions, sv)
 	}
+	v.Solutions, v.AI = b.aiSection(p, v.Solutions)
 	for _, a := range p.Appearances {
 		if a.Primary {
 			continue
