@@ -37,6 +37,9 @@ type CLI struct {
 	version     string
 }
 
+// codexModelRE finds the model in the header that codex exec writes to its standard error.
+var codexModelRE = regexp.MustCompile(`(?m)^model: (\S+)\s*$`)
+
 // versionRE finds a version number in the output of --version, as in "2.1.318 (Claude Code)" or "codex-cli 0.166.0".
 var versionRE = regexp.MustCompile(`[0-9]+\.[0-9]+(?:\.[0-9]+)?`)
 
@@ -170,6 +173,12 @@ func (l *CLI) Ask(ctx context.Context, q Question) (Answer, error) {
 	text, model, err := l.read(stdout, outFile)
 	if err != nil {
 		return a, fmt.Errorf("%s: %w", l.Kind, err)
+	}
+	if model == "" && l.Kind == "codex" {
+		// codex exec writes the model to its standard error, in a header line such as "model: gpt-5.5".
+		if m := codexModelRE.FindSubmatch(stderr); m != nil {
+			model = string(m[1])
+		}
 	}
 	if model != "" {
 		a.Model = model

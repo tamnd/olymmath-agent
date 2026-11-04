@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -118,5 +119,55 @@ func TestGrade(t *testing.T) {
 	}
 	if code, out, _ := run("fmt", "-check", "-content", dir); code != ExitOK {
 		t.Fatalf("the grade is not in the canonical form: %s", out)
+	}
+}
+
+// cliModel answers the cli: jurors as gemini-2.5-pro would.
+type cliModel struct{ f *model.Fake }
+
+func (c cliModel) Complete(ctx context.Context, reqs []model.Request) ([]model.Response, error) {
+	out, err := c.f.Complete(ctx, reqs)
+	for i := range out {
+		out[i].Model = "gemini-2.5-pro"
+	}
+	return out, err
+}
+
+func TestGradeOtherFamily(t *testing.T) {
+	api := fakeModel(t)
+	cf := &model.Fake{Answer: func(model.Request) string { return "Checkpoint 1 met.\nSCORE: 7" }}
+	old := newCLIClient
+	newCLIClient = func(string) model.Client { return cliModel{cf} }
+	t.Cleanup(func() { newCLIClient = old })
+	dir := copyContent(t)
+	if code, _, errs := run("grade", "-dry-run", "-jurors", "claude-sonnet-5-5,cli:llama", "-content", dir); code != ExitUsage || !strings.Contains(errs, "cli:llama") {
+		t.Fatalf("an unknown client gives %d, %q", code, errs)
+	}
+	code, out, errs := run("grade", "-regrade", "-budget", "1", "-jurors", "claude-sonnet-5-5,cli:gemini", "-content", dir, "-work", t.TempDir(), "RG3MNR0R50")
+	if code != ExitOK || !strings.Contains(out, "1 graded") || api.Calls() != 1 || cf.Calls() != 1 || strings.Contains(out, "Note:") {
+		t.Fatalf("code %d, %d and %d calls, out %q, errs %q", code, api.Calls(), cf.Calls(), out, errs)
+	}
+	corpus, findings := content.Load(dir)
+	if findings.Errors() > 0 {
+		t.Fatalf("the content has errors after om grade: %v", findings)
+	}
+	var g *content.Grade
+	for _, s := range corpus.ByTag("0HVHSDNNMY").Solutions {
+		if s.Tag == "RG3MNR0R50" {
+			g = s.Grade
+		}
+	}
+	if g == nil || len(g.Graders) != 2 || g.Graders[1].By != "model:gemini-2.5-pro" || g.Graders[1].Family != "google" || g.Graders[0].Family != "anthropic" {
+		t.Fatalf("the grade is %+v", g)
+	}
+	if code, out, _ := run("fmt", "-check", "-content", dir); code != ExitOK {
+		t.Fatalf("the grade is not in the canonical form: %s", out)
+	}
+	// Only cli: jurors need no API key.
+	t.Setenv(model.KeyEnv, "")
+	newClient = func(bool) (model.Client, error) { return model.NewAnthropic() }
+	code, out, errs = run("grade", "-regrade", "-budget", "1", "-jurors", "cli:gemini,cli:codex", "-content", dir, "-work", t.TempDir(), "RG3MNR0R50")
+	if code != ExitOK || !strings.Contains(out, "1 graded") {
+		t.Fatalf("with cli: jurors only: code %d, out %q, errs %q", code, out, errs)
 	}
 }

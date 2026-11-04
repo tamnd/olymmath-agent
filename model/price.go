@@ -34,8 +34,11 @@ const (
 	BatchFactor = 0.5
 )
 
-// Cost gives the cost in US dollars of the tokens of one or more calls of a model.
+// Cost gives the cost in US dollars of the tokens of one or more calls of a model. A cli: model costs nothing here, because the plan of its command-line client pays for the calls.
 func Cost(model string, t content.Tokens, batch bool) (float64, error) {
+	if IsCLI(model) {
+		return 0, nil
+	}
 	p, ok := Prices[model]
 	if !ok {
 		return 0, fmt.Errorf("the model %s has no price; add it to model.Prices", model)

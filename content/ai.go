@@ -16,8 +16,10 @@ import (
 // Judgement is one grade of one grader for a solution (spec 04.4 and 07.4). A grade in the grades list of a solution names its rubric and its date. A grader in the graders list of a jury grade takes them from the jury grade when it does not name them.
 type Judgement struct {
 	// By is the grader: model:<model id> for a model, human:reviewer/<person id> for a person.
-	By    string `yaml:"by" json:"by"`
-	Score int    `yaml:"score" json:"score"`
+	By string `yaml:"by" json:"by"`
+	// Family is the model family of a model grader, such as anthropic, openai or google. Spec 07.4 asks for a juror of another family than the generator.
+	Family string `yaml:"family,omitempty" json:"family,omitempty"`
+	Score  int    `yaml:"score" json:"score"`
 	// Max is the top score of the scale. It is 7 when it is 0.
 	Max    int    `yaml:"max,omitempty" json:"max,omitempty"`
 	Rubric string `yaml:"rubric,omitempty" json:"rubric,omitempty"`

@@ -19,7 +19,7 @@ var keyOrder = map[string][]string{
 	"author":     {"name", "person", "display", "role", "country"},
 	"run":        {"model", "prompt", "pipeline", "date", "run_id", "transcript", "tokens", "cost", "cutoff"},
 	"grade":      {"scale", "score", "bucket", "rubric", "at", "graders", "rule", "queue", "run_id"},
-	"judgement":  {"by", "score", "max", "rubric", "at", "notes_hash", "revised"},
+	"judgement":  {"by", "family", "score", "max", "rubric", "at", "notes_hash", "revised"},
 	"link":       {"type", "to"},
 }
 

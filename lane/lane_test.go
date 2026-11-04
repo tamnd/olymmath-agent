@@ -181,3 +181,11 @@ func TestSelect(t *testing.T) {
 		t.Error("an empty list does not give all")
 	}
 }
+
+func TestCodexModel(t *testing.T) {
+	l, _ := fake(t, "codex", "SCORE: 7", "OpenAI Codex v0.166.0\n--------\nworkdir: /tmp/x\nmodel: gpt-5.5\nprovider: openai\n", nil)
+	a, err := l.Ask(context.Background(), Question{Prompt: "grade"})
+	if err != nil || a.Model != "gpt-5.5" || a.Text != "SCORE: 7" {
+		t.Fatalf("answer %+v, %v", a, err)
+	}
+}
