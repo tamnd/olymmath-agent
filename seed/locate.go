@@ -146,20 +146,20 @@ func (a *Aliases) Code(labels []string) string {
 // Len is the number of keys.
 func (a *Aliases) Len() int { return len(a.m) }
 
-var posRE = regexp.MustCompile(`^(?:problem|prob|p|q|#)?\s*([a-z]?)\s*([0-9]{1,4})$`)
+var posRE = regexp.MustCompile(`^(problem|prob|p|q|#)?\s*([a-z]?)\s*([0-9]{1,4})$`)
 
-// Position makes a position from a problem label of a dataset: "3", "P3" and "Problem 3" give "p3", and "A1" and "A-1" give "a1". A number of three or four digits needs a letter, for example the KöMaL sign B3802, because a long number alone is often a year. It returns "" for a label it cannot read.
+// Position makes a position from a problem label of a dataset: "3", "P3" and "Problem 3" give "p3", and "A1" and "A-1" give "a1". A number of four digits needs a letter, for example the KöMaL sign B3802, because a long number alone is often a year. A number of three digits needs a letter or a word such as "P" or "Problem", as in "P148". It returns "" for a label it cannot read.
 func Position(label string) string {
 	m := posRE.FindStringSubmatch(strings.NewReplacer("-", "", "_", "", ".", "").Replace(strings.ToLower(strings.TrimSpace(label))))
 	if m == nil {
 		return ""
 	}
-	n, _ := strconv.Atoi(m[2])
-	if n == 0 || (m[1] == "" && len(m[2]) > 2) {
+	n, _ := strconv.Atoi(m[3])
+	if n == 0 || (m[2] == "" && len(m[3]) > 2 && (m[1] == "" || len(m[3]) > 3)) {
 		return ""
 	}
-	if m[1] != "" {
-		return m[1] + strconv.Itoa(n)
+	if m[2] != "" {
+		return m[2] + strconv.Itoa(n)
 	}
 	return "p" + strconv.Itoa(n)
 }

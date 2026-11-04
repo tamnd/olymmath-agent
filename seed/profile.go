@@ -306,7 +306,7 @@ var Profiles = map[string]Profile{
 			n, _ := strconv.Atoi(r.Get("problem_number"))
 			st := strings.TrimSpace(strings.ReplaceAll(r.Get("problem_statement"), `\\`, `\`))
 			return Row{
-				ID: r.Get("label"), Labels: labels("GAIC Math"), Year: 2024, Number: r.Get("problem_number"), Lang: "en",
+				ID: r.Get("label"), Labels: labels("GAIC Math"), Year: 2024, Number: "P" + strconv.Itoa(n), Lang: "en",
 				Statement: st, Answer: r.Get("answer"), Solutions: count(r, "reasoning"),
 			}, st != "" && n >= 1 && n <= 148
 		},
