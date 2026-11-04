@@ -1,0 +1,3 @@
+{"problem_id":"APMO-2023-2","problem":"Find all n.","model_solution":"All n work.","reference_solution":"Only n = 1.","marking_scheme":"7 for the answer and the proof.","expert_rating":0,"generator":"OpenAI-o3","response_number":0}
+{"problem_id":"APMO-2023-2","problem":"Find all n.","model_solution":"Only n = 1, proved.","reference_solution":"Only n = 1.","marking_scheme":"7 for the answer and the proof.","expert_rating":7,"generator":"claude-sonnet-5-5","response_number":0}
+{"problem_id":"APMO-2023-2","problem":"Find all n.","model_solution":"Only n = 1, proved.","reference_solution":"Only n = 1.","marking_scheme":"7 for the answer and the proof.","expert_rating":7,"generator":"claude-sonnet-5-5","response_number":0}

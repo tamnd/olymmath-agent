@@ -1,0 +1,3 @@
+{"problem_id":"usamo_2025_1","problem":"Prove it.","solution":"A proof.","score":[1,1],"model_id":"o4-mini","ground_truth_solution":"Ref."}
+{"problem_id":"usamo_2025_1","problem":"Prove it.","solution":"Not a proof.","score":[0,0,1],"model_id":"gemini","ground_truth_solution":"Ref."}
+{"problem_id":"usamo_2025_2","problem":"Prove it.","solution":"Split.","score":[0,1],"model_id":"gemini","ground_truth_solution":"Ref."}
