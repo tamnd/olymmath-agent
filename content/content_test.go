@@ -38,8 +38,24 @@ func TestLoadValid(t *testing.T) {
 	if p.Tag != "0HVHSDNNMY" || c.ByTag(p.Tag) != p || p.Source.Origin != "H1" || p.Source.Zone != "Z2" {
 		t.Fatalf("problem: %+v", p)
 	}
-	if len(p.Solutions) != 1 || p.Solutions[0].Origin != "human" {
+	if len(p.Solutions) != 2 || p.Solutions[0].Origin != "human" || p.Solutions[1].Origin != "ai" {
 		t.Fatalf("solutions: %+v", p.Solutions)
+	}
+	ai := p.Solutions[1]
+	if ai.Run == nil || ai.Run.Cost != 0.66 || ai.Grade == nil || ai.Grade.Score != 6 || len(ai.All()) != 2 || ai.HumanGraded() {
+		t.Fatalf("AI solution: %+v", ai)
+	}
+	if j := ai.All()[0]; j.Rubric != "imo/2024/p1@r2" || j.At != "2026-11-03" || j.Max != 7 {
+		t.Fatalf("a grader does not take the rubric and the date of the jury: %+v", j)
+	}
+	if p.Rubric == nil || p.Rubric.Ref() != "imo/2024/p1@r2" || p.Rubric.Max() != 7 || c.Rubrics["imo/2024/p1"] != p.Rubric {
+		t.Fatalf("rubric: %+v", p.Rubric)
+	}
+	if r := c.Runs["solve-20261103-0001"]; r == nil || len(r.Items) != 1 || r.Items[0].Tokens.Output != 30000 {
+		t.Fatalf("runs: %+v", c.Runs)
+	}
+	if pe := c.People["tamnd"]; pe == nil || !pe.Has("reviewer") || c.People["ann"].Has("reviewer") {
+		t.Fatalf("people: %+v", c.People)
 	}
 	loose := c.Loose[0]
 	if loose.Locator() != loose.Tag || loose.Source.Name != "Mathematics Stack Exchange" {
@@ -147,6 +163,50 @@ func TestShapeError(t *testing.T) {
 		got := shapeError(&tc.c)
 		if (tc.want == "") != (got == "") || !strings.Contains(got, tc.want) {
 			t.Errorf("shapeError(%+v) = %q, want %q", tc.c, got, tc.want)
+		}
+	}
+}
+
+func TestBucket(t *testing.T) {
+	for _, tc := range []struct {
+		score, max int
+		want       string
+	}{{7, 7, "correct"}, {6, 7, "almost"}, {5, 7, "almost"}, {4, 7, "partial"}, {1, 7, "partial"}, {0, 7, "incorrect"}, {9, 10, "almost"}, {10, 10, "correct"}, {1, 10, "incorrect"}} {
+		if got := Bucket(tc.score, tc.max); got != tc.want {
+			t.Errorf("Bucket(%d, %d) = %s, want %s", tc.score, tc.max, got, tc.want)
+		}
+	}
+}
+
+func TestParseRubricRef(t *testing.T) {
+	loc, v, err := ParseRubricRef("imo/2024/p1@r12")
+	if err != nil || loc != "imo/2024/p1" || v != 12 {
+		t.Fatalf("got %q %d %v", loc, v, err)
+	}
+	for _, bad := range []string{"imo/2024/p1", "imo/2024/p1@r0", "@r1", "imo/2024/p1@2"} {
+		if _, _, err := ParseRubricRef(bad); err == nil {
+			t.Errorf("%q: want an error", bad)
+		}
+	}
+}
+
+func TestRubricError(t *testing.T) {
+	ok := Rubric{Version: 1, Scale: "imo-7", Source: "written", Status: "draft", Checkpoints: []Checkpoint{{Points: 7, Text: "all"}}}
+	if msg := rubricError(&ok); msg != "" {
+		t.Fatal(msg)
+	}
+	for name, edit := range map[string]func(r *Rubric){
+		"sum":      func(r *Rubric) { r.Checkpoints[0].Points = 6 },
+		"scale":    func(r *Rubric) { r.Scale = "ten" },
+		"reviewed": func(r *Rubric) { r.Status = "reviewed" },
+		"drafted":  func(r *Rubric) { r.Source = "drafted" },
+		"deduct":   func(r *Rubric) { r.Deductions = []Checkpoint{{Points: 1, Text: "x"}} },
+	} {
+		r := ok
+		r.Checkpoints = []Checkpoint{ok.Checkpoints[0]}
+		edit(&r)
+		if rubricError(&r) == "" {
+			t.Errorf("%s: want an error", name)
 		}
 	}
 }

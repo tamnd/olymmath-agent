@@ -1,0 +1,8 @@
+# The people of olymmath: authors, solvers, graders and contributors.
+- id: tamnd
+  name: Tam Nguyen Duc
+  github: tamnd
+  roles: [maintainer, reviewer]
+- id: ann
+  name: Ann Example
+  roles: [contributor]

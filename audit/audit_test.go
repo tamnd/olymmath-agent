@@ -78,6 +78,10 @@ func TestValidHasNoFindings(t *testing.T) {
 
 const p2 = "problems/imo/2024/p2.md"
 const sol = "solutions/imo/2024/p1/006SZE6NAS.md"
+const aiSol = "solutions/imo/2024/p1/RG3MNR0R50.md"
+
+// longText is a solution text that is long enough for rule L06.
+const longText = "Write the number as a sum of an even integer and a remainder from zero to two. The sum of the floors changes by a multiple of n when the even part changes, so the remainder alone decides the property. Take n equal to two and then n equal to three, and compare the sums; the remainder must be zero or the property fails at the first n where the fractional part is large enough. This proves that only the even integers work, and each even integer works since the sum is then n times an integer."
 
 const (
 	formal      = "formal/imo/2024/p1/X70GFNJBRT.yaml"
@@ -140,6 +144,19 @@ func TestRules(t *testing.T) {
 		{"L02", map[string][][2]string{sol: {{"origin: human", "origin: ai"}}}},
 		{"L03", map[string][][2]string{sol: {{"complete: true", "complete: true\nrun:\n  model: claude-opus-5-5"}}}},
 		{"L04", map[string][][2]string{sol: {{"zone: Z1", "zone: Z3"}}}},
+		{"L02", map[string][][2]string{aiSol: {{"run_id: solve-20261103-0001", "run_id: solve-20261103-0009"}}}},
+		{"L05", map[string][][2]string{aiSol: {{"answer_check: match", "answer_check: mismatch"}}}},
+		{"L05", map[string][][2]string{aiSol: {{"answer_check: match\n", ""}, {"answer_claimed: All even integers $\\alpha$.", "answer_claimed: All odd integers."}}}},
+		{"L06", map[string][][2]string{sol: {{"Write $\\alpha = k + \\beta$ with $k$ an integer and $0 \\leq \\beta < 1$.", longText}}, aiSol: {{"Write $\\alpha = 2m + \\beta$ with $m$ an integer and $0 \\leq \\beta < 2$. The sum changes by a multiple of $n$, so we may take $\\alpha = \\beta$.", longText + " This ends the proof."}}}},
+		{"G01", map[string][][2]string{aiSol: {{"  at: 2026-11-03\n", ""}}}},
+		{"G01", map[string][][2]string{aiSol: {{"rubric: imo/2024/p1@r2", "rubric: imo/2024/p1@r3"}}}},
+		{"G01", map[string][][2]string{aiSol: {{"bucket: almost", "bucket: correct"}}}},
+		{"G01", map[string][][2]string{aiSol: {{"score: 6\n  bucket", "score: 7\n  bucket"}, {"bucket: almost", "bucket: correct"}}}},
+		{"G01", map[string][][2]string{aiSol: {{"model:claude-haiku-5-5", "model:claude-opus-5-5"}}}},
+		{"G01", map[string][][2]string{sol: {{"complete: true", "complete: true\ngrades:\n  - {by: human:reviewer/tamnd, score: 7, max: 7}"}}}},
+		{"G02", map[string][][2]string{sol: {{"complete: true", "complete: true\ngrades:\n  - {by: human:reviewer/ann, score: 7, max: 7, rubric: imo/2024/p1@r2, at: 2026-12-01}"}}}},
+		{"G02", map[string][][2]string{sol: {{"complete: true", "complete: true\ngrades:\n  - {by: human:reviewer/zoe, score: 7, max: 7, rubric: imo/2024/p1@r2, at: 2026-12-01}"}}}},
+		{"G03", map[string][][2]string{aiSol: {{"score: 6\n  bucket: almost", "score: 2\n  bucket: partial"}, {"'model:claude-haiku-5-5', score: 6", "'model:claude-haiku-5-5', score: 2"}}}},
 		{"F01", map[string][][2]string{formal: {{"  result: pass", "  result: fail"}}}},
 		{"F01", map[string][][2]string{formal: {{"toolchain: leanprover/lean4:v4.35.0\nmathlib", "toolchain: leanprover/lean4:v4.34.0\nmathlib"}}}},
 		{"F01", map[string][][2]string{formal: {{"path: lean/vendor/compfiles/1745e6ced3e6/Compfiles/Imo2024P1.lean", "path: lean/Missing.lean"}}}},
@@ -220,5 +237,20 @@ func TestWithdrawnTag(t *testing.T) {
 	tags["registers/aliases.tsv"] = [][2]string{{"", "0000000000\t-\tthe text was of another problem\n"}}
 	if _, fs, _ := Run(fixture(t, tags), "T02"); len(fs) != 0 {
 		t.Errorf("a withdrawn tag: want no finding, got %v", fs)
+	}
+}
+
+// TestHumanGradeClearsG03 checks that a human grade settles a disagreement of the models.
+func TestHumanGradeClearsG03(t *testing.T) {
+	edits := map[string][][2]string{aiSol: {
+		{"score: 6\n  bucket: almost", "score: 2\n  bucket: partial"},
+		{"'model:claude-haiku-5-5', score: 6}", "'model:claude-haiku-5-5', score: 2}\n    - {by: human:reviewer/tamnd, score: 2}"},
+	}}
+	_, fs, err := Run(fixture(t, edits))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fs) != 0 {
+		t.Errorf("want no finding, got %v", fs)
 	}
 }

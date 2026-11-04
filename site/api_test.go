@@ -16,7 +16,7 @@ func TestAPIFiles(t *testing.T) {
 	if err := json.Unmarshal([]byte(read(t, out, "api/problem/0HVHSDNNMY.json")), &p); err != nil {
 		t.Fatal(err)
 	}
-	if p.Locator != "imo/2024/p1" || p.Edition != "2024" || p.URL != "https://example.org/imo/2024/p1" || p.Title != "IMO 2024 Problem 1" || !p.HasAnswer || p.Solutions != 1 || p.Statement == "" {
+	if p.Locator != "imo/2024/p1" || p.Edition != "2024" || p.URL != "https://example.org/imo/2024/p1" || p.Title != "IMO 2024 Problem 1" || !p.HasAnswer || p.Solutions != 2 || p.Statement == "" {
 		t.Errorf("problem record: %+v", p)
 	}
 	// The problem record hides the answer and the solutions.
@@ -27,7 +27,7 @@ func TestAPIFiles(t *testing.T) {
 	if err := json.Unmarshal([]byte(read(t, out, "api/solutions/0HVHSDNNMY.json")), &s); err != nil {
 		t.Fatal(err)
 	}
-	if s.Answer != "All even integers $\\alpha$." || len(s.Solutions) != 1 || s.Solutions[0].Text == "" {
+	if s.Answer != "All even integers $\\alpha$." || len(s.Solutions) != 2 || s.Solutions[0].Text == "" || s.Solutions[1].Origin != "ai" {
 		t.Errorf("solutions record: %+v", s)
 	}
 	// The loose problem has no answer and no solution, so it has no solutions file.
