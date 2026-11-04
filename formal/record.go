@@ -63,7 +63,10 @@ func ReadResults(dir, lib string) (*Results, error) {
 
 var axiomsRE = regexp.MustCompile(`(?s)'([^']+)' (depends on axioms: \[([^\]]*)\]|does not depend on any axioms)`)
 
-// ParseAxioms reads the output of #print axioms.
+// privateRE finds the prefix of a private name, as in _private.Archive.Imo.Imo2019Q2.0.imo2019_q2. The check script imports a file of the module system with import all, and then #print axioms names a private declaration in this form. A part of a module name that is a number is in « and », so the first part that is a number ends the prefix.
+var privateRE = regexp.MustCompile(`^_private(?:\.[^.]+)*?\.[0-9]+\.`)
+
+// ParseAxioms reads the output of #print axioms. A private declaration gets its name without the private prefix, which is the name in the targets.
 func ParseAxioms(out string) map[string][]string {
 	m := map[string][]string{}
 	for _, g := range axiomsRE.FindAllStringSubmatch(out, -1) {
@@ -74,7 +77,7 @@ func ParseAxioms(out string) map[string][]string {
 			}
 		}
 		sort.Strings(as)
-		m[g[1]] = as
+		m[privateRE.ReplaceAllString(g[1], "")] = as
 	}
 	return m
 }

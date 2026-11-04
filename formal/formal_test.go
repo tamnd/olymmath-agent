@@ -246,6 +246,7 @@ func TestRenamePatches(t *testing.T) {
 		{"putnambench", "src/putnam_2025_a3.lean", "  play.Chain isValidMove (initialState n) ∧", "  (initialState n :: play).IsChain isValidMove ∧"},
 		{"putnambench", "src/putnam_2021_a1.lean", "P l ↔ l.Chain' fun p q ↦", "P l ↔ l.IsChain fun p q ↦"},
 		{"putnambench", "src/putnam_1987_a4.lean", "(hPreal : ∀ i : Fin 3 →₀ ℕ, (coeff i P).im = 0)", "(hPreal : ∀ i : Fin 3 →₀ ℕ, (P.coeff i).im = 0)"},
+		{"putnambench", "src/putnam_1971_a4.lean", ": ∃ N : ℕ, ∀ n ≥ N, ∀ i : Fin 2 →₀ ℕ, MvPolynomial.coeff i (P n ε) ≥ 0 :=", ": ∃ N : ℕ, ∀ n ≥ N, ∀ i : Fin 2 →₀ ℕ, (P n ε).coeff i ≥ 0 :="},
 	} {
 		if got := Sources[c.source].Patches[c.rel](c.src); got != c.want {
 			t.Errorf("%s %s: %q", c.source, c.rel, got)
@@ -267,5 +268,26 @@ func TestDeclsSectionModifiers(t *testing.T) {
 	ds := Decls(src)
 	if len(ds) != 2 || ds[0].Name != "Imo1962P4.f" || ds[1].Name != "Imo1962P4.imo1962_p4" {
 		t.Fatalf("decls: %+v", ds)
+	}
+}
+
+func TestParseAxiomsPrivate(t *testing.T) {
+	ax := ParseAxioms("'_private.Archive.Imo.Imo2019Q2.0.imo2019_q2' depends on axioms: [propext]\n'_private.Imo.«2005».P3.0.Imo2005P3.result' does not depend on any axioms\n'imo2019_q1' does not depend on any axioms\n")
+	if a, ok := ax["imo2019_q2"]; !ok || len(a) != 1 || a[0] != "propext" {
+		t.Fatalf("axioms %v", ax)
+	}
+	if _, ok := ax["Imo2005P3.result"]; !ok {
+		t.Fatalf("axioms %v", ax)
+	}
+	if _, ok := ax["imo2019_q1"]; !ok {
+		t.Fatalf("axioms %v", ax)
+	}
+}
+
+func TestCheckScriptModules(t *testing.T) {
+	for _, s := range []string{`header="module"; imp="import all"`, `echo "$imp $m"`} {
+		if !strings.Contains(CheckScript, s) {
+			t.Fatalf("the check script has no %q", s)
+		}
 	}
 }
