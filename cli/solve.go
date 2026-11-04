@@ -248,7 +248,7 @@ func writeAISolution(corpus *content.Corpus, root, runID string, r *solve.Result
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return "", err
 	}
-	if err := os.WriteFile(path, out, 0o600); err != nil {
+	if err := os.WriteFile(path, out, 0o644); err != nil { // #nosec G306 G703 -- content files are public.
 		return "", err
 	}
 	if err := addTag(root, t, "solution"); err != nil {

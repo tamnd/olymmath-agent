@@ -126,6 +126,31 @@ func order(m *yaml.Node, kind string) {
 
 // SetTopics sets the topics of a problem file.
 func SetTopics(b []byte, topics []string) ([]byte, error) {
+	list := &yaml.Node{Kind: yaml.SequenceNode, Style: yaml.FlowStyle}
+	for _, t := range topics {
+		list.Content = append(list.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: t})
+	}
+	return setKey(b, "topics", list)
+}
+
+// SetGrade sets the jury grade of a solution file.
+func SetGrade(b []byte, g *Grade) ([]byte, error) {
+	var n yaml.Node
+	if err := n.Encode(g); err != nil {
+		return nil, err
+	}
+	for _, v := range n.Content {
+		if v.Kind == yaml.SequenceNode {
+			for _, j := range v.Content {
+				j.Style = yaml.FlowStyle
+			}
+		}
+	}
+	return setKey(b, "grade", &n)
+}
+
+// setKey sets a key of the front matter of a file and puts the file in its canonical form.
+func setKey(b []byte, key string, val *yaml.Node) ([]byte, error) {
 	front, body, err := splitFront(b)
 	if err != nil {
 		return nil, err
@@ -137,15 +162,11 @@ func SetTopics(b []byte, topics []string) ([]byte, error) {
 	if len(doc.Content) != 1 || doc.Content[0].Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("the front matter is not a mapping")
 	}
-	list := &yaml.Node{Kind: yaml.SequenceNode, Style: yaml.FlowStyle}
-	for _, t := range topics {
-		list.Content = append(list.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: t})
-	}
 	top := doc.Content[0]
-	if v := value(top, "topics"); v != nil {
-		*v = *list
+	if v := value(top, key); v != nil {
+		*v = *val
 	} else {
-		top.Content = append(top.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: "topics"}, list)
+		top.Content = append(top.Content, &yaml.Node{Kind: yaml.ScalarNode, Value: key}, val)
 	}
 	var buf bytes.Buffer
 	buf.WriteString("---\n")

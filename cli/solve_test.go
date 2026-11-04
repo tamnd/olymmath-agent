@@ -89,3 +89,34 @@ func TestSolve(t *testing.T) {
 		t.Fatal("the resume wrote a second solution")
 	}
 }
+
+func TestGrade(t *testing.T) {
+	f := fakeModel(t)
+	dir := copyContent(t)
+	code, out, errs := run("grade", "-dry-run", "-content", dir)
+	if code != ExitOK || !strings.Contains(out, "0 solutions to grade") || f.Calls() != 0 {
+		t.Fatalf("the dry run gives %d, %q, %q", code, out, errs)
+	}
+	code, out, errs = run("grade", "-regrade", "-budget", "1", "-content", dir, "-work", t.TempDir(), "RG3MNR0R50")
+	if code != ExitOK || !strings.Contains(out, "1 graded") || f.Calls() != 2 {
+		t.Fatalf("code %d, %d calls, out %q, errs %q", code, f.Calls(), out, errs)
+	}
+	corpus, findings := content.Load(dir)
+	if findings.Errors() > 0 {
+		t.Fatalf("the content has errors after om grade: %v", findings)
+	}
+	s := corpus.ByTag("0HVHSDNNMY").Solutions[1]
+	if s.Tag != "RG3MNR0R50" {
+		s = corpus.ByTag("0HVHSDNNMY").Solutions[0]
+	}
+	g := s.Grade
+	if g == nil || g.Score != 7 || g.Bucket != "correct" || g.Rubric != "imo/2024/p1@r2" || len(g.Graders) != 2 || corpus.Runs[g.RunID] == nil {
+		t.Fatalf("the grade is %+v", g)
+	}
+	if code, out, _ := run("audit", "-content", dir); strings.Contains(out, "G01") || strings.Contains(out, "G03") {
+		t.Fatalf("the audit gives %d: %s", code, out)
+	}
+	if code, out, _ := run("fmt", "-check", "-content", dir); code != ExitOK {
+		t.Fatalf("the grade is not in the canonical form: %s", out)
+	}
+}
