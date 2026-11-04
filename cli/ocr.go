@@ -28,6 +28,7 @@ func init() {
 // ocrOptions are the flags of om ocr.
 type ocrOptions struct {
 	root, source, paper, lang, file, pages, work string
+	images                                       string
 	lanes, dpi                                   string
 	limit                                        int
 	dry, sequence                                bool
@@ -42,6 +43,7 @@ func runOCR(env Env, args []string) int {
 	fs.StringVar(&o.paper, "paper", "", "the paper of the layout of the competition that the PDF holds, such as day1. The problems of a paper that numbers from 1 get the positions of that paper")
 	fs.StringVar(&o.lang, "lang", "", "the language code of the paper. It is the code of the official paper of the edition when it is not given")
 	fs.StringVar(&o.file, "file", "", "a local copy of the PDF at the URL. Then om ocr does not get the URL")
+	fs.StringVar(&o.images, "images", "", "a directory of image files to read instead of a PDF, in the order of their names. Each image is a part of a page that holds one problem, as the images of a dataset. The name of each file without its extension names the problem in the source, such as the id of the row")
 	fs.StringVar(&o.pages, "pages", "", "the pages to read, such as 1-2,4. All the pages up to -limit when it is not given")
 	fs.IntVar(&o.limit, "limit", ocr.DefaultLimit, "the largest number of pages to read when -pages is not given")
 	fs.StringVar(&o.work, "work", filepath.Join(os.TempDir(), "om-ocr"), "the directory for the PDF and the page images. om ocr deletes them when it ends")
@@ -54,7 +56,11 @@ func runOCR(env Env, args []string) int {
 		return ExitUsage
 	}
 	if len(pos) < 1 || len(pos) > 2 {
-		fmt.Fprintln(env.Stderr, "usage: om ocr [-source SOURCE] [-paper PAPER] [-pages PAGES] [-file FILE] [-dry] EDITION [URL]\nEDITION is an edition such as pl-om/1997. URL is the address of the official paper. It is the official paper of the edition from the source when it is not given.")
+		fmt.Fprintln(env.Stderr, "usage: om ocr [-source SOURCE] [-paper PAPER] [-pages PAGES] [-file FILE | -images DIR] [-dry] EDITION [URL]\nEDITION is an edition such as pl-om/1997. URL is the address of the official paper. It is the official paper of the edition from the source when it is not given, or the address of the source for the images of a dataset.")
+		return ExitUsage
+	}
+	if o.images != "" && (o.file != "" || o.pages != "") {
+		fmt.Fprintln(env.Stderr, "om ocr: -images reads image files, so it takes no -file and no -pages")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(o.root)
@@ -66,6 +72,9 @@ func runOCR(env Env, args []string) int {
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om ocr: %v\n", err)
 		return ExitUsage
+	}
+	if s := corpus.Source(o.source); o.images != "" && len(pos) == 1 && s != nil && s.Kind == "dataset" {
+		pos = append(pos, s.URL)
 	}
 	paper, err := ocrPaper(e, o, pos[1:])
 	if err != nil {
@@ -98,29 +107,19 @@ func runOCR(env Env, args []string) int {
 		return ExitFailure
 	}
 	ctx := context.Background()
-	pdf, err := ocrBytes(ctx, env, o, *dir, *remote, src.ID, paper.URL)
-	if err != nil {
-		fmt.Fprintf(env.Stderr, "om ocr: %s: %v\n", paper.URL, err)
-		return ExitFailure
-	}
-	if err := os.MkdirAll(o.work, 0o750); err != nil {
-		fmt.Fprintf(env.Stderr, "om ocr: %v\n", err)
-		return ExitFailure
-	}
-	work, err := os.MkdirTemp(o.work, "run-")
-	if err != nil {
-		fmt.Fprintf(env.Stderr, "om ocr: %v\n", err)
-		return ExitFailure
-	}
-	defer func() { _ = os.RemoveAll(work) }()
-	file := filepath.Join(work, "paper.pdf")
-	if err := os.WriteFile(file, pdf, 0o600); err != nil {
-		fmt.Fprintf(env.Stderr, "om ocr: %v\n", err)
-		return ExitFailure
-	}
 	chain := &lane.Chain{Lanes: lanes, State: filepath.Join(cache.Dir, "lanes.json")}
-	r := &ocr.Reader{Asker: chain, Cache: cache, Work: work, DPI: dpi, Limit: o.limit, Log: env.Stderr}
-	read, err := r.Read(ctx, file, pages)
+	var read []ocr.Page
+	if o.images != "" {
+		files, ferr := imageFiles(o.images)
+		if ferr != nil {
+			fmt.Fprintf(env.Stderr, "om ocr: -images: %v\n", ferr)
+			return ExitUsage
+		}
+		r := &ocr.Reader{Asker: chain, Cache: cache, Log: env.Stderr}
+		read, err = r.ReadImages(ctx, files)
+	} else {
+		read, err = readPDF(ctx, env, o, *dir, *remote, src.ID, paper.URL, chain, cache, dpi, pages)
+	}
 	if errors.Is(err, lane.ErrExhausted) {
 		// The batch stops here. The pages that were read are in the cache, so the next run asks only for the others.
 		fmt.Fprintf(env.Stderr, "om ocr: %s: %v\nThe pages read so far are in the cache. Run again when a lane has its allowance.\n", e.Locator(), err)
@@ -136,8 +135,18 @@ func runOCR(env Env, args []string) int {
 		return ExitFailure
 	}
 	news := planScans(corpus, e, paper, read, o.sequence, textAllowed(src), markup)
+	if o.images != "" {
+		// A crop is not a page of the paper, so the statement gives no page.
+		for i := range news {
+			news[i].scan.Page = 0
+		}
+	}
 	for _, n := range news {
-		fmt.Fprintf(env.Stdout, "%s: page %d, %s\n", n.at, n.scan.Page, n.why)
+		where := fmt.Sprintf("page %d", n.scan.Page)
+		if n.ref != "" {
+			where = n.ref
+		}
+		fmt.Fprintf(env.Stdout, "%s: %s, %s\n", n.at, where, n.why)
 	}
 	if o.dry {
 		for _, n := range news {
@@ -250,6 +259,8 @@ type newScan struct {
 	at   string
 	scan canon.Scan
 	why  string
+	// ref names the problem in the source: the name of its image file without the extension. It is "" for a page of a PDF.
+	ref string
 }
 
 // planScans gives a new problem for each problem of the pages at a position of the edition that has no problem. A problem holds its text when the source allows it, the checks find nothing, and the text renders. Otherwise it only links to its page.
@@ -298,7 +309,11 @@ func planScans(corpus *content.Corpus, e *content.Edition, paper content.Officia
 		if s.Text == "" {
 			s.Extraction, s.Confidence = "", 0
 		}
-		out = append(out, newScan{at: at, scan: s, why: why})
+		ref := ""
+		if pg.File != "" {
+			ref = strings.TrimSuffix(filepath.Base(pg.File), filepath.Ext(pg.File))
+		}
+		out = append(out, newScan{at: at, scan: s, why: why, ref: ref})
 	}
 	return out
 }
@@ -314,8 +329,16 @@ func writeScans(root string, corpus *content.Corpus, e *content.Edition, src *co
 	}
 	c := e.Competition
 	name := fmt.Sprintf("%s %d official paper", c.Name, e.Year)
+	dataset := src.Kind == "dataset"
 	for i, n := range news {
 		cd := &canon.Candidate{Source: src.ID, Origin: src.Origin, Zone: src.Zone.Statement, Lang: paper.Code, Name: name, URL: paper.URL}
+		if dataset {
+			// The text is a row of a dataset, not the official paper: the statement names the dataset and the row.
+			cd.Name, cd.Ref = src.Name, n.ref
+			if n.ref != "" {
+				cd.Name = src.Name + ", " + n.ref
+			}
+		}
 		_, rule := canon.Rank(&canon.Candidate{Origin: src.Origin, Lang: paper.Code}, original(c))
 		b, err := canon.RenderScan(n.at, tags[i], cd, n.scan, rule)
 		if err != nil {
@@ -325,7 +348,7 @@ func writeScans(root string, corpus *content.Corpus, e *content.Edition, src *co
 			return fmt.Errorf("%s: %w", n.at, err)
 		}
 	}
-	if slices.ContainsFunc(e.Official, func(p content.OfficialPaper) bool { return p.URL == paper.URL }) {
+	if dataset || slices.ContainsFunc(e.Official, func(p content.OfficialPaper) bool { return p.URL == paper.URL }) {
 		return nil
 	}
 	file := filepath.Join(root, "editions", c.Code, e.ID+".yaml")
@@ -364,6 +387,49 @@ func parseInts(s string) ([]int, error) {
 			return nil, fmt.Errorf("%q is not a number", f)
 		}
 		out = append(out, n)
+	}
+	return out, nil
+}
+
+// readPDF gets the PDF, from the local file or the URL, and reads its pages.
+func readPDF(ctx context.Context, env Env, o ocrOptions, dir string, remote bool, source, url string, chain *lane.Chain, cache *ocr.Cache, dpi, pages []int) ([]ocr.Page, error) {
+	pdf, err := ocrBytes(ctx, env, o, dir, remote, source, url)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", url, err)
+	}
+	if err := os.MkdirAll(o.work, 0o750); err != nil {
+		return nil, err
+	}
+	work, err := os.MkdirTemp(o.work, "run-")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = os.RemoveAll(work) }()
+	file := filepath.Join(work, "paper.pdf")
+	if err := os.WriteFile(file, pdf, 0o600); err != nil {
+		return nil, err
+	}
+	r := &ocr.Reader{Asker: chain, Cache: cache, Work: work, DPI: dpi, Limit: o.limit, Log: env.Stderr}
+	return r.Read(ctx, file, pages)
+}
+
+// imageExts are the extensions of the image files that -images reads.
+var imageExts = []string{".png", ".jpg", ".jpeg", ".webp"}
+
+// imageFiles gives the image files of the directory, in the order of their names.
+func imageFiles(dir string) ([]string, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, e := range entries {
+		if !e.IsDir() && slices.Contains(imageExts, strings.ToLower(filepath.Ext(e.Name()))) {
+			out = append(out, filepath.Join(dir, e.Name()))
+		}
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%s has no image file", dir)
 	}
 	return out, nil
 }

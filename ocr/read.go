@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 
 	"github.com/tamnd/olymmath-agent/lane"
@@ -47,6 +48,8 @@ type Page struct {
 	// Key is the key of the page image in the cache.
 	Key    string
 	Cached bool
+	// File is the image file of a page that ReadImages read. It is "" for a page of a PDF.
+	File string
 }
 
 // Extraction gives the extraction of the page as spec 05.7 writes it: vision/<client>@<version>, and the model when the client tells it.
@@ -150,12 +153,38 @@ func (r *Reader) at(ctx context.Context, path string, n, dpi int) (Page, error) 
 		return Page{}, err
 	}
 	defer func() { _ = os.Remove(img) }()
-	b, err := os.ReadFile(img) // #nosec G304 -- the image that Render wrote.
+	p, err := r.ask(ctx, img, Prompt, PromptVersion)
+	p.N, p.DPI = n, dpi
+	if err == nil {
+		r.logf("page %d at %d dpi: %d characters, cached %v, flags %v", n, dpi, len(p.Text), p.Cached, p.Flags)
+	}
+	return p, err
+}
+
+// ReadImages reads image files, such as the images of a dataset that cut a paper into problems. Each file is a page: the first file is page 1. It reads each image once, with CropPrompt, and does not render or delete it. It stops at the first error that tells that no lane can answer, as Read does.
+func (r *Reader) ReadImages(ctx context.Context, files []string) ([]Page, error) {
+	var out []Page
+	for i, f := range files {
+		p, err := r.ask(ctx, f, CropPrompt, CropPromptVersion)
+		if err != nil {
+			// A lane.ErrExhausted stays in the chain, so the caller can stop the batch.
+			return out, fmt.Errorf("%s: %w", f, err)
+		}
+		p.N, p.File = i+1, f
+		r.logf("%s: %d characters, cached %v, flags %v", filepath.Base(f), len(p.Text), p.Cached, p.Flags)
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+// ask gives the text of one image, from the cache when the cache has the image for the prompt version.
+func (r *Reader) ask(ctx context.Context, img, prompt, version string) (Page, error) {
+	b, err := os.ReadFile(img) // #nosec G304 -- an image that Render wrote or that the user named.
 	if err != nil {
 		return Page{}, err
 	}
-	key := Key(b)
-	p := Page{N: n, DPI: dpi, Key: key}
+	key := KeyFor(version, b)
+	p := Page{Key: key}
 	e, ok, err := r.Cache.Get(key)
 	if err != nil {
 		return Page{}, err
@@ -163,11 +192,11 @@ func (r *Reader) at(ctx context.Context, path string, n, dpi int) (Page, error) 
 	if ok {
 		p.Cached = true
 	} else {
-		a, err := r.Asker.Ask(ctx, lane.Question{Prompt: Prompt, Images: []string{img}})
+		a, err := r.Asker.Ask(ctx, lane.Question{Prompt: prompt, Images: []string{img}})
 		if err != nil {
 			return Page{}, err
 		}
-		e = Entry{Text: a.Text, Lane: a.Lane, Model: a.Model, Version: a.Version, Prompt: PromptVersion, At: now()}
+		e = Entry{Text: a.Text, Lane: a.Lane, Model: a.Model, Version: a.Version, Prompt: version, At: now()}
 		if err := r.Cache.Put(key, e); err != nil {
 			return Page{}, err
 		}
@@ -183,6 +212,5 @@ func (r *Reader) at(ctx context.Context, path string, n, dpi int) (Page, error) 
 			p.Flags = append(p.Flags, f)
 		}
 	}
-	r.logf("page %d at %d dpi: %d characters, cached %v, flags %v", n, dpi, len(p.Text), p.Cached, p.Flags)
 	return p, nil
 }
