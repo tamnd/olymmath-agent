@@ -118,6 +118,10 @@ func (s *Seeds) Add(r seed.Row) {
 		s.skip(r, code, "no competition")
 		return
 	}
+	if r.Year == 0 && r.Number == "" && s.Topics != nil {
+		// A collection such as the AoPS AHSME set has no year in its labels. The topic of the row gives the year when the numbered source knows the topic.
+		r.Year = s.Topics.Year(r.Ref, code)
+	}
 	if r.Year == 0 || (comp.FirstYear > 0 && r.Year < comp.FirstYear) || (s.ThisYear > 0 && r.Year > s.ThisYear) {
 		s.skip(r, code, "no valid year")
 		return

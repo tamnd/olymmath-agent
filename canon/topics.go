@@ -84,6 +84,24 @@ func (t *Topics) Add(r seed.Row) {
 	t.at[m[1]] = at
 }
 
+// Year gives the year of the topic of ref when the numbered source gives the topic one position of competition code. It gives 0 when it does not know the year.
+func (t *Topics) Year(ref, code string) int {
+	topic, ok := strings.CutPrefix(ref, "aops-topic:")
+	if !ok {
+		return 0
+	}
+	at := t.at[topic]
+	rest, ok := strings.CutPrefix(at, code+"/")
+	if !ok || len(t.topics[at]) != 1 || len(rest) < 4 {
+		return 0
+	}
+	y, err := strconv.Atoi(rest[:4])
+	if err != nil {
+		return 0
+	}
+	return y
+}
+
 // Position gives the position of the topic of ref, such as aops-topic:1738331, when its competition and its year are code and year, and the letter of its paper, such as "a" for the AMC 10A, when the numbered source gives it. It gives "" when it does not know the position.
 func (t *Topics) Position(ref, code string, year int) (pos, letter string) {
 	topic, ok := strings.CutPrefix(ref, "aops-topic:")

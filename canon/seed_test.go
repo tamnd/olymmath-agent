@@ -105,6 +105,12 @@ func TestTopics(t *testing.T) {
 	if got := pos("aops-topic:300", 2021); got != "p3" {
 		t.Errorf("the topic of a title gives %q", got)
 	}
+	if y := tp.Year("aops-topic:300", "imo"); y != 2021 {
+		t.Errorf("the year of topic 300 is %d", y)
+	}
+	if y := tp.Year("aops-topic:101", "imo") + tp.Year("aops-topic:300", "usamo") + tp.Year("x", "imo"); y != 0 {
+		t.Errorf("unknown topics give the year %d", y)
+	}
 	for _, ref := range []string{"aops-topic:101", "aops-topic:103", "aops-topic:301", "aops-topic:999", "x"} {
 		for _, y := range []int{2013, 2023} {
 			if got := pos(ref, y); got != "" {
