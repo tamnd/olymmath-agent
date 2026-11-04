@@ -3,6 +3,7 @@ package canon
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"strings"
 
 	"go.yaml.in/yaml/v3"
@@ -30,6 +31,9 @@ type outStatement struct {
 	Origin string `yaml:"origin"`
 	Zone   string `yaml:"zone"`
 	Kind   string `yaml:"kind"`
+	// Extraction and Confidence are set for a text that a model read from a scan.
+	Extraction string  `yaml:"extraction,omitempty"`
+	Confidence float64 `yaml:"confidence,omitempty"`
 }
 
 type outProblem struct {
@@ -363,5 +367,49 @@ func RenderLink(at, tag string, c *Candidate, page int, rule string) ([]byte, er
 		return nil, err
 	}
 	buf.WriteString("---\n")
+	return content.Format(buf.Bytes())
+}
+
+// Scan is the text of a problem that a model read from a page image of an official paper.
+type Scan struct {
+	Page int
+	// Text is the Markdown text with TeX math. It is "" when the content may not hold the text of the source: the file then only links to the page.
+	Text string
+	// Extraction is <lane>/<tool>@<version>, as in vision/claude@2.1.318.
+	Extraction string
+	// Confidence is from 0 to 1.
+	Confidence float64
+}
+
+// RenderScan writes the file of a new problem whose only statement is the official paper of c at the page of s. When s has a text, the file holds it, with the extraction and the confidence, and the status is captured: a model read the words and no person has checked them (spec 09.1). When s has no text, the file is the same as the file of RenderLink.
+func RenderScan(at, tag string, c *Candidate, s Scan, rule string) ([]byte, error) {
+	if strings.TrimSpace(s.Text) == "" {
+		return RenderLink(at, tag, c, s.Page, rule)
+	}
+	if s.Extraction == "" {
+		return nil, fmt.Errorf("%s: a scanned text needs its extraction", at)
+	}
+	p := outProblem{Tag: tag, Kind: "problem"}
+	p.Appearances = []outAppearance{{At: at, Primary: true}}
+	p.Canonical.Statement = "S1"
+	p.Canonical.Rule = rule
+	p.Status.Statement = "captured"
+	st := statementOf("S1", c)
+	st.Page = s.Page
+	st.Extraction = s.Extraction
+	st.Confidence = math.Round(s.Confidence*100) / 100
+	p.Statements = []outStatement{st}
+	var buf bytes.Buffer
+	buf.WriteString("---\n")
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(p); err != nil {
+		return nil, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, err
+	}
+	buf.WriteString("---\n")
+	buf.WriteString(strings.TrimSpace(s.Text) + "\n")
 	return content.Format(buf.Bytes())
 }

@@ -320,7 +320,7 @@ func (l *loader) problem(rel string) {
 
 // source gives the source of a statement for the site. The register fills the fields that the statement does not give.
 func (l *loader) source(s *Statement) Source {
-	src := Source{Name: s.Name, URL: s.URL, Page: s.Page, Origin: s.Origin, Zone: s.Zone}
+	src := Source{Name: s.Name, URL: s.URL, Page: s.Page, Origin: s.Origin, Zone: s.Zone, Extraction: s.Extraction}
 	if r := l.corpus.bySource[s.Source]; r != nil {
 		if src.Name == "" {
 			src.Name = r.Name
