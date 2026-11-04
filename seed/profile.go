@@ -269,10 +269,55 @@ var Profiles = map[string]Profile{
 			}, true
 		},
 	},
+	// The three sets below hold problems that their authors wrote for the set, under an open licence (zone Z1). Each set is one edition: the label names the set, the year is the year of the set and the number is the position.
+	"hf-amo-bench": {
+		Columns: []string{"question_id", "prompt", "solution", "answer"},
+		Map: func(r Record) (Row, bool) {
+			st := r.Get("prompt")
+			// Each prompt ends with the format of the answer for a model, which is not part of the problem.
+			if i := strings.Index(st, "\nAfter solving the above problem"); i >= 0 {
+				st = st[:i]
+			}
+			st = strings.TrimSpace(st)
+			ans := strings.TrimSpace(r.Get("answer"))
+			if strings.HasPrefix(ans, `\boxed{`) && strings.HasSuffix(ans, "}") {
+				ans = strings.TrimSpace(ans[len(`\boxed{`) : len(ans)-1])
+			}
+			return Row{
+				ID: r.Get("question_id"), Labels: labels("AMO-Bench"), Year: 2025, Number: r.Get("question_id"), Lang: "en",
+				Statement: st, Answer: ans, Solutions: count(r, "solution"),
+			}, st != "" && r.Get("question_id") != ""
+		},
+	},
+	"hf-nemotron-imo-bench": {
+		Columns: []string{"id", "problem", "proof", "subject"},
+		Map: func(r Record) (Row, bool) {
+			st := strings.TrimSpace(r.Get("problem"))
+			return Row{
+				ID: r.Get("id"), Labels: labels("Nemotron-IMO-Bench"), Year: 2026, Number: r.Get("id"), Lang: "en",
+				Statement: st, Solutions: count(r, "proof"),
+			}, st != "" && r.Get("id") != ""
+		},
+	},
+	// MathOdyssey holds the problems of GAIC Math 2024. Problems 1 to 148 are the high school competition problems. The others are school and university exercises, which are not olympiad problems. The file escapes each backslash twice, so "\\left" stands for "\left".
+	"hf-mathodyssey": {
+		Columns: []string{"problem_number", "label", "problem_statement", "answer", "reasoning"},
+		Map: func(r Record) (Row, bool) {
+			n, _ := strconv.Atoi(r.Get("problem_number"))
+			st := strings.TrimSpace(strings.ReplaceAll(r.Get("problem_statement"), `\\`, `\`))
+			return Row{
+				ID: r.Get("label"), Labels: labels("GAIC Math"), Year: 2024, Number: r.Get("problem_number"), Lang: "en",
+				Statement: st, Answer: r.Get("answer"), Solutions: count(r, "reasoning"),
+			}, st != "" && n >= 1 && n <= 148
+		},
+	},
 }
 
 // amcIDRE reads an id of the AMC 12 set, such as 2019A-P15: the year, the paper and the problem.
 var amcIDRE = regexp.MustCompile(`^(\d{4})([AB])-P?(\d{1,2})$`)
+
+// yearPaperRE reads a number that has the year, the paper and the problem, such as 1938-A-1.
+var yearPaperRE = regexp.MustCompile(`^((?:18|19|20)[0-9]{2})-([AB])-?([0-9]{1,2})$`)
 
 // The columns that Generic looks for, in order.
 var (
@@ -322,6 +367,13 @@ func Generic(cols []string) Profile {
 				ls = append(ls, r.Get(c))
 			}
 			y, _ := strconv.Atoi(r.First(genYear...))
+			if m := yearPaperRE.FindStringSubmatch(num); m != nil {
+				// PutnamGAP gives the year, the paper and the problem in one number, as in "1938-A-1".
+				if y == 0 {
+					y, _ = strconv.Atoi(m[1])
+				}
+				num = m[2] + m[3]
+			}
 			if y == 0 {
 				for _, l := range ls {
 					if y = Year(l); y != 0 {

@@ -109,7 +109,7 @@ func (c *Competition) HasShape() bool {
 }
 
 // Groups are the groups of the competition register, in the order of the site.
-var Groups = []string{"international", "undergraduate", "usa", "national", "journal"}
+var Groups = []string{"international", "undergraduate", "usa", "national", "journal", "benchmark"}
 
 // Levels are the levels of the competition register.
 var Levels = []string{"junior", "high-school", "undergraduate", "open"}

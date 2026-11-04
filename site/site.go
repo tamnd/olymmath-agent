@@ -662,6 +662,7 @@ var groupTitles = map[string]string{
 	"usa":           "United States",
 	"national":      "National olympiads",
 	"journal":       "Journals",
+	"benchmark":     "Problem sets",
 }
 
 // competitionsData puts the competitions in the groups of the register. The national group is split by country. In each list, the competitions with problems come first, and then the order of the register.

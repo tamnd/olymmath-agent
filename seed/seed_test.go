@@ -185,6 +185,14 @@ func TestCSV(t *testing.T) {
 	}
 }
 
+func TestGenericYearPaper(t *testing.T) {
+	p := Generic([]string{"index", "problem"})
+	row, ok := p.Map(Record{"index": {"1938-A-1"}, "problem": {"x"}})
+	if !ok || row.Year != 1938 || row.Number != "A1" || Position(row.Number) == "" {
+		t.Errorf("row %+v, position %q", row, Position(row.Number))
+	}
+}
+
 func TestProfiles(t *testing.T) {
 	r := Record{"metadata.path": {"Contest Collections/2023 Contests/2023 Germany Team Selection Test/3107329.json"}, "problem": {"x"}}
 	row, ok := Profiles["hf-ai-mo-aops"].Map(r)
@@ -248,6 +256,21 @@ func TestProfiles(t *testing.T) {
 	row, ok = Profiles["hf-mathnet"].Map(Record{"problem_markdown": {"Problem:\nShow it."}, "competition": {"IRL_ABooklet_2023"}, "country": {"Ireland"}})
 	if !ok || row.Statement != "Show it." || row.Year != 2023 {
 		t.Errorf("mathnet row %+v", row)
+	}
+	row, ok = Profiles["hf-amo-bench"].Map(Record{"question_id": {"7"}, "prompt": {"Find $x$.\nAfter solving the above problem, please output your final answer."}, "answer": {`\boxed{3}`}})
+	if !ok || row.Statement != "Find $x$." || row.Answer != "3" || row.Year != 2025 || row.Number != "7" || row.Labels[0] != "AMO-Bench" {
+		t.Errorf("amo-bench row %+v", row)
+	}
+	row, ok = Profiles["hf-nemotron-imo-bench"].Map(Record{"id": {"G12"}, "problem": {"Prove it."}, "proof": {"p"}})
+	if !ok || row.Number != "G12" || row.Year != 2026 || row.Solutions != 1 {
+		t.Errorf("nemotron-imo-bench row %+v", row)
+	}
+	row, ok = Profiles["hf-mathodyssey"].Map(Record{"problem_number": {"2"}, "problem_statement": {`Let $\\left( x \\right)$.`}})
+	if !ok || row.Statement != `Let $\left( x \right)$.` || row.Year != 2024 {
+		t.Errorf("mathodyssey row %+v", row)
+	}
+	if _, ok := Profiles["hf-mathodyssey"].Map(Record{"problem_number": {"149"}, "problem_statement": {"x"}}); ok {
+		t.Error("mathodyssey row 149 is not a competition problem")
 	}
 }
 
