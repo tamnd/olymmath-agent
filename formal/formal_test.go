@@ -100,7 +100,7 @@ func TestParse(t *testing.T) {
 
 func TestLakefile(t *testing.T) {
 	lf := Lakefile([]Vendored{{Source: Sources["compfiles"], Dir: "vendor/compfiles/1745e6ced3e6", Roots: []string{"ProblemExtraction"}}, {Source: Sources["imosllean4"], Dir: "vendor/imosllean4/883b0326e585"}}, nil)
-	for _, want := range []string{`rev = "v4.35.0"`, `srcDir = "vendor/compfiles/1745e6ced3e6"`, `roots = ["ProblemExtraction"]`, `leanOptions = {autoImplicit = true}`, `autoImplicit = false`} {
+	for _, want := range []string{`rev = "v4.35.0"`, `srcDir = "vendor/compfiles/1745e6ced3e6"`, `roots = ["ProblemExtraction"]`, `leanOptions = {autoImplicit = true, relaxedAutoImplicit = true}`, `autoImplicit = false`} {
 		if !strings.Contains(lf, want) {
 			t.Errorf("the lakefile has no %q:\n%s", want, lf)
 		}
@@ -234,6 +234,22 @@ func TestPortPatch(t *testing.T) {
 	}
 	if !Sources["formal-conjectures"].Keep("FormalConjecturesForMathlib/Geometry/2d.lean") || Sources["formal-conjectures"].Keep("FormalConjectures/Paper/X.lean") {
 		t.Fatal("keep")
+	}
+}
+
+func TestRenamePatches(t *testing.T) {
+	for _, c := range []struct{ source, rel, src, want string }{
+		{"formal-imo", "Imo/2022/P6.lean", "      L.Chain' isAdj ∧\n      L.Chain' (fun i j => B i ≤ B j)) :\n", "      L.IsChain isAdj ∧\n      L.IsChain (fun i j => B i ≤ B j)) :\n"},
+		{"formal-imo", "Imo/2004/P6.lean", "(Nat.digits 10 n).Chain' fun d1 d2 =>", "(Nat.digits 10 n).IsChain fun d1 d2 =>"},
+		{"formal-imo", "Imo/1970/P6.lean", "(S_ncoll : Set.Triplewise S.toSet (¬Collinear ℝ {·, ·, ·}))", "(S_ncoll : Set.Triplewise (S : Set ℝ²) (¬Collinear ℝ {·, ·, ·}))"},
+		{"formal-imo", "Imo/1992/P3.lean", "    T.toSet ⊆ P ∧ P < ⊤) → False} :", "    (T : Set (Fin 3 → ℝ)) ⊆ P ∧ P < ⊤) → False} :"},
+		{"putnambench", "src/putnam_2025_a3.lean", "  play.Chain isValidMove (initialState n) ∧", "  (initialState n :: play).IsChain isValidMove ∧"},
+		{"putnambench", "src/putnam_2021_a1.lean", "P l ↔ l.Chain' fun p q ↦", "P l ↔ l.IsChain fun p q ↦"},
+		{"putnambench", "src/putnam_1987_a4.lean", "(hPreal : ∀ i : Fin 3 →₀ ℕ, (coeff i P).im = 0)", "(hPreal : ∀ i : Fin 3 →₀ ℕ, (P.coeff i).im = 0)"},
+	} {
+		if got := Sources[c.source].Patches[c.rel](c.src); got != c.want {
+			t.Errorf("%s %s: %q", c.source, c.rel, got)
+		}
 	}
 }
 
