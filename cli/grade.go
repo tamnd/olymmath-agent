@@ -30,7 +30,7 @@ func runGrade(env Env, args []string) int {
 	root := fs.String("content", ".", "the root of the content repository")
 	dry := fs.Bool("dry-run", false, "print the plan and the cost estimate, and call no model")
 	budget := fs.Float64("budget", 0, "the most the run may cost, in US dollars")
-	jurors := fs.String("jurors", strings.Join(grade.DefaultJurors, ","), "the models of the jury, by commas. The model that wrote a solution is taken out.")
+	jurors := fs.String("jurors", strings.Join(grade.DefaultJurors, ","), "the models of the jury, by commas. The model that wrote a solution is taken out. A juror cli:codex, cli:gemini or cli:claude, or cli:<client>/<model>, runs a local command-line client with its own login, for a juror of another model family.")
 	batch := fs.Bool("batch", true, "use the Batch API, at half the price")
 	work := fs.String("work", defaultWork(), "the directory of the call caches and the transcripts")
 	limit := fs.Int("limit", 0, "the most solutions, or 0 for all")
@@ -47,6 +47,10 @@ func runGrade(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om grade: the content has %d errors. Run om check first.\n", findings.Errors())
 		return ExitFindings
 	}
+	if err := checkJurors(strings.Split(*jurors, ",")); err != nil {
+		fmt.Fprintf(env.Stderr, "om grade: %v\n", err)
+		return ExitUsage
+	}
 	jobs, skipped := gradeJobs(corpus, pos, strings.Split(*jurors, ","), *draft, *regrade, *human)
 	if *limit > 0 && len(jobs) > *limit {
 		jobs = jobs[:*limit]
@@ -62,6 +66,9 @@ func runGrade(env Env, args []string) int {
 		return ExitUsage
 	}
 	fmt.Fprintf(env.Stdout, "%d solutions to grade, about %d calls and $%.2f. %d have no rubric that can be used.\n", len(jobs), calls, cost, skipped)
+	if note := juryNote(tasks); note != "" {
+		fmt.Fprintln(env.Stdout, note)
+	}
 	if *dry || len(jobs) == 0 {
 		return ExitOK
 	}
@@ -69,7 +76,7 @@ func runGrade(env Env, args []string) int {
 		fmt.Fprintln(env.Stderr, "om grade: set -budget in US dollars, or use -dry-run")
 		return ExitUsage
 	}
-	client, err := newClient(*batch)
+	client, err := juryClient(taskJurors(tasks), *batch, *work)
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om grade: %v\n", err)
 		return ExitUsage

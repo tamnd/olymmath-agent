@@ -56,7 +56,7 @@ func runCalibrate(env Env, args []string) int {
 	grades := fs.String("grades", "", "a JSON Lines file of jury scores {\"id\": \"set/item\", \"score\": N}; om compares them and calls no model")
 	dry := fs.Bool("dry-run", false, "print the plan and the cost estimate, and call no model")
 	budget := fs.Float64("budget", 0, "the most the run may cost, in US dollars")
-	jurors := fs.String("jurors", strings.Join(grade.DefaultJurors, ","), "the models of the jury, by commas")
+	jurors := fs.String("jurors", strings.Join(grade.DefaultJurors, ","), "the models of the jury, by commas. A juror such as cli:gemini runs a local command-line client (see om grade).")
 	batch := fs.Bool("batch", true, "use the Batch API, at half the price")
 	out := fs.String("out", "", "the report file, for example reports/calibration.md in the content repository; empty for the standard output")
 	if _, err := parseMixed(fs, args); err != nil {
@@ -71,6 +71,10 @@ func runCalibrate(env Env, args []string) int {
 	items := map[string][]calibrate.Item{}
 	var tasks []grade.Task
 	js := strings.Split(*jurors, ",")
+	if err := checkJurors(js); err != nil {
+		fmt.Fprintf(env.Stderr, "om calibrate: %v\n", err)
+		return ExitUsage
+	}
 	for _, s := range ss {
 		its, err := readCalibrationSet(s, dir)
 		if err != nil {
@@ -106,7 +110,7 @@ func runCalibrate(env Env, args []string) int {
 			fmt.Fprintln(env.Stderr, "om calibrate: set -budget in US dollars, -grades FILE, or -dry-run")
 			return ExitUsage
 		}
-		client, err := newClient(*batch)
+		client, err := juryClient(taskJurors(tasks), *batch, *work)
 		if err != nil {
 			fmt.Fprintf(env.Stderr, "om calibrate: %v\n", err)
 			return ExitUsage

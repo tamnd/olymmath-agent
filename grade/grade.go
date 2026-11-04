@@ -1,4 +1,4 @@
-// Package grade is the grading jury of spec 07.4. At least two model graders score a solution against the rubric of its problem. When their scores differ by more than one point they read each other's notes and revise once. The jury score is the minimum; a difference that remains sends the solution to the human queue.
+// Package grade is the grading jury of spec 07.4. At least two model graders score a solution against the rubric of its problem. A grader can be a model of the Messages API, such as claude-sonnet-5-5, or a local command-line client of another model family, such as cli:gemini or cli:codex (model.CLI). When their scores differ by more than one point they read each other's notes and revise once. The jury score is the minimum; a difference that remains sends the solution to the human queue.
 package grade
 
 import (
@@ -25,8 +25,22 @@ const Pipeline = "grade/1"
 // Spread is the largest difference of the scores that needs no revision.
 const Spread = 1
 
-// DefaultJurors are the graders of the jury before the generator is taken out.
+// DefaultJurors are the graders of the jury before the generator is taken out. They are both Claude models, so for a Claude solution the jury has no grader of another family. Spec 07.4 asks for one: add a cli: juror with -jurors, for example claude-sonnet-5-5,cli:gemini. The default stays Claude only while no command-line client of another family has an allowance on the host of the runs.
 var DefaultJurors = []string{model.Sonnet, model.Haiku}
+
+// OtherFamily reports whether one of the jurors is of another model family than the generator gen. A person's solution (gen "") needs no other family, so it gives true.
+func OtherFamily(jurors []string, gen string) bool {
+	if gen == "" {
+		return true
+	}
+	g := model.Family(gen)
+	for _, j := range jurors {
+		if f := model.Family(j); f != "" && f != g {
+			return true
+		}
+	}
+	return false
+}
 
 // Jurors gives the jury for a solution of the model gen: the jurors without gen, since a model does not grade its own output. When fewer than two are left, it adds the first of Opus, Sonnet and Haiku that is not there.
 func Jurors(jurors []string, gen string) []string {
@@ -106,10 +120,28 @@ func RubricText(r *content.Rubric) string {
 
 // Verdict is one grader's work on a task.
 type Verdict struct {
-	Model   string
-	Score   int
-	Notes   string
-	Revised bool
+	// Model is the juror, as in the list of jurors. Answered is the model that answered, when the client told it, for example gemini-2.5-pro for the juror cli:gemini.
+	Model    string
+	Answered string
+	Score    int
+	Notes    string
+	Revised  bool
+}
+
+// Name gives the real model of the verdict: the model that answered, or the juror when the client did not tell it.
+func (v Verdict) Name() string {
+	if v.Answered != "" {
+		return v.Answered
+	}
+	return v.Model
+}
+
+// Family gives the model family of the verdict, such as anthropic or google.
+func (v Verdict) Family() string {
+	if f := model.Family(v.Answered); f != "" {
+		return f
+	}
+	return model.Family(v.Model)
 }
 
 // Result is the jury grade of a task.
@@ -128,20 +160,22 @@ type Result struct {
 
 // Call is one model call of a task, for the transcript.
 type Call struct {
-	Round  int            `json:"round"`
-	Model  string         `json:"model"`
-	Output string         `json:"output"`
-	Usage  content.Tokens `json:"usage"`
-	Cost   float64        `json:"cost_usd"`
-	Cached bool           `json:"cached,omitempty"`
-	Error  string         `json:"error,omitempty"`
+	Round int    `json:"round"`
+	Model string `json:"model"`
+	// Answered is the model that answered, when the client told it and it is not Model.
+	Answered string         `json:"answered,omitempty"`
+	Output   string         `json:"output"`
+	Usage    content.Tokens `json:"usage"`
+	Cost     float64        `json:"cost_usd"`
+	Cached   bool           `json:"cached,omitempty"`
+	Error    string         `json:"error,omitempty"`
 }
 
 // Grade gives the content record of the result.
 func (r *Result) Grade(at, runID string) *content.Grade {
 	g := &content.Grade{Scale: "imo-7", Score: r.Score, Bucket: content.Bucket(r.Score, 7), Rubric: r.Task.Ref, At: at, Rule: Rule, Queue: r.Queue, RunID: runID}
 	for _, v := range r.Verdicts {
-		g.Graders = append(g.Graders, content.Judgement{By: "model:" + v.Model, Score: v.Score, NotesHash: Hash(v.Notes), Revised: v.Revised})
+		g.Graders = append(g.Graders, content.Judgement{By: "model:" + v.Name(), Family: v.Family(), Score: v.Score, NotesHash: Hash(v.Notes), Revised: v.Revised})
 	}
 	return g
 }
@@ -266,6 +300,9 @@ func Run(ctx context.Context, client model.Client, tasks []Task, o Options) ([]*
 
 func take(r *Result, v, round int, req model.Request, res model.Response) {
 	c := Call{Round: round, Model: req.Model, Output: res.Text, Usage: res.Usage, Cached: res.Cached}
+	if res.Model != req.Model {
+		c.Answered = res.Model
+	}
 	if res.Err == nil {
 		c.Cost, _ = model.Cost(req.Model, res.Usage, res.Batch)
 	} else {
@@ -292,6 +329,9 @@ func take(r *Result, v, round int, req model.Request, res model.Response) {
 		vd.Revised = s != vd.Score
 	}
 	vd.Score, vd.Notes = s, res.Text
+	if c.Answered != "" {
+		vd.Answered = c.Answered
+	}
 }
 
 func spread(r *Result) int {

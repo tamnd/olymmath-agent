@@ -94,3 +94,46 @@ func TestEstimate(t *testing.T) {
 		t.Fatalf("Estimate = %v, %d, %v", c, n, err)
 	}
 }
+
+func TestOtherFamily(t *testing.T) {
+	if OtherFamily(Jurors(DefaultJurors, model.Opus), model.Opus) {
+		t.Fatal("two Claude jurors are of another family than Opus")
+	}
+	if !OtherFamily([]string{model.Sonnet, "cli:gemini"}, model.Opus) || !OtherFamily([]string{model.Sonnet, model.Haiku}, "") {
+		t.Fatal("no other family")
+	}
+}
+
+// cliJury answers the Claude jurors with the fake and the cli: jurors with a fake model that tells its real name.
+type cliJury struct{ api *model.Fake }
+
+func (c cliJury) Complete(ctx context.Context, reqs []model.Request) ([]model.Response, error) {
+	out, err := c.api.Complete(ctx, reqs)
+	for i, r := range reqs {
+		if model.IsCLI(r.Model) {
+			out[i].Model = "gemini-2.5-pro"
+		}
+	}
+	return out, err
+}
+
+func TestRunOtherFamily(t *testing.T) {
+	f := jury(map[string]int{model.Sonnet: 7, "cli:gemini": 7}, nil)
+	tk := task()
+	tk.Jurors = Jurors([]string{model.Sonnet, "cli:gemini"}, model.Opus)
+	got, err := Run(context.Background(), cliJury{f}, []Task{tk}, Options{})
+	if err != nil || got[0].Err != nil {
+		t.Fatal(err, got[0].Err)
+	}
+	r := got[0]
+	if r.Calls[1].Cost != 0 || r.Calls[0].Cost == 0 || r.Calls[1].Model != "cli:gemini" || r.Calls[1].Answered != "gemini-2.5-pro" || r.Calls[0].Answered != "" {
+		t.Fatalf("calls %+v", r.Calls)
+	}
+	g := r.Grade("2026-11-05", "grade-20261105-0001")
+	if g.Graders[0].By != "model:"+model.Sonnet || g.Graders[0].Family != model.FamilyAnthropic || g.Graders[1].By != "model:gemini-2.5-pro" || g.Graders[1].Family != model.FamilyGoogle {
+		t.Fatalf("the graders are %+v", g.Graders)
+	}
+	if est, calls, err := Estimate([]Task{tk}, Options{}, true); err != nil || calls != 2 || est <= 0 {
+		t.Fatalf("Estimate = %v, %d, %v", est, calls, err)
+	}
+}

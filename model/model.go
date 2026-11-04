@@ -1,4 +1,4 @@
-// Package model calls language models for the solver and the grader of spec 07. A Client sends a list of requests and gives one response for each. The Anthropic client calls the Messages API; the Fake client answers in tests and in dry runs.
+// Package model calls language models for the solver and the grader of spec 07. A Client sends a list of requests and gives one response for each. The Anthropic client calls the Messages API; the CLI client runs a local command-line client such as codex or gemini, for a juror of another model family; the Fake client answers in tests and in dry runs.
 package model
 
 import (
@@ -52,6 +52,8 @@ func (r Request) Key() string {
 type Response struct {
 	ID   string `json:"id"`
 	Text string `json:"text"`
+	// Model is the model that answered, when the client tells it and it is not the model of the request. A command-line client tells it, for example gemini-2.5-pro for the request model cli:gemini.
+	Model string `json:"model,omitempty"`
 	// StopReason is end_turn, max_tokens, refusal or another stop reason of the API.
 	StopReason string         `json:"stop_reason"`
 	Usage      content.Tokens `json:"usage"`

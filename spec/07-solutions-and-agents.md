@@ -50,8 +50,8 @@ grade:
   bucket: correct          # correct (7) | almost (5 to 6) | partial (1 to 4) | incorrect (0)
   rubric: imo/2024/p1@r2   # the rubric file and its version
   graders:
-    - {by: model:claude-opus-5-5, score: 7, notes_hash: …}
-    - {by: model:<other-family>, score: 7, notes_hash: …}
+    - {by: model:claude-sonnet-5-5, family: anthropic, score: 7, notes_hash: …}
+    - {by: model:gemini-2.5-pro, family: google, score: 7, notes_hash: …}
     - {by: human:reviewer/<id>, score: 7, at: 2026-12-01}
   rule: min-of-jury-v1
 ```
@@ -60,6 +60,7 @@ The rules:
 
 - **Rubric first.** Each problem that gets AI grading has a rubric file `rubrics/<locator>.md`: the checkpoints with points, the zero-credit items, the common deductions. An official marking scheme is used when it is public. Otherwise a model drafts the rubric from the human solutions and a person edits it. MathArena found that rubric wording caused most grading errors, so a rubric is reviewed before it is used at scale.
 - **A jury, not one judge.** At least two judges, at least one of another model family than the generator. A model does not grade its own output (OPC found self-judging worse).
+- **Jurors of another family.** A juror is a model of the Messages API, such as `claude-sonnet-5-5`, or a local command-line client: `cli:codex` (OpenAI), `cli:gemini` (Google) or `cli:claude`, or `cli:<client>/<model>` for one model of the client. A `cli:` juror runs through the `lane` package, with the login of the client, so it needs no API key, and its calls cost nothing in the run record. When the allowance of a client is spent, its lane rests until the time that the client gave, and its grades fail and are not written. The grade record names the model that answered, such as `model:gemini-2.5-pro`, and its family. The default jury (`claude-sonnet-5-5,claude-haiku-5-5`) is still Claude only, because codex has no allowance until 2026-11-09 and gemini has no login on the host of the runs. `om grade` prints a note when a jury has no judge of another family. Use for example `om grade -jurors claude-sonnet-5-5,cli:gemini`.
 - **Minimum.** The jury score is the minimum of the judges' scores. When judges differ by more than 1 point, they see each other's notes and revise once; then the minimum. A difference that remains goes to the human queue.
 - **Humans for the badge.** "Verified 7/7" needs a human grade. Model-only grades show as "model-graded".
 - **Human solutions are graded too,** with the same rubric, when a forum solution is used as the top solution. This finds wrong forum solutions, which are common.
