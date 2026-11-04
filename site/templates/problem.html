@@ -29,11 +29,31 @@
     </article>
     {{else}}
     <div class="card empty">
-      <p>No solution is on olymmath yet. Official and human solutions come first when they arrive. AI solutions come after them, with a label.</p>
+      <p>No {{if .AI}}official or human {{end}}solution is on olymmath yet. Official and human solutions come first when they arrive. AI solutions come after them, with a label.</p>
       <p><a href="https://github.com/tamnd/olymmath/blob/main/CONTRIBUTING.md">Add a solution</a></p>
     </div>
     {{end}}
   </section>
+
+  {{with .AI}}
+  <section class="block ai" id="ai" data-origin="ai">
+    <details class="card reveal ai-reveal">
+      <summary>Show {{len .}} AI solution{{if gt (len .) 1}}s{{end}}</summary>
+      <p class="source muted">A model wrote these solutions. Other models graded them with the rubric of the problem. A grade is verified only when a person graded the solution too. Read them as a model's attempt, not as a checked proof.</p>
+      {{range $i, $s := .}}
+      <article class="solution ai-solution" id="ai{{add $i 1}}" data-origin="ai">
+        <p class="card-kicker"><span class="badge badge-sol-ai">AI-written</span> AI solution {{add $i 1}}{{with $s.Run}} · {{.Model}} · {{date .Date}} · pipeline {{.Pipeline}}{{end}}</p>
+        {{if $s.Contaminated}}<p class="source contamination">This problem is older than the training cutoff of {{$s.Run.Model}} ({{$s.Run.Cutoff}}), so the model may have seen the problem or its solutions in training.</p>{{end}}
+        {{with $s.Grade}}<p class="source">{{if $s.Verified}}<span class="badge badge-sol-official">verified</span>{{else}}<span class="badge badge-sol-ai">model-graded</span>{{end}} Grade {{.}}{{with $s.Solution.Grade}} on {{date .At}}{{end}}{{if $s.Rubric}} with <a href="{{$s.Rubric}}" rel="noopener">the rubric</a>{{end}}.{{with $s.Solution.Grade}}{{if .Queue}} The graders do not agree, so the solution waits for a person.{{end}}{{end}}</p>{{else}}<p class="source"><span class="badge badge-sol-ai">not graded</span> No grader has read this solution yet.</p>{{end}}
+        {{with $s.Graders}}<p class="source">Graded by {{range $j, $g := .}}{{if $j}}, {{end}}{{if $g.Agent}}{{$g.Name}} (agent grade){{else}}{{$g.Name}} (person){{end}}: {{$g.Score}} of {{$g.Max}}{{end}}.</p>{{end}}
+        {{with $s.Solution.AnswerCheck}}{{if eq . "match"}}<p class="source">The answer of the solution matches the known answer.</p>{{else if eq . "mismatch"}}<p class="source">The answer of the solution does not match the known answer.</p>{{end}}{{end}}
+        <div class="statement">{{$s.Body}}</div>
+        <p class="source muted">{{with $s.Run}}Cost of the model calls ${{printf "%.2f" .Cost}}. {{end}}{{if $s.Followers}}{{$s.Followers}} more AI solution{{if gt $s.Followers 1}}s follow{{else}} follows{{end}} this one closely and {{if gt $s.Followers 1}}are{{else}}is{{end}} not shown. {{end}}<a href="{{link "ai/"}}">About the AI solutions</a>.</p>
+      </article>
+      {{end}}
+    </details>
+  </section>
+  {{end}}
 
   {{with .Formal}}
   <section class="block formal" id="formal">

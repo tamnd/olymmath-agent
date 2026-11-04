@@ -164,3 +164,58 @@
 <p><button type="button" class="button ghost" id="facet-more" hidden>Show more</button></p>
 <noscript><p>The list needs JavaScript. Use the <a href="{{link "c/"}}">list of competitions</a> or the <a href="{{link "t/"}}">topics</a>.</p></noscript>
 {{end}}{{template "bottom" .}}{{end}}
+
+{{define "ai.html"}}{{template "top" .}}{{with .Data}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>AI solutions</span></nav>
+<div class="prose">
+<h1>AI solutions</h1>
+<p class="lede">Some problems have solutions that a model wrote. The site labels each one, shows it after the official and human solutions, and keeps it closed until you open it.</p>
+<p>A solver model writes a few attempts. A verifier model reads each attempt and reports its gaps, and the solver revises it. An attempt is kept after three clean reports in a row, and only if its answer matches the known answer. A jury of at least two other models then grades it with the rubric of the problem, and the grade is the lowest score of the jury. These are agent grades. A grade is verified only when a person graded the solution too. When the problem is older than the training cutoff of the model, the page says that the model may have seen it.</p>
+</div>
+<dl class="measures">
+  <div><dt>AI solutions</dt><dd>{{.Solutions}}</dd></div>
+  <div><dt>Shown</dt><dd>{{.Shown}}</dd></div>
+  <div><dt>Close copies, not shown</dt><dd>{{.Followers}}</dd></div>
+  <div><dt>Graded by the jury</dt><dd>{{.Graded}}</dd></div>
+  <div><dt>Verified by a person</dt><dd>{{.Verified}}</dd></div>
+  <div><dt>Waiting for a person</dt><dd>{{.Queue}}</dd></div>
+  <div><dt>Answer matches</dt><dd>{{.Match}}</dd></div>
+  <div><dt>Cost of all runs</dt><dd>${{printf "%.2f" .Cost}}</dd></div>
+</dl>
+{{if .Solutions}}
+<h2>Grades</h2>
+<div class="table-wrap">
+<table class="years ai-grades">
+  <thead><tr>{{range .Buckets}}<th scope="col">{{.Name}}</th>{{end}}</tr></thead>
+  <tbody><tr>{{range .Buckets}}<td>{{.Count}}</td>{{end}}</tr></tbody>
+</table>
+</div>
+<h2>Models</h2>
+<div class="table-wrap">
+<table class="years ai-models">
+  <thead><tr><th scope="col">Model</th><th scope="col">Solutions</th><th scope="col">Graded</th><th scope="col">Correct</th><th scope="col">Verified</th><th scope="col">Cost</th></tr></thead>
+  <tbody>
+  {{range .Models}}<tr><th scope="row">{{.Model}}</th><td>{{.Solutions}}</td><td>{{.Graded}}</td><td>{{.Correct}}</td><td>{{.Verified}}</td><td>${{printf "%.2f" .Cost}}</td></tr>{{end}}
+  </tbody>
+</table>
+</div>
+{{else}}
+<p class="muted">No AI solution is on olymmath yet.</p>
+{{end}}
+{{with .Waiting}}
+<h2>Waiting for a person</h2>
+<p class="muted">The graders of these solutions still differ by more than one point after they read each other's notes.</p>
+<ul class="similar">{{range .}}<li><a href="{{.Link}}">{{.Title}}</a></li>{{end}}</ul>
+{{end}}
+{{with .Runs}}
+<h2>Runs</h2>
+<div class="table-wrap">
+<table class="years ai-runs">
+  <thead><tr><th scope="col">Run</th><th scope="col">Kind</th><th scope="col">Pipeline</th><th scope="col">Started</th><th scope="col">Status</th><th scope="col">Items</th><th scope="col">Cost</th><th scope="col">Budget</th></tr></thead>
+  <tbody>
+  {{range .}}<tr><th scope="row"><a href="{{$.Site.Repo}}/blob/main/{{.Path}}" rel="noopener"><code>{{.ID}}</code></a></th><td>{{.Kind}}</td><td>{{.Pipeline}}</td><td>{{.Started}}</td><td>{{.Status}}</td><td>{{len .Items}}</td><td>${{printf "%.2f" .Cost}}</td><td>${{printf "%.2f" .Budget}}</td></tr>{{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
+{{end}}{{template "bottom" .}}{{end}}
