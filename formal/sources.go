@@ -65,8 +65,9 @@ var Sources = map[string]*Source{
 		Keep: func(rel string) bool {
 			return rel == "LICENSE" || (strings.HasPrefix(rel, "IMOSLLean4/") && strings.HasSuffix(rel, ".lean")) || rel == "IMOSLLean4.lean"
 		},
-		Items:   imoslItems,
-		Options: map[string]string{"autoImplicit": "true"},
+		Items: imoslItems,
+		// The upstream lakefile keeps the Lean defaults, so autoImplicit and relaxedAutoImplicit are true. IMO 2009 C5 and IMO 2010 C4 bind names such as isPlayerATurn and seed₁ that way.
+		Options: map[string]string{"autoImplicit": "true", "relaxedAutoImplicit": "true"},
 	},
 	"mathlib-archive-imo": {
 		ID: "mathlib-archive-imo", Name: "Mathlib Archive/Imo", Repo: "https://github.com/leanprover-community/mathlib4", Licence: "Apache-2.0", Rank: 3,
@@ -89,6 +90,14 @@ var Sources = map[string]*Source{
 			"Imo/ProblemImports.lean": func(src string) string {
 				return strings.Replace(src, "import FormalConjectures.Util.Answer\n", "import FormalConjecturesUtil.Answer\n", 1)
 			},
+			// Mathlib v4.35.0 renamed List.Chain' to List.IsChain, with the same meaning.
+			"Imo/2004/P6.lean": rename(".Chain' ", ".IsChain "),
+			"Imo/2020/P4.lean": rename(".Chain' ", ".IsChain "),
+			"Imo/2022/P6.lean": rename(".Chain' ", ".IsChain "),
+			// Mathlib v4.35.0 has no Finset.toSet. The coercion to Set gives the same set.
+			"Imo/1969/P5.lean": rename("S.toSet", "(S : Set ℝ²)"),
+			"Imo/1970/P6.lean": rename("S.toSet", "(S : Set ℝ²)"),
+			"Imo/1992/P3.lean": rename("T.toSet ⊆ P", "(T : Set (Fin 3 → ℝ)) ⊆ P"),
 		},
 	},
 	"putnambench": {
@@ -98,6 +107,14 @@ var Sources = map[string]*Source{
 			return rel == "LICENSE" || (strings.HasPrefix(rel, "src/") && strings.HasSuffix(rel, ".lean"))
 		},
 		Items: putnamItems,
+		Patches: map[string]func(string) string{
+			// Mathlib v4.35.0 renamed List.Chain' to List.IsChain. List.Chain R a l is now List.IsChain R (a :: l). The meaning is the same.
+			"src/putnam_2021_a1.lean": rename(".Chain' ", ".IsChain "),
+			"src/putnam_2022_a5.lean": rename(".Chain' ", ".IsChain "),
+			"src/putnam_2025_a3.lean": rename("play.Chain isValidMove (initialState n)", "(initialState n :: play).IsChain isValidMove"),
+			// In Mathlib v4.35.0 the coefficients of an MvPolynomial come from AddMonoidAlgebra.coeff, which takes the polynomial first. P.coeff i is the coefficient of the monomial i, as coeff i P was.
+			"src/putnam_1987_a4.lean": rename("(coeff i P).im", "(P.coeff i).im"),
+		},
 	},
 	"formal-conjectures": {
 		ID: "formal-conjectures", Name: "formal-conjectures (support files)", Repo: "https://github.com/google-deepmind/formal-conjectures", Licence: "Apache-2.0", Rank: 6,
@@ -115,6 +132,11 @@ var Sources = map[string]*Source{
 			},
 		},
 	},
+}
+
+// rename gives a patch that replaces each old with new. The patch keeps the number of lines, so the port diff shows the changed lines only.
+func rename(old, new string) func(string) string {
+	return func(src string) string { return strings.ReplaceAll(src, old, new) }
 }
 
 // formalConjecturesFiles are the files of formal-conjectures that formal-imo needs, with the files that they import.
