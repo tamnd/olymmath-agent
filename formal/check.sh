@@ -18,9 +18,23 @@ cut -f1 "$targets" | sort -u | while read -r m; do
 done
 echo "built $(wc -l < "$out/$lib.built") of $(cut -f1 "$targets" | sort -u | wc -l) modules"
 
+# A file of the Lean module system, such as a Mathlib Archive file, keeps a declaration private when it is not public. A plain import does not see it, so #print axioms gives "Unknown constant". When each module that compiled is of the module system, the two files of checks are modules too and use import all, which also sees the private declarations. A module of the module system has an .olean.private file, or its source starts with the line module.
+is_module() {
+  p=$(echo "$1" | tr . / | sed 's/[«»]//g')
+  [ -f ".lake/build/lib/lean/$p.olean.private" ] || [ -f ".lake/packages/mathlib/.lake/build/lib/lean/$p.olean.private" ] || grep -qxs 'module' ".lake/packages/mathlib/$p.lean"
+}
+header=""
+imp="import"
+if [ -s "$out/$lib.built" ]; then
+  all=1
+  while read -r m; do is_module "$m" || all=0; done < "$out/$lib.built"
+  if [ "$all" = 1 ]; then header="module"; imp="import all"; fi
+fi
+
 # The axioms of each declaration in a module that compiled (spec 08.5).
 {
-  while read -r m; do echo "import $m"; done < "$out/$lib.built"
+  [ -n "$header" ] && echo "$header"
+  while read -r m; do echo "$imp $m"; done < "$out/$lib.built"
   echo
   awk -F'\t' 'NR==FNR{ok[$1]=1;next} ok[$1]{print "#print axioms " $2}' "$out/$lib.built" "$targets" | sort -u
 } > "$out/$lib.axioms.lean"
@@ -28,7 +42,8 @@ echo "built $(wc -l < "$out/$lib.built") of $(cut -f1 "$targets" | sort -u | wc 
 
 # The static checks on each statement (spec 08.4 step 2). An example that compiles shows a possible defect. Lean reads maxErrors from the command line only, not from set_option.
 {
-  while read -r m; do echo "import $m"; done < "$out/$lib.built"
+  [ -n "$header" ] && echo "$header"
+  while read -r m; do echo "$imp $m"; done < "$out/$lib.built"
   echo
   echo "set_option maxHeartbeats 40000"
   awk -F'\t' 'NR==FNR{ok[$1]=1;next} ok[$1] && $3=="statement"{print $2}' "$out/$lib.built" "$targets" | sort -u | while read -r d; do

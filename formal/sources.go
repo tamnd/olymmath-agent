@@ -112,8 +112,9 @@ var Sources = map[string]*Source{
 			"src/putnam_2021_a1.lean": rename(".Chain' ", ".IsChain "),
 			"src/putnam_2022_a5.lean": rename(".Chain' ", ".IsChain "),
 			"src/putnam_2025_a3.lean": rename("play.Chain isValidMove (initialState n)", "(initialState n :: play).IsChain isValidMove"),
-			// In Mathlib v4.35.0 the coefficients of an MvPolynomial come from AddMonoidAlgebra.coeff, which takes the polynomial first. P.coeff i is the coefficient of the monomial i, as coeff i P was.
+			// In Mathlib v4.35.0 the coefficients of an MvPolynomial come from AddMonoidAlgebra.coeff, which takes the polynomial first. P.coeff i is the coefficient of the monomial i, as coeff i P was. Mathlib v4.35.0 has no MvPolynomial.coeff, so 1971 A4 also uses P.coeff i.
 			"src/putnam_1987_a4.lean": rename("(coeff i P).im", "(P.coeff i).im"),
+			"src/putnam_1971_a4.lean": rename("MvPolynomial.coeff i (P n ε) ≥ 0", "(P n ε).coeff i ≥ 0"),
 		},
 	},
 	"formal-conjectures": {
