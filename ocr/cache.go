@@ -39,9 +39,12 @@ func DefaultCache() (*Cache, error) {
 }
 
 // Key gives the key of a page image: the hash of the bytes of the image and of the prompt version.
-func Key(image []byte) string {
+func Key(image []byte) string { return KeyFor(PromptVersion, image) }
+
+// KeyFor gives the key of an image that is read with the prompt of the version.
+func KeyFor(version string, image []byte) string {
 	h := sha256.New()
-	h.Write([]byte(PromptVersion + "\n"))
+	h.Write([]byte(version + "\n"))
 	h.Write(image)
 	return hex.EncodeToString(h.Sum(nil))
 }

@@ -32,6 +32,24 @@ Rules:
 - When the page has no text, write only: EMPTY PAGE
 - Write only the Markdown. Do not write comments or code fences.`
 
+// CropPromptVersion names CropPrompt, as PromptVersion names Prompt. The cache key of a cropped image holds it, so a crop and a page never share an answer.
+const CropPromptVersion = "ocr-crop/1"
+
+// CropPrompt is the instruction for an image that is a part of a page and holds one problem, as the images of a dataset that cut a paper into problems. Such an image often shows, at its top or bottom edge, a line of the problem before or after it that is cut through. The model leaves that line out, so it does not mark it with [?].
+const CropPrompt = `The image is a part of one page of an official paper of a mathematics olympiad. It holds one problem. Write the text of the problem as Markdown with TeX math.
+
+Rules:
+- Write the words exactly as they are printed, in the language of the page. Do not translate. Do not correct. Do not shorten. Do not add words.
+- Write all mathematics in TeX: $...$ in a line, and $$...$$ for a formula on its own line. Use only commands that KaTeX can render.
+- Start the problem on a new line with its number as printed, in bold, as **1.** When the number has a word before it, as in "Problem 1" or "Soru 1", write the word too, as **Soru 1.**
+- Write the choices of a multiple-choice problem as they are printed, after the problem.
+- A line at the top or the bottom edge of the image that is cut through, so that only a part of its letters shows, belongs to another problem or to an answer. Do not write it, and do not write [?] for it.
+- For a figure or a diagram, write [figure] on its own line.
+- When you cannot read a word or a symbol in a whole line, write [?] in its place.
+- Do not write page numbers, running heads or footers.
+- When the image has no text, write only: EMPTY PAGE
+- Write only the Markdown. Do not write comments or code fences.`
+
 // Flags of the checks. A flag lowers the confidence of the text that has it.
 const (
 	FlagFence      = "fence"      // the answer was in a code fence

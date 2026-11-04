@@ -178,3 +178,57 @@ func TestCache(t *testing.T) {
 		t.Error("two images have one key")
 	}
 }
+
+func TestReadImages(t *testing.T) {
+	dir := t.TempDir()
+	var files []string
+	for i, body := range []string{"crop 1", "crop 2"} {
+		f := fmt.Sprintf("%s/row-%d.png", dir, i+1)
+		if err := os.WriteFile(f, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, f)
+	}
+	calls := 0
+	ask := lane.AskerFunc(func(_ context.Context, q lane.Question) (lane.Answer, error) {
+		calls++
+		if q.Prompt != CropPrompt {
+			t.Errorf("the prompt of a crop is not CropPrompt")
+		}
+		b, err := os.ReadFile(q.Images[0])
+		if err != nil {
+			return lane.Answer{}, err
+		}
+		return lane.Answer{Text: fmt.Sprintf("**%s.** Prove that $x \\ge 0$ for each real $x$.", strings.TrimPrefix(string(b), "crop ")), Lane: "claude", Version: "2.1"}, nil
+	})
+	cache := &Cache{Dir: t.TempDir()}
+	r := &Reader{Asker: ask, Cache: cache}
+	pages, err := r.ReadImages(context.Background(), files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(pages) != 2 || calls != 2 || pages[1].N != 2 || pages[1].File != files[1] || pages[0].Key != KeyFor(CropPromptVersion, []byte("crop 1")) {
+		t.Fatalf("%d calls, pages %+v", calls, pages)
+	}
+	if probs := Split(pages); len(probs) != 2 || probs[1].Number != 2 || probs[1].Page != 2 {
+		t.Errorf("split = %+v", probs)
+	}
+	for _, f := range files {
+		if _, err := os.Stat(f); err != nil {
+			t.Errorf("ReadImages deleted %s", f)
+		}
+	}
+	// A crop and a page with the same bytes have two keys, so the cache never gives the answer of one prompt to the other.
+	if KeyFor(CropPromptVersion, []byte("crop 1")) == Key([]byte("crop 1")) {
+		t.Error("a crop and a page share a key")
+	}
+	if again, err := r.ReadImages(context.Background(), files); err != nil || calls != 2 || !again[0].Cached {
+		t.Errorf("the second run: %d calls, %v", calls, err)
+	}
+	stop := &Reader{Asker: lane.AskerFunc(func(context.Context, lane.Question) (lane.Answer, error) {
+		return lane.Answer{}, fmt.Errorf("no lane: %w", lane.ErrExhausted)
+	}), Cache: &Cache{Dir: t.TempDir()}}
+	if got, err := stop.ReadImages(context.Background(), files); !errors.Is(err, lane.ErrExhausted) || len(got) != 0 {
+		t.Errorf("an exhausted chain: %d pages, %v", len(got), err)
+	}
+}
