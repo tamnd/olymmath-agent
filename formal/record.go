@@ -135,10 +135,12 @@ func ParseBuildErrors(log string) map[string]string {
 }
 
 // Record writes the results of the checks into the formal and proof records of a source. A statement passes when its module compiled. A proof passes when its module compiled and #print axioms reached it.
-func Record(root, source string, r *Results, date string) (pass, fail, proofs int, err error) {
+//
+// The date of a check is the date of the last run that changed its result (spec 08.5). When the new check of a record is the same as the old check, apart from the date, Record does not write the file, so the record keeps its old date. Changed counts the records that Record wrote.
+func Record(root, source string, r *Results, date string) (pass, fail, proofs, changed int, err error) {
 	corpus, fs := content.Load(root)
 	if fs.Errors() > 0 {
-		return 0, 0, 0, fmt.Errorf("the content has errors:\n%v", fs)
+		return 0, 0, 0, 0, fmt.Errorf("the content has errors:\n%v", fs)
 	}
 	for _, f := range corpus.Formals {
 		if f.Origin.Source != source {
@@ -157,7 +159,6 @@ func Record(root, source string, r *Results, date string) (pass, fail, proofs in
 		if v := f.Options["autoImplicit"]; v == "true" {
 			ch.Note = strings.TrimSpace(ch.Note + " The source needs autoImplicit true.")
 		}
-		f.Check = ch
 		for _, pr := range f.ProofRecords {
 			pc := &content.Check{Result: content.Fail, Toolchain: Toolchain, Mathlib: Mathlib, At: date, Comparator: content.NotRun, Lean4checker: content.NotRun}
 			as, ok := r.Axioms[pr.Decl]
@@ -171,16 +172,35 @@ func Record(root, source string, r *Results, date string) (pass, fail, proofs in
 				}
 				pc.Note = "The proof is in the same declaration as the statement, so it cannot change the statement."
 			}
+			if SameCheck(pr.Check, pc) {
+				continue
+			}
 			pr.Check = pc
 			if err := writeYAML(root, pr.File, pr); err != nil {
-				return 0, 0, 0, err
+				return 0, 0, 0, 0, err
 			}
+			changed++
 		}
+		if SameCheck(f.Check, ch) {
+			continue
+		}
+		f.Check = ch
 		if err := writeYAML(root, f.File, f); err != nil {
-			return 0, 0, 0, err
+			return 0, 0, 0, 0, err
 		}
+		changed++
 	}
-	return pass, fail, proofs, nil
+	return pass, fail, proofs, changed, nil
+}
+
+// SameCheck tells if the new check b gives the same result as the old check a. The date is not part of the result. A record with no old check has a new result.
+func SameCheck(a, b *content.Check) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return a.Result == b.Result && a.Toolchain == b.Toolchain && a.Mathlib == b.Mathlib && a.Log == b.Log &&
+		slices.Equal(a.Axioms, b.Axioms) && a.Sorry == b.Sorry && a.NativeDecide == b.NativeDecide &&
+		a.Comparator == b.Comparator && a.Lean4checker == b.Lean4checker && a.Note == b.Note
 }
 
 // Fidelity runs the steps of the fidelity pipeline that an agent may run (spec 08.4 steps 1 and 2) and records them. A statement that compiled with autoImplicit false and that no static check flagged becomes checker-clean, backed by one agent review for the source. A flagged statement stays unreviewed and gets a suspected defect. The function never sets a status above checker-clean, and it does not lower a status that a person set.

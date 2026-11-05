@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -184,7 +185,7 @@ func TestRecordAndFidelity(t *testing.T) {
 		Flags:   map[string][]string{},
 		Checked: map[string]bool{"Imo2024P1.imo2024_p1": true},
 	}
-	pass, fail, proofs, err := Record(root, "compfiles", r, "2026-11-03")
+	pass, fail, proofs, _, err := Record(root, "compfiles", r, "2026-11-03")
 	if err != nil || pass != 1 || fail != 0 || proofs != 1 {
 		t.Fatalf("record: %d %d %d %v", pass, fail, proofs, err)
 	}
@@ -212,6 +213,93 @@ func TestRecordAndFidelity(t *testing.T) {
 	fm = corpus.Formals[0]
 	if fm.Fidelity.Status != content.Unreviewed || len(fm.Fidelity.Defects) != 1 {
 		t.Fatalf("after a flag: %+v", fm.Fidelity)
+	}
+}
+
+func TestRecordKeepsUnchanged(t *testing.T) {
+	root := t.TempDir()
+	copyTree(t, "../content/testdata/valid", root)
+	formalFile := filepath.Join(root, "formal/imo/2024/p1/X70GFNJBRT.yaml")
+	proofFile := filepath.Join(root, "formal/imo/2024/p1/9BH0CCQ1QX.yaml")
+	read := func(p string) string {
+		t.Helper()
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(b)
+	}
+	r := &Results{
+		Built:  map[string]bool{"Compfiles.Imo2024P1": true},
+		Axioms: map[string][]string{"Imo2024P1.imo2024_p1": {"Classical.choice", "Quot.sound", "propext"}},
+	}
+	// The fixture has no comparator and lean4checker results in the proof check, so the first run changes the proof record. The check of the statement is the same, so its file keeps its bytes.
+	oldFormal := read(formalFile)
+	if _, _, _, changed, err := Record(root, "compfiles", r, "2026-11-04"); err != nil || changed != 1 {
+		t.Fatalf("first run: %d changed, %v", changed, err)
+	}
+	if read(formalFile) != oldFormal {
+		t.Fatalf("the unchanged formal record was written:\n%s", read(formalFile))
+	}
+	if !strings.Contains(read(proofFile), `at: "2026-11-04"`) {
+		t.Fatalf("the changed proof record has no new date:\n%s", read(proofFile))
+	}
+	// A run on another date with the same results writes no file.
+	oldProof := read(proofFile)
+	if _, _, _, changed, err := Record(root, "compfiles", r, "2026-12-01"); err != nil || changed != 0 {
+		t.Fatalf("rerun: %d changed, %v", changed, err)
+	}
+	if read(formalFile) != oldFormal || read(proofFile) != oldProof {
+		t.Fatal("a rerun with the same results changed a file")
+	}
+	// New axioms change the proof record only.
+	r.Axioms["Imo2024P1.imo2024_p1"] = []string{"Classical.choice", "Lean.ofReduceBool", "Quot.sound", "propext"}
+	if _, _, _, changed, err := Record(root, "compfiles", r, "2026-12-02"); err != nil || changed != 1 {
+		t.Fatalf("new axioms: %d changed, %v", changed, err)
+	}
+	if p := read(proofFile); !strings.Contains(p, `at: "2026-12-02"`) || !strings.Contains(p, "native_decide: true") {
+		t.Fatalf("proof record after new axioms:\n%s", p)
+	}
+	if read(formalFile) != oldFormal {
+		t.Fatal("new axioms of the proof changed the formal record")
+	}
+	// A statement that no longer compiles changes both records.
+	r.Built = map[string]bool{}
+	if pass, fail, _, changed, err := Record(root, "compfiles", r, "2026-12-03"); err != nil || pass != 0 || fail != 1 || changed != 2 {
+		t.Fatalf("fail: %d %d %d changed, %v", pass, fail, changed, err)
+	}
+	if f := read(formalFile); !strings.Contains(f, "result: fail") || !strings.Contains(f, `at: "2026-12-03"`) {
+		t.Fatalf("formal record after a fail:\n%s", f)
+	}
+}
+
+func TestSameCheck(t *testing.T) {
+	base := content.Check{Result: content.Pass, Toolchain: Toolchain, Mathlib: Mathlib, At: "2026-11-04", Axioms: []string{"Quot.sound", "propext"}, Comparator: content.NotRun, Lean4checker: content.NotRun}
+	other := func(change func(c *content.Check)) *content.Check {
+		c := base
+		c.Axioms = slices.Clone(base.Axioms)
+		change(&c)
+		return &c
+	}
+	if !SameCheck(&base, other(func(c *content.Check) { c.At = "2026-12-01" })) {
+		t.Fatal("a new date alone is a change")
+	}
+	for name, c := range map[string]*content.Check{
+		"status":    other(func(c *content.Check) { c.Result = content.Fail }),
+		"toolchain": other(func(c *content.Check) { c.Toolchain = "leanprover/lean4:v4.36.0" }),
+		"mathlib":   other(func(c *content.Check) { c.Mathlib = "v4.36.0" }),
+		"axioms":    other(func(c *content.Check) { c.Axioms = append(c.Axioms, "Classical.choice") }),
+		"sorry":     other(func(c *content.Check) { c.Sorry = true }),
+		"native":    other(func(c *content.Check) { c.NativeDecide = true }),
+		"note":      other(func(c *content.Check) { c.Note = "First error: x" }),
+		"new":       nil,
+	} {
+		if SameCheck(&base, c) || SameCheck(c, &base) {
+			t.Errorf("%s: a change is not seen", name)
+		}
+	}
+	if !SameCheck(nil, nil) {
+		t.Error("two missing checks differ")
 	}
 }
 
