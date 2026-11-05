@@ -354,3 +354,25 @@ func TestTitlePosition(t *testing.T) {
 		t.Errorf("the topics with a part give %q and %q", d, e)
 	}
 }
+
+// A row of the AoPS wiki with a title takes the place of its title, as its topic does. A row whose title names another number gives no candidate.
+func TestSeedsTitle(t *testing.T) {
+	corpus, fs := content.Load("../content/testdata/valid")
+	if fs.Errors() > 0 {
+		t.Fatal(fs)
+	}
+	al, err := seed.LoadAliases("../content/testdata/valid", corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &Seeds{Corpus: corpus, Aliases: al, Topics: &Topics{Aliases: al, Corpus: corpus}}
+	text := "Let $n$ be a positive integer. Prove that the sum of the first $n$ odd numbers is a square."
+	url := "https://artofproblemsolving.com/community/c6h"
+	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO"}, Year: 1982, Number: "2", Ref: url + "301p1", Title: "IMO 1982 P5", Statement: text})
+	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO"}, Number: "1", Ref: url + "302p1", Title: "IMO 1983 P4", Statement: text})
+	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO"}, Year: 2011, Number: "1", Ref: url + "303p1", Title: "IMO 2011 TST problem 5", Statement: text})
+	got := s.Candidates()
+	if len(got["imo/1982/p5"]) != 1 || len(got["imo/1982/p2"]) != 0 || len(got["imo/1983/p4"]) != 1 || len(got["imo/2011/p1"]) != 0 || s.Skipped["no position from the title"] != 1 {
+		t.Errorf("candidates %v, skipped %v", got, s.Skipped)
+	}
+}

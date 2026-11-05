@@ -20,9 +20,11 @@ type Row struct {
 	Country   string   `json:"country,omitempty"`
 	Lang      string   `json:"lang,omitempty"`
 	Statement string   `json:"statement"`
-	Answer    string   `json:"answer,omitempty"`
-	Solutions int      `json:"solutions,omitempty"`
-	Ref       string   `json:"ref,omitempty"`
+	// Title is the source line of an AoPS post, such as "IMO Shortlist 2013 Combinatorics #3", when the statement is the text of the post.
+	Title     string `json:"title,omitempty"`
+	Answer    string `json:"answer,omitempty"`
+	Solutions int    `json:"solutions,omitempty"`
+	Ref       string `json:"ref,omitempty"`
 	// Author is the id of the register source that wrote the text, when it is not the dataset. For example, the NuminaMath rows from the notes files have the texts of Evan Chen.
 	Author string `json:"author,omitempty"`
 }
@@ -189,17 +191,22 @@ var Profiles = map[string]Profile{
 		},
 	},
 	"hf-aops-wiki": {
-		Columns: []string{"category", "contest", "name", "which", "problem", "source", "solution_1", "solution_2", "solution_3", "solution_4", "solution_5"},
+		Columns: []string{"category", "contest", "name", "which", "problem", "problem_html", "source", "solution_1", "solution_2", "solution_3", "solution_4", "solution_5"},
+		// The column problem is the source line of the post in most rows, such as "IMO Shortlist 2013 Combinatorics #3", and it is empty in some. The statement is the text of problem_html. The column problem is then the title of the row, which gives the position of some rows. A row whose HTML has no sure text keeps the column problem as its text, which the import does not take as a statement.
 		Map: func(r Record) (Row, bool) {
 			name := r.Get("name")
 			ref := r.Get("source")
 			if strings.HasPrefix(ref, "/") {
 				ref = "https://artofproblemsolving.com" + ref
 			}
+			text, title := strings.TrimSpace(r.Get("problem")), ""
+			if t, ok := aopsHTML(r.Get("problem_html")); ok {
+				text, title = t, text
+			}
 			return Row{
 				Labels: labels(noYear(name), r.Get("contest"), name), Year: Year(name), Number: r.Get("which"), Lang: "en",
-				Statement: r.Get("problem"), Solutions: count(r, "solution_1", "solution_2", "solution_3", "solution_4", "solution_5"), Ref: ref,
-			}, r.Get("problem") != ""
+				Statement: text, Title: title, Solutions: count(r, "solution_1", "solution_2", "solution_3", "solution_4", "solution_5"), Ref: ref,
+			}, text != ""
 		},
 	},
 	"hf-omni-math": {

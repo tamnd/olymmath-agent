@@ -122,20 +122,29 @@ func (s *Seeds) Add(r seed.Row) {
 		// A collection such as the AoPS AHSME set has no year in its labels. The topic of the row gives the year when the numbered source knows the topic.
 		r.Year = s.Topics.Year(r.Ref, code)
 	}
+	pos := seed.Position(r.Number)
+	topicLetter := ""
+	if r.Title != "" && s.Topics != nil {
+		// A row of the AoPS wiki with a title takes the place that its title and its number give, as its topic does in Topics, because the wiki numbers some papers from 1.
+		y, l, p, ok := s.Topics.Place(r)
+		if !ok {
+			s.skip(r, code, "no position from the title")
+			return
+		}
+		r.Year, pos, topicLetter = y, p, l
+	}
 	if r.Year == 0 || (comp.FirstYear > 0 && r.Year < comp.FirstYear) || (s.ThisYear > 0 && r.Year > s.ThisYear) {
 		s.skip(r, code, "no valid year")
 		return
 	}
-	pos := seed.Position(r.Number)
 	// A line such as "Paper 2 P1" at the start of the text is surer than the number, because some sources number each paper from 1.
-	if p, rest, ok := PaperPosition(comp, r.Year, r.Statement); ok {
+	if p, rest, ok := PaperPosition(comp, r.Year, r.Statement); ok && r.Title == "" {
 		pos, r.Statement = p, rest
 		if pos == "" {
 			s.skip(r, code, "no position in the paper")
 			return
 		}
 	}
-	topicLetter := ""
 	if pos == "" && r.Number == "" && s.Topics != nil {
 		if pos, topicLetter = s.Topics.Position(r.Ref, code, r.Year); pos != "" {
 			if s.Confirm != nil && !s.Confirm(code, r.Year, normalize.Statement(r.Statement, ""), pos) {

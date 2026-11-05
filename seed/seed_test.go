@@ -299,3 +299,45 @@ func TestReadWrite(t *testing.T) {
 }
 
 var testTime = time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
+
+func TestAopsHTML(t *testing.T) {
+	h := `<div class="cmty-post-html">
+ <div>
+ </div>
+ Let
+ <img alt="$n$" class="latex" src="//x.png"/>
+ be a positive integer
+ <span style="white-space:nowrap;">
+  <img alt="$n &gt; 1$" class="latex" src="//x.png"/>
+  .
+ </span>
+ Prove ( for all
+ <img alt="$k$" class="latex" src="//x.png"/>
+ ) that
+ <br/>
+ <img alt="\[ k^2 \geq 0. \]" class="latexcenter" src="//x.png"/>
+ <ol class="bbcode_list">
+  <li>first</li>
+  <li>second</li>
+ </ol>
+ <img alt='[asy]draw((0,0)--(1,1));[/asy]' class="asy-image" src="//x.png"/>
+</div>`
+	got, ok := aopsHTML(h)
+	want := "Let $n$ be a positive integer $n > 1$. Prove ( for all $k$) that\n\\[ k^2 \\geq 0. \\]\n1. first\n2. second\n[asy]draw((0,0)--(1,1));[/asy]"
+	if !ok || got != want {
+		t.Errorf("aopsHTML gave %q, want %q", got, want)
+	}
+	for _, h := range []string{"", `<div>Show it. <img alt="https://i.imgur.com/x.png" class="bbcode_img" src="x"/></div>`, `<div>Find <a class="cmty-hide-heading">hint</a><div class="cmty-hide-content">x</div></div>`} {
+		if _, ok := aopsHTML(h); ok {
+			t.Errorf("aopsHTML took %q", h)
+		}
+	}
+	row, ok := Profiles["hf-aops-wiki"].Map(Record{"name": {"2013 IMO Shortlist"}, "contest": {"IMO Shortlist"}, "which": {"C3"}, "problem": {" IMO Shortlist 2013 Combinatorics #3"}, "problem_html": {`<div class="cmty-post-html">Show <img alt="$x$" class="latex"/>.</div>`}})
+	if !ok || row.Statement != "Show $x$." || row.Year != 2013 || row.Number != "C3" {
+		t.Errorf("aops-wiki row %+v", row)
+	}
+	row, ok = Profiles["hf-aops-wiki"].Map(Record{"name": {"2013 IMO Shortlist"}, "problem": {"IMO Shortlist 2013 C3"}, "problem_html": {`<div>See <img alt="u" class="bbcode_img"/></div>`}})
+	if !ok || row.Statement != "IMO Shortlist 2013 C3" {
+		t.Errorf("aops-wiki row with a picture %+v", row)
+	}
+}
