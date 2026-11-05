@@ -368,7 +368,7 @@ var paperRE = regexp.MustCompile(`(?i)^[^\n]{0,40}?\b(?:(?:paper|day)\s*([1-9])|
 // ordinals gives the number of an ordinal word in a paper line, such as "Second Day".
 var ordinals = map[string]int{"first": 1, "second": 2, "third": 3}
 
-// PaperPosition reads a first line of text that names the paper and the problem, such as "2006 IrMO Paper 2 P1", and gives the position of that problem in the layout of the competition c in the year, and the text after the line. The problem number counts from 1 in its paper, or it is a position of the paper, as in "Day 2 Problem 4". The result ok is false when the text has no such line or c has no layout. The position is "" when the layout has no such problem.
+// PaperPosition reads a first line of text that names the paper and the problem, such as "2006 IrMO Paper 2 P1", and gives the position of that problem in the layout of the competition c in the year, and the text after the line. The problem number counts from 1 in its paper, or it is a position of the paper, as in "Day 2 Problem 4". When both readings give a position and the two positions differ, the position is "". The result ok is false when the text has no such line or c has no layout. The position is "" when the layout has no such problem.
 func PaperPosition(c *content.Competition, year int, text string) (pos, rest string, ok bool) {
 	m := paperRE.FindStringSubmatchIndex(text)
 	if m == nil || c == nil {
@@ -398,10 +398,14 @@ func PaperPosition(c *content.Competition, year int, text string) (pos, rest str
 		return "", rest, true
 	}
 	ps := layout[paper-1].Positions
-	switch p := "p" + strconv.Itoa(n); {
-	case n <= len(ps):
+	p := "p" + strconv.Itoa(n)
+	switch in, named := n <= len(ps), slices.Contains(ps, p); {
+	case in && named && ps[n-1] != p:
+		// The paper has more problems than the papers before it, as Day 2 of the IMO 1960 has p4 to p7. Then "Day 2 P4" can be the fourth problem of the day or the position p4, so the line gives no position.
+		return "", rest, true
+	case in:
 		return ps[n-1], rest, true
-	case slices.Contains(ps, p):
+	case named:
 		return p, rest, true
 	}
 	return "", rest, true
