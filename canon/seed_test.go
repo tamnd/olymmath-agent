@@ -382,6 +382,11 @@ func TestSeedsTitle(t *testing.T) {
 		// Two topics with the number 1 in one year, as when the wiki numbers each day from 1, give no candidate.
 		{Source: "imo-official", Labels: []string{"IMO"}, Year: 1984, Number: "1", Ref: url + "304p1", Title: "IMO 1984", Statement: text},
 		{Source: "imo-official", Labels: []string{"IMO"}, Year: 1984, Number: "1", Ref: url + "305p1", Title: "IMO 1984", Statement: text},
+		// A row with no title and a number that another topic claims gives no candidate.
+		{Source: "imo-official", Labels: []string{"IMO"}, Year: 1985, Number: "1", Ref: url + "306p1", Title: "IMO 1985 P1", Statement: text},
+		{Source: "imo-official", Labels: []string{"IMO"}, Year: 1985, Number: "1", Ref: url + "307p1", Statement: text},
+		// A row with no title and a number that no other topic claims gives a candidate.
+		{Source: "imo-official", Labels: []string{"IMO"}, Year: 1985, Number: "2", Ref: url + "308p1", Statement: text},
 	}
 	for _, r := range rows {
 		s.Topics.Add(r)
@@ -390,7 +395,7 @@ func TestSeedsTitle(t *testing.T) {
 		s.Add(r)
 	}
 	got := s.Candidates()
-	if len(got["imo/1982/p5"]) != 1 || len(got["imo/1982/p2"]) != 0 || len(got["imo/1983/p4"]) != 1 || len(got["imo/2011/p1"]) != 0 || len(got["imo/1984/p1"]) != 0 || s.Skipped["no position from the title"] != 3 {
+	if len(got["imo/1982/p5"]) != 1 || len(got["imo/1982/p2"]) != 0 || len(got["imo/1983/p4"]) != 1 || len(got["imo/2011/p1"]) != 0 || len(got["imo/1984/p1"]) != 0 || len(got["imo/1985/p1"]) != 0 || len(got["imo/1985/p2"]) != 1 || s.Skipped["no position from the title"] != 5 {
 		t.Errorf("candidates %v, skipped %v", got, s.Skipped)
 	}
 }

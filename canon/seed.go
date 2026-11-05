@@ -124,8 +124,8 @@ func (s *Seeds) Add(r seed.Row) {
 	}
 	pos := seed.Position(r.Number)
 	topicLetter := ""
-	if r.Title != "" && s.Topics != nil {
-		// A row of the AoPS wiki with a title takes the place that its title and its number give, as its topic does in Topics, because the wiki numbers some papers from 1.
+	if s.Topics != nil && (r.Title != "" || (r.Number != "" && topicRE.MatchString(r.Ref))) {
+		// A row of the AoPS wiki takes the place that its title and its number give, as its topic does in Topics, because the wiki numbers some papers from 1. A row with no title is read the same way, so that its number alone does not take an appearance that another topic claims.
 		y, l, p, ok := s.Topics.Place(r)
 		if !ok {
 			s.skip(r, code, "no position from the title")
