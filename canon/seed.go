@@ -79,6 +79,11 @@ type Seeds struct {
 	Located int
 	// Numbered counts the rows that got a position from Topics.
 	Numbered int
+	// Led counts the rows that got a position from the problem mark at the start of their text, as described at LeadNumber and leadSure.
+	Led int
+	// collections counts the rows of each collection, and leads gives the numbers of the lead marks of each collection.
+	collections map[string]int
+	leads       map[string][]int
 	// Trace, when it is not nil, gets each row with the code of its competition and the reason why it was skipped. The reason is "" for a row that gives a candidate, and at is the appearance of the candidate. Candidates also calls it for a candidate that it drops.
 	Trace func(r seed.Row, code, at, reason string)
 }
@@ -90,6 +95,10 @@ type pendingRow struct {
 	year   int
 	letter string
 	pos    string
+	// lead is not nil for a row that got its position from the problem mark at the start of its text.
+	lead *leadRow
+	k    int
+	one  bool
 }
 
 func (s *Seeds) skip(r seed.Row, code, reason string) {
@@ -152,6 +161,35 @@ func (s *Seeds) Add(r seed.Row) {
 				return
 			}
 			s.Numbered++
+		}
+	}
+	collection := r.Source + "|" + code + "/" + strconv.Itoa(r.Year) + "|" + strings.Join(r.Labels, "\x1f")
+	if r.Number == "" && r.Title == "" {
+		if s.collections == nil {
+			s.collections = map[string]int{}
+		}
+		s.collections[collection]++
+	}
+	var lead *leadRow
+	var leadK int
+	if pos == "" && r.Number == "" && r.Title == "" && !topicRE.MatchString(r.Ref) && (comp.EditionForm == "" || comp.EditionForm == "year") {
+		// Agent decision: a row with no number whose text starts with a problem mark, such as "Problem 4.", takes the number of the mark, but only when the whole collection agrees, as described at leadSure, and when no topic of the numbered source claims the appearance or gives the row another one.
+		if n, rest, ok := LeadNumber(r.Statement); ok {
+			p, k := leadPosition(comp, r.Year, n)
+			at := code + "/" + strconv.Itoa(r.Year) + "/" + p
+			switch {
+			case p == "":
+				s.skip(r, code, "no valid position")
+				return
+			case s.Topics.Claimed(at, r.Ref) || s.Topics.Elsewhere(at, r.Ref):
+				s.skip(r, code, "lead number claimed by another topic")
+				return
+			}
+			pos, r.Statement, lead, leadK = p, rest, &leadRow{collection: collection, n: n}, k
+			if s.leads == nil {
+				s.leads = map[string][]int{}
+			}
+			s.leads[collection] = append(s.leads[collection], n)
 		}
 	}
 	if pos == "" && r.Number == "" && s.Locate != nil {
@@ -230,7 +268,7 @@ func (s *Seeds) Add(r seed.Row) {
 		Name: src.Name, URL: url, Ref: r.File + "#" + strconv.Itoa(r.Row),
 		Text: text, Answer: Answer(r.Answer), Key: key, Reworded: src.Reworded,
 	}
-	s.pending = append(s.pending, pendingRow{row: r, c: c, comp: comp, year: r.Year, letter: letter, pos: pos})
+	s.pending = append(s.pending, pendingRow{row: r, c: c, comp: comp, year: r.Year, letter: letter, pos: pos, lead: lead, k: leadK, one: onePaper(comp, r.Year)})
 }
 
 // Candidates returns the candidates of each appearance. A position such as p3 is dropped when another row of the same year has a position with a section letter, such as c3, because the two numberings do not agree. For a competition with two papers each year, a row with no letter is dropped when a row of the same year or of an earlier year has a letter, because the paper of the row is not known.
@@ -245,6 +283,13 @@ func (s *Seeds) Candidates() map[string][]*Candidate {
 	}
 	out := map[string][]*Candidate{}
 	for _, p := range s.pending {
+		if p.lead != nil {
+			if !leadSure(s.leads[p.lead.collection], s.collections[p.lead.collection], p.k, p.one) {
+				s.skip(p.row, p.comp.Code, "lead number not sure")
+				continue
+			}
+			s.Led++
+		}
 		if p.pos[0] == 'p' && s.sections[p.comp.Code][p.year] {
 			s.skip(p.row, p.comp.Code, "numbered position in a year with sections")
 			continue
