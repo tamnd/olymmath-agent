@@ -22,7 +22,7 @@ const formalUsage = `usage: om formal SUB [flags]
   lakefile  write lean/lakefile.toml and lean/lean-toolchain for the vendored sources
   targets   print the declarations of a source that the checks look at
   script    print the check script that runs on the Lean host
-  record    write the results of the check script into the records of a source
+  record    write the results of the check script into the records of a source whose result changed
   fidelity  run the agent steps of the fidelity pipeline on a source and write the agent reviews
 `
 
@@ -108,11 +108,11 @@ func runFormal(env Env, args []string) int {
 			return fail(err)
 		}
 		if sub == "record" {
-			pass, nfail, proofs, err := formal.Record(*root, s.ID, r, *date)
+			pass, nfail, proofs, changed, err := formal.Record(*root, s.ID, r, *date)
 			if err != nil {
 				return fail(err)
 			}
-			fmt.Fprintf(env.Stdout, "%s: %d statements compiled, %d did not, %d proofs passed\n", s.ID, pass, nfail, proofs)
+			fmt.Fprintf(env.Stdout, "%s: %d statements compiled, %d did not, %d proofs passed, %d records changed\n", s.ID, pass, nfail, proofs, changed)
 			return ExitOK
 		}
 		clean, flagged, err := formal.Fidelity(*root, s.ID, r, *date)

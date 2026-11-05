@@ -77,6 +77,7 @@ In order, each step recorded:
 1. Check each proof with `lake env lean` on the pinned toolchain, and with the comparator against the frozen statement file, so that a proof cannot change the statement it claims to prove. Canonical proofs also pass `lean4checker` (`--paranoid`). This runs on Linux in a container (`images/lean`).
 2. Allowed axioms: `propext`, `Quot.sound`, `Classical.choice`. No `sorry`. `native_decide` is allowed only with a flag, and the site shows the flag.
 3. Each proof record keeps the toolchain on which it last passed. The monthly bump rechecks all proofs; a failure opens an issue and the site shows "last checked at v…".
+4. The date of a check (`check.at` in a formal or proof record) is the date of the last run that changed the result of the check. The result is the status, the toolchain and Mathlib of the pin, the axioms, the flags (`sorry`, `native_decide`), the comparator and lean4checker results and the note. A rerun that gives the same result does not write the record, so the file stays the same and keeps its old date. A new record or a changed result gets the date of the run.
 
 ## 8.6 Autoformalization by agents
 
