@@ -84,7 +84,7 @@ func TestPrompt(t *testing.T) {
 }
 
 func TestCLIComplete(t *testing.T) {
-	gem := &fakeLane{name: "gemini", ask: func(q lane.Question) (lane.Answer, error) {
+	gem := &fakeLane{name: "gemini", ask: func(_ lane.Question) (lane.Answer, error) {
 		return lane.Answer{Text: "Notes.\nSCORE: 6", Lane: "gemini", Model: "gemini-2.5-pro"}, nil
 	}}
 	var made []string

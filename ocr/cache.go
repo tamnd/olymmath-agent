@@ -73,7 +73,7 @@ func (c *Cache) Get(key string) (Entry, bool, error) {
 // Put writes the entry of the key. It writes to a new file and renames it, so a reader never sees half a file.
 func (c *Cache) Put(key string, e Entry) error {
 	p := c.path(key)
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
 		return err
 	}
 	b, err := json.MarshalIndent(e, "", "  ")

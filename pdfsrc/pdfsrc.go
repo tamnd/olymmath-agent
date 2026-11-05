@@ -21,7 +21,7 @@ type Runner interface {
 type execRunner struct{}
 
 func (execRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...) // #nosec G204 -- the callers give the fixed names of the poppler tools, and the arguments are flags, numbers and the path of a paper.
 	cmd.Stdin = nil
 	out, err := cmd.Output()
 	if err != nil {
@@ -117,7 +117,7 @@ func Render(ctx context.Context, r Runner, path string, page, dpi int, dir strin
 	if dpi < MinDPI || dpi > MaxDPI {
 		return "", fmt.Errorf("render: %d dpi is not in %d..%d", dpi, MinDPI, MaxDPI)
 	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return "", err
 	}
 	base := filepath.Join(dir, fmt.Sprintf("p%03d-%d", page, dpi))
