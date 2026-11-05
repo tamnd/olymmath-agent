@@ -120,6 +120,37 @@ func TestTopics(t *testing.T) {
 	}
 }
 
+// TestTopicsLonglistTitle checks that a row of a shortlist whose title gives the number of a longlist problem gives no position.
+func TestTopicsLonglistTitle(t *testing.T) {
+	corpus, fs := content.Load("../content/testdata/valid")
+	if fs.Errors() > 0 {
+		t.Fatal(fs)
+	}
+	al, err := seed.LoadAliases("../content/testdata/valid", corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	corpus.Competition("imo").TopicPositions = true
+	tp := &Topics{Aliases: al, Corpus: corpus}
+	url := "https://artofproblemsolving.com/community/c6h"
+	rows := []seed.Row{
+		{Labels: []string{"IMO"}, Year: 1966, Number: "24", Ref: url + "400p1", Title: "IMO LongList 1959 1966 P24"},
+		{Labels: []string{"IMO"}, Year: 1970, Number: "27", Ref: url + "401p1", Title: "ILL 1970   P27."},
+		{Labels: []string{"IMO"}, Year: 1988, Number: "15", Ref: url + "402p1", Title: "IMO ShortList 1988 P15 Iceland 1 P34 of ILL"},
+		{Labels: []string{"IMO"}, Year: 1983, Number: "11", Ref: url + "403p1", Title: "IMO Longlist 1983"},
+	}
+	for _, r := range rows {
+		tp.Add(r)
+	}
+	want := []string{"", "", "p15", "p11"}
+	for i, r := range rows {
+		_, _, got, _ := tp.Place(r)
+		if got != want[i] {
+			t.Errorf("Place(%q) = %q, want %q", r.Title, got, want[i])
+		}
+	}
+}
+
 func TestTopicsLetter(t *testing.T) {
 	corpus, fs := content.Load("../content/testdata/valid")
 	if fs.Errors() > 0 {
