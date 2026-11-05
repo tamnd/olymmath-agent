@@ -68,7 +68,7 @@ func (t *Topics) Place(r seed.Row) (year int, letter, pos string, ok bool) {
 // place gives the appearance of a row as Add describes it. unsure is true when the title names a part and its number does not agree with the number column.
 func (t *Topics) place(r seed.Row) (code string, year int, letter, pos string, unsure, ok bool) {
 	pos = seed.Position(r.Number)
-	if pos == "" {
+	if pos == "" && !gradeNumberRE.MatchString(strings.TrimSpace(r.Number)) {
 		return
 	}
 	code = t.Aliases.Code(r.Labels)
@@ -91,6 +91,17 @@ func (t *Topics) place(r seed.Row) (code string, year int, letter, pos string, u
 	year = r.Year
 	if comp != nil && comp.EditionForm == "year-letter" {
 		letter = Letter(r.Labels)
+	}
+	// Agent decision: in a year with one paper for each grade, the wiki numbers the problems of each grade from 1, so a row gets a position only from its grade, as described at gradePosition.
+	y := year
+	if ys := titleYearRE.FindAllString(title, -1); y == 0 && len(ys) > 0 && !slices.ContainsFunc(ys, func(s string) bool { return s != ys[0] }) {
+		y, _ = strconv.Atoi(ys[0])
+	}
+	if p, graded := gradePosition(comp, y, r.Number, title); graded {
+		return code, y, letter, p, false, p != ""
+	}
+	if pos == "" {
+		return
 	}
 	if year == 0 {
 		y, p, l, found := TitleAt(comp, title, pos)
@@ -473,4 +484,116 @@ func TitlePosition(c *content.Competition, al *seed.Aliases, year int, pos, text
 		return ""
 	}
 	return "p" + strconv.Itoa(n)
+}
+
+var (
+	// gradeRE finds a grade in a title, such as "Grade 10", "grade XI", "9th Grade", "XI Class" or "Class 11".
+	gradeRE = regexp.MustCompile(`(?i)\b(?:(?:grade|class)\s*([0-9]{1,2}|[ivx]{1,4})|([0-9]{1,2})(?:st|nd|rd|th)?\s*(?:grade|class)|([ivx]{1,4})\s*(?:grade|class))\b`)
+	// gradeNumberRE matches a number that names the grade and the problem, such as "10.3" for problem 3 of grade 10.
+	gradeNumberRE = regexp.MustCompile(`^([0-9]{1,2})\.([0-9]{1,2})$`)
+	// gradeTokenRE finds a number such as "10.3" in a title, as in "2018 Belarusian NMO 10.3".
+	gradeTokenRE = regexp.MustCompile(`(?:^|[^0-9.])([0-9]{1,2})\.([0-9]{1,2})(?:[^0-9.]|$)`)
+	// gradeMarkRE finds the number after a mark of a problem number in a title, as titleMarkNumRE does, and also after "problem nr.", as in "Moldova NMO 2002 grade 7 problem nr.5".
+	gradeMarkRE = regexp.MustCompile(`(?i)(?:\bp|#|\bproblem(?:\s*nr)?|\bq|\bpb|/)\s*\.?\s*([0-9]{1,2})\b`)
+	// gradePaperRE matches the name of a paper of one grade, such as "Grade 10".
+	gradePaperRE = regexp.MustCompile(`(?i)^grade ([0-9]{1,2})$`)
+)
+
+// romans gives the value of a roman numeral of a grade, from I to XII.
+var romans = map[string]int{"i": 1, "ii": 2, "iii": 3, "iv": 4, "v": 5, "vi": 6, "vii": 7, "viii": 8, "ix": 9, "x": 10, "xi": 11, "xii": 12}
+
+// titleGrade gives the grade that a title names, such as 10 for "Kosovo MO 2019 Grade 10 P1". It gives 0 when the title names no grade, and -1 when it names two different grades.
+func titleGrade(title string) int {
+	g := 0
+	for _, m := range gradeRE.FindAllStringSubmatch(title, -1) {
+		s := strings.ToLower(m[1] + m[2] + m[3])
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			n = romans[s]
+		}
+		if n == 0 || (g != 0 && n != g) {
+			return -1
+		}
+		g = n
+	}
+	return g
+}
+
+// gradePosition reads a row of a competition that has one paper for each grade in the year, such as the Kosovo MO, where the wiki numbers the problems of each grade from 1. The name of such a paper is "Grade G". The grade comes from the title, such as "Kosovo MO 2019 Grade 10 P1", or from a number such as "10.3", in the number column or in the title, as in "2018 Belarusian NMO 10.3". The number of the problem comes from the number column, and a number of the title must agree with it. In a paper of several days, the number column can count from 1 in each day, as in the Moldova NMO 2002, where problem 5 of a grade has the number 1. It gives the position of the problem in the paper of its grade. graded is false when the layout of the year has no paper of a grade. Then the row is read by the other rules. The position is "" when the row does not name one grade and one problem of that grade, so that a row with no grade is never placed by its number alone.
+func gradePosition(c *content.Competition, year int, number, title string) (pos string, graded bool) {
+	if c == nil || year == 0 {
+		return "", false
+	}
+	layout := c.Shape(year).Layout
+	grades := map[int]int{}
+	for i, l := range layout {
+		if m := gradePaperRE.FindStringSubmatch(l.Name); m != nil {
+			g, _ := strconv.Atoi(m[1])
+			grades[g] = i
+		}
+	}
+	if len(grades) == 0 {
+		return "", false
+	}
+	// Each source of the grade and of the number must agree. 0 means not known.
+	g, n := 0, 0
+	agree := func(old *int, v int) bool {
+		if *old != 0 && *old != v {
+			return false
+		}
+		*old = v
+		return true
+	}
+	number = strings.TrimSpace(number)
+	if m := gradeNumberRE.FindStringSubmatch(number); m != nil {
+		g, _ = strconv.Atoi(m[1])
+		n, _ = strconv.Atoi(m[2])
+	} else if p := seed.Position(number); strings.HasPrefix(p, "p") {
+		n, _ = strconv.Atoi(p[1:])
+	}
+	if n == 0 {
+		return "", true
+	}
+	title = strings.TrimSpace(title)
+	if !isTitle(title) {
+		return "", true
+	}
+	if tg := titleGrade(title); tg < 0 || (tg > 0 && !agree(&g, tg)) {
+		return "", true
+	}
+	if ms := gradeTokenRE.FindAllStringSubmatch(title, -1); len(ms) > 1 {
+		return "", true
+	} else if len(ms) == 1 {
+		tg, _ := strconv.Atoi(ms[0][1])
+		tn, _ := strconv.Atoi(ms[0][2])
+		if !agree(&g, tg) || tn != n {
+			return "", true
+		}
+	}
+	i, ok := grades[g]
+	if g == 0 || !ok {
+		return "", true
+	}
+	ps := layout[i].Positions
+	t := n
+	if ms := gradeMarkRE.FindAllStringSubmatch(title, -1); len(ms) > 1 {
+		return "", true
+	} else if len(ms) == 1 {
+		t, _ = strconv.Atoi(ms[0][1])
+	}
+	if t < 1 || t > len(ps) {
+		return "", true
+	}
+	// Agent decision: the number column counts in the paper, or from 1 in the day of the problem.
+	if t != n {
+		days := layout[i].Days
+		if days < 2 || len(ps)%days != 0 {
+			return "", true
+		}
+		per := len(ps) / days
+		if t-(t-1)/per*per != n {
+			return "", true
+		}
+	}
+	return ps[t-1], true
 }

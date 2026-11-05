@@ -430,3 +430,102 @@ func TestSeedsTitle(t *testing.T) {
 		t.Errorf("candidates %v, skipped %v", got, s.Skipped)
 	}
 }
+
+// TestGradePosition checks the rows of a competition with one paper for each grade, where the wiki numbers the problems of each grade from 1.
+func TestGradePosition(t *testing.T) {
+	grade := func(g, n, days int) content.Layout {
+		l := content.Layout{Paper: "grade" + strconv.Itoa(g), Name: "Grade " + strconv.Itoa(g), Days: days}
+		for i := 1; i <= n; i++ {
+			l.Positions = append(l.Positions, "p"+strconv.Itoa(g)+strconv.Itoa(i))
+		}
+		return l
+	}
+	c := &content.Competition{
+		Code: "xk-mo",
+		Eras: []content.Era{
+			{From: 2019, To: 2019, Layout: []content.Layout{grade(9, 5, 0), grade(10, 5, 0), grade(11, 5, 0), grade(12, 5, 0)}},
+			{From: 2002, To: 2002, Layout: []content.Layout{grade(7, 8, 2), grade(11, 8, 2)}},
+		},
+	}
+	cases := []struct {
+		year          int
+		number, title string
+		pos           string
+		graded        bool
+	}{
+		{2019, "1", "Kosovo MO 2019 Grade 10 P1", "p101", true},
+		{2019, "5", "Kosovo MO 2019 Grade 9 P5", "p95", true},
+		{2019, "3", "Kosovo MO 2019 grade XI problem 3", "p113", true},
+		{2019, "2", "Kosovo MO 2019 12th Grade P2", "p122", true},
+		{2019, "10.3", "2019 Kosovo MO 10.3", "p103", true},
+		{2019, "10.3", "2019 Kosovo MO", "p103", true},
+		// A row with no grade, a grade with no paper, two grades or a number that does not agree gives no position.
+		{2019, "3", "", "", true},
+		{2019, "5", "Kosovo MO 2019 P5", "", true},
+		{2019, "1", "Kosovo MO 2019 Grade 8 P1", "", true},
+		{2019, "1", "Kosovo MO 2019 Grade 9 P1 Grade 10 P1", "", true},
+		{2019, "2", "Kosovo MO 2019 Grade 9 P3", "", true},
+		{2019, "6", "Kosovo MO 2019 Grade 9 P6", "", true},
+		{2019, "10.3", "2019 Kosovo MO 11.3", "", true},
+		{2019, "10.3", "2019 Kosovo MO Grade 11", "", true},
+		{2019, "1", "Kosovo MO 2019 Grade 9 P1\n$x$", "", true},
+		// In a paper of two days, the number column can count from 1 in each day.
+		{2002, "1", "Moldova NMO 2002 grade 7 problem nr.5", "p75", true},
+		{2002, "4", "Moldova NMO 2002 grade 11 problem nr.8", "p118", true},
+		{2002, "3", "Moldova NMO 2002 grade 7 problem nr.3", "p73", true},
+		{2002, "2", "Moldova NMO 2002 grade 7 problem nr.5", "", true},
+		// A year with no paper of a grade is read by the other rules.
+		{2020, "1", "Kosovo MO 2020 Grade 10 P1", "", false},
+	}
+	for _, tc := range cases {
+		pos, graded := gradePosition(c, tc.year, tc.number, tc.title)
+		if pos != tc.pos || graded != tc.graded {
+			t.Errorf("gradePosition(%d, %q, %q) = %q, %v, want %q, %v", tc.year, tc.number, tc.title, pos, graded, tc.pos, tc.graded)
+		}
+	}
+	if pos, graded := gradePosition(nil, 2019, "1", "Kosovo MO 2019 Grade 10 P1"); pos != "" || graded {
+		t.Errorf("a nil competition gives %q, %v", pos, graded)
+	}
+	if g := titleGrade("Moldova National MO XI Class 2007"); g != 11 {
+		t.Errorf("titleGrade gives %d", g)
+	}
+}
+
+// TestTopicsGrade checks that the rows of the grades of one year get the positions of their grades, also when the row has no year and its title gives it.
+func TestTopicsGrade(t *testing.T) {
+	corpus, fs := content.Load("../content/testdata/valid")
+	if fs.Errors() > 0 {
+		t.Fatal(fs)
+	}
+	al, err := seed.LoadAliases("../content/testdata/valid", corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := corpus.Competition("imo")
+	c.Eras = append(c.Eras, content.Era{From: 2030, To: 2030, Layout: []content.Layout{
+		{Paper: "grade9", Name: "Grade 9", Positions: []string{"p91", "p92"}},
+		{Paper: "grade10", Name: "Grade 10", Positions: []string{"p101", "p102"}},
+	}})
+	tp := &Topics{Aliases: al, Corpus: corpus}
+	url := "https://artofproblemsolving.com/community/c6h"
+	rows := []seed.Row{
+		{Labels: []string{"IMO"}, Year: 2030, Number: "1", Ref: url + "1p1", Title: "IMO 2030 Grade 9 P1"},
+		{Labels: []string{"IMO"}, Number: "1", Ref: url + "1p1", Title: "IMO 2030 Grade 9 P1"},
+		{Labels: []string{"IMO"}, Year: 2030, Number: "1", Ref: url + "2p1", Title: "IMO 2030 Grade 10 P1"},
+		{Labels: []string{"IMO"}, Year: 2030, Number: "10.2", Ref: url + "3p1", Title: "IMO 2030 10.2"},
+		{Labels: []string{"IMO"}, Year: 2030, Number: "2", Ref: url + "4p1"},
+	}
+	for _, r := range rows {
+		tp.Add(r)
+	}
+	want := []string{"p91", "p91", "p101", "p102", ""}
+	for i, r := range rows {
+		year, _, pos, ok := tp.Place(r)
+		if pos != want[i] || ok != (want[i] != "") || (ok && year != 2030) {
+			t.Errorf("row %d gives %d %q %v, want %q", i, year, pos, ok, want[i])
+		}
+	}
+	if p, _ := tp.Position("aops-topic:1", "imo", 2030); p != "p91" {
+		t.Errorf("topic 1 gives %q", p)
+	}
+}
