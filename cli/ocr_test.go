@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/tamnd/olymmath-agent/content"
+	"github.com/tamnd/olymmath-agent/lane"
 	"github.com/tamnd/olymmath-agent/ocr"
 	"github.com/tamnd/olymmath-agent/official"
 	"github.com/tamnd/olymmath-agent/site"
@@ -199,5 +200,21 @@ func TestImageFiles(t *testing.T) {
 	}
 	if _, err := imageFiles(t.TempDir()); err == nil {
 		t.Error("an empty directory gave no error")
+	}
+}
+
+func TestOCRLanes(t *testing.T) {
+	lanes, variants, err := ocrLanes(ocrOptions{lanes: "local", local: lane.DefaultLocal})
+	if err != nil || len(lanes) != 1 || lanes[0].Name() != "local" {
+		t.Fatalf("%v %v", lanes, err)
+	}
+	if !slices.Equal(variants, []string{"local/GLM-OCR-8bit", "local/reader-a"}) {
+		t.Errorf("variants %v", variants)
+	}
+	if _, _, err := ocrLanes(ocrOptions{lanes: "local,codex", local: lane.DefaultLocal}); err == nil {
+		t.Error("the local lane ran with another lane")
+	}
+	if _, _, err := ocrLanes(ocrOptions{lanes: "local", local: "http://127.0.0.1:8079/v1"}); err == nil {
+		t.Error("a target with no model")
 	}
 }

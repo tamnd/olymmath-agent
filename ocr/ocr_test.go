@@ -232,3 +232,80 @@ func TestReadImages(t *testing.T) {
 		t.Errorf("an exhausted chain: %d pages, %v", len(got), err)
 	}
 }
+
+func TestCleanFrontMatter(t *testing.T) {
+	// The block of empty keys that a server writes above the page, and the block that olmOCR writes.
+	for _, in := range []string{
+		"---\nrunning_head: \nfolio: \n---\n\n**1.** Prove $x$.\n",
+		"---\nprimary_language: pl\nis_rotation_valid: True\nrotation_correction: 0\nis_table: False\nis_diagram: False\n---\n**1.** Prove $x$.",
+	} {
+		if got, flags := Clean(in); got != "**1.** Prove $x$." || len(flags) != 0 {
+			t.Errorf("Clean(%q) = %q %v", in, got, flags)
+		}
+	}
+	// A rule and a line with a capital letter are a part of the page.
+	in := "---\nProblem 1: Prove $x$.\n---"
+	if got, _ := Clean(in); got != in {
+		t.Errorf("Clean took a part of the page: %q", got)
+	}
+	got, _ := Clean("**2.** See the figure.\n\n![A triangle ABC](page_10_20_300_200.png)")
+	if got != "**2.** See the figure.\n\n[figure]" || !slices.Contains(Check(got), FlagFigure) {
+		t.Errorf("image: %q", got)
+	}
+}
+
+func TestReaderVariants(t *testing.T) {
+	calls := 0
+	model := "glm"
+	ask := lane.AskerFunc(func(context.Context, lane.Question) (lane.Answer, error) {
+		calls++
+		return lane.Answer{Text: "**1.** Prove that $x \\ge 0$ for each real $x$.", Lane: "local", Model: model}, nil
+	})
+	cache := &Cache{Dir: t.TempDir()}
+	// An answer of another lane is in the cache under the shared key. The local lane does not take it.
+	img := []byte("image 1 200")
+	if err := cache.Put(Key(img), Entry{Text: "**1.** codex", Lane: "codex", Prompt: PromptVersion}); err != nil {
+		t.Fatal(err)
+	}
+	r := &Reader{Asker: ask, Cache: cache, PDF: pdf{}, Work: t.TempDir(), DPI: []int{200}, Variants: []string{"local/glm", "local/olm"}}
+	pages, err := r.Read(t.Context(), "a.pdf", []int{1})
+	if err != nil || calls != 1 || pages[0].Cached || pages[0].Key != KeyFor(PromptVersion+" local/glm", img) {
+		t.Fatalf("%d calls, %+v, %v", calls, pages, err)
+	}
+	if got := pages[0].Extraction(); got != "vision/local (glm)" {
+		t.Errorf("extraction %q", got)
+	}
+	// A page that the second model read is in the cache for the lane too.
+	img2 := []byte("image 2 200")
+	if err := cache.Put(KeyFor(PromptVersion+" local/olm", img2), Entry{Text: "**2.** olm text", Lane: "local", Model: "olm", Prompt: PromptVersion}); err != nil {
+		t.Fatal(err)
+	}
+	pages, err = r.Read(t.Context(), "a.pdf", []int{1, 2})
+	if err != nil || calls != 1 || !pages[0].Cached || !pages[1].Cached || pages[1].Model != "olm" {
+		t.Fatalf("%d calls, %+v, %v", calls, pages, err)
+	}
+	// The shared key still holds the answer of codex.
+	if e, ok, _ := cache.Get(Key(img)); !ok || e.Lane != "codex" {
+		t.Errorf("shared entry %+v", e)
+	}
+}
+
+func TestReaderRefusedPage(t *testing.T) {
+	calls := 0
+	ask := lane.AskerFunc(func(_ context.Context, q lane.Question) (lane.Answer, error) {
+		calls++
+		b, _ := os.ReadFile(q.Images[0])
+		if strings.HasPrefix(string(b), "image 2 ") {
+			return lane.Answer{}, fmt.Errorf("local: %w: the answer reached the token limit", lane.ErrRefused)
+		}
+		return lane.Answer{Text: "**1.** Prove that $x \\ge 0$ for each real $x$.", Lane: "local", Model: "m"}, nil
+	})
+	r := &Reader{Asker: ask, Cache: &Cache{Dir: t.TempDir()}, PDF: pdf{}, Work: t.TempDir()}
+	pages, err := r.Read(t.Context(), "a.pdf", []int{1, 2, 3})
+	if err != nil || len(pages) != 3 || calls != 4 {
+		t.Fatalf("%d calls, %d pages, %v", calls, len(pages), err)
+	}
+	if pages[1].N != 2 || pages[1].Text != "" || !slices.Equal(pages[1].Flags, []string{FlagRefusal}) {
+		t.Errorf("refused page %+v", pages[1])
+	}
+}

@@ -1,4 +1,4 @@
-// Package lane holds the transports to the vision models. Each model call goes through Asker, which has one method. So a test drives the code above it with a function and makes no network call, and no code in this package uses an API key: each lane runs a local command-line client with its own login.
+// Package lane holds the transports to the vision models. Each model call goes through Asker, which has one method. So a test drives the code above it with a function and makes no network call, and no code in this package uses an API key: a CLI lane runs a local command-line client with its own login, and the local lane posts to the vision servers of the user (package vision).
 package lane
 
 import (

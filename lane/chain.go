@@ -19,7 +19,13 @@ type Named interface {
 	Name() string
 }
 
-// Chain asks its lanes in order. A lane whose allowance is spent rests until the time that its provider gave, and a lane that is not available on this machine is skipped for the rest of the run. Then the chain asks the next lane. When no lane can answer, Ask gives an error that wraps ErrExhausted, so that a caller stops the batch and does not loop.
+// rester is an error that tells how long a lane rests: a QuotaError or a RestError.
+type rester interface {
+	error
+	Rest(now time.Time) time.Duration
+}
+
+// Chain asks its lanes in order. A lane whose allowance is spent rests until the time that its provider gave, a lane whose servers do not answer rests until the first of them comes back, and a lane that is not available on this machine is skipped for the rest of the run. Then the chain asks the next lane. When no lane can answer, Ask gives an error that wraps ErrExhausted, so that a caller stops the batch and does not loop.
 type Chain struct {
 	Lanes []Named
 	// State is the file that keeps the rest of each lane between runs, or "" for none. So a run does not spend a call to learn again that an allowance is spent.
@@ -111,13 +117,13 @@ func (c *Chain) Ask(ctx context.Context, q Question) (Answer, error) {
 			continue
 		}
 		a, err := l.Ask(ctx, q)
-		var qe *QuotaError
+		var re rester
 		switch {
 		case err == nil:
 			return a, nil
-		case errors.As(err, &qe):
+		case errors.As(err, &re):
 			c.mu.Lock()
-			c.rest[name] = c.now().Add(qe.Rest(c.now()))
+			c.rest[name] = c.now().Add(re.Rest(c.now()))
 			c.save()
 			c.mu.Unlock()
 			why = append(why, err.Error())

@@ -149,13 +149,20 @@ For sites without a challenge, the adapter crawls normally under 5.5.
 
 ## 5.7 PDFs and OCR
 
-Many national olympiads, all journals and the official IMO texts are PDF. The `ocr` package reuses the kvant-solver lanes:
+Many national olympiads, all journals and the official IMO texts are PDF. The `ocr` package reads a PDF in one of these lanes:
 
 | Lane | When | Tool |
 |---|---|---|
 | native | born-digital PDF with a text layer | `pdftotext` + layout, then `marker` for math |
 | TeX | the source TeX exists (Evan Chen, USA TST archive, some booklets) | use the TeX; skip OCR |
 | vision | scans | `olmOCR` or `MinerU`, then a vision-model pass that compares the LaTeX rendering with the page image |
+
+`om ocr` implements the vision lane. It renders each page to an image and asks one of two kinds of reader for Markdown with TeX math:
+
+| Reader | `-lanes` | Tool |
+|---|---|---|
+| model clients | `codex,gemini,claude` (the default) | the command-line client of each model, with its own login. A client whose allowance is spent rests until the time that it gives |
+| local servers | `local` | vision servers of the user through the OpenAI chat-completions API (package `vision`): GLM-OCR under MLX on this Mac, and olmOCR 2 under vLLM on the GPU host gpc through `ssh` and `curl`. Targets are `MODEL=URL` in `-local` or `$OLYMMATH_LOCAL`. The targets of one model share the pages in turns, a 429 rests a target, a target that does not answer rests for 5 minutes, and a health check asks each target for one token. The cache keeps the answers of each model apart |
 
 Every OCR text records `extraction: <lane>/<tool>@<version>`, a confidence, and the page image crop. It goes through the no-rewrite guard of 06.4 step 6. OCR statements below the confidence threshold go to review before they can be canonical.
 
