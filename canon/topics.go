@@ -27,47 +27,11 @@ type Topics struct {
 // Add reads one row of a numbered source. When the text of the row starts with a line that names the paper and the problem, the position comes from that line and the layout of the competition, because the source numbers some papers again from 1. A row with no year, no number or no topic link gives nothing, except a row whose text is a title that gives the year, as described at TitleAt. When the text is a title that names the problem, such as "Vietnam MO 1982 P5", the position comes from the title, as described at TitlePosition. When two rows give one topic two different appearances, the topic gets no appearance. When two topics claim one appearance, neither gets it, because the source numbers some papers again from 1 on each day, as the AoPS wiki does for some years of the IMO.
 func (t *Topics) Add(r seed.Row) {
 	m := topicRE.FindStringSubmatch(r.Ref)
-	pos := seed.Position(r.Number)
-	if m == nil || pos == "" {
+	if m == nil {
 		return
 	}
-	code := t.Aliases.Code(r.Labels)
-	if code == "" || code == "-" {
-		return
-	}
-	var comp *content.Competition
-	if t.Corpus != nil {
-		comp = t.Corpus.Competition(code)
-	}
-	year, letter, unsure := r.Year, "", false
-	if comp != nil && comp.EditionForm == "year-letter" {
-		letter = Letter(r.Labels)
-	}
-	if year == 0 {
-		y, p, l, ok := TitleAt(comp, r.Statement, pos)
-		if !ok && letter == "" {
-			// The number of the title can differ from the number column. TitlePosition then reads the title.
-			if ys := titleYearRE.FindAllString(r.Statement, -1); len(ys) == 1 {
-				y, _ = strconv.Atoi(ys[0])
-				p = TitlePosition(comp, t.Aliases, y, pos, r.Statement)
-				ok = p != "" && (comp == nil || comp.EditionForm != "year-letter")
-			}
-		}
-		if !ok {
-			return
-		}
-		year, pos, letter = y, p, l
-	} else if p, _, ok := PaperPosition(comp, year, r.Statement); ok {
-		pos = p
-	} else if p, ok := namedPaper(comp, year, r.Statement, pos); ok {
-		pos = p
-	} else if p := TitlePosition(comp, t.Aliases, year, pos, r.Statement); p != "" {
-		pos = p
-	} else if n := titleNumber(r.Statement); n != "" && strings.HasPrefix(pos, "p") && n != pos {
-		// The title names a part, such as "China TST 1986 problem 5", so TitlePosition does not read it. Its number does not agree with the number of the row, so the topic gets no appearance. It still claims the appearance of its number, because the true position is not known.
-		unsure = true
-	}
-	if pos == "" {
+	code, year, letter, pos, unsure, ok := t.place(r)
+	if !ok {
 		return
 	}
 	at := code + "/" + strconv.Itoa(year) + letter + "/" + pos
@@ -82,6 +46,62 @@ func (t *Topics) Add(r seed.Row) {
 		at = ""
 	}
 	t.at[m[1]] = at
+}
+
+// Place gives the year, the letter of the paper and the position of a row of a numbered source, from its number and its title, by the rules of Add. The import uses it for the rows of the AoPS wiki themselves, so that a row gets the appearance that its topic gets. The result ok is false when the row has no position, or when its title names another number than the number column.
+func (t *Topics) Place(r seed.Row) (year int, letter, pos string, ok bool) {
+	_, year, letter, pos, unsure, ok := t.place(r)
+	return year, letter, pos, ok && !unsure
+}
+
+// place gives the appearance of a row as Add describes it. unsure is true when the title names a part and its number does not agree with the number column.
+func (t *Topics) place(r seed.Row) (code string, year int, letter, pos string, unsure, ok bool) {
+	pos = seed.Position(r.Number)
+	if pos == "" {
+		return
+	}
+	code = t.Aliases.Code(r.Labels)
+	if code == "" || code == "-" {
+		return
+	}
+	var comp *content.Competition
+	if t.Corpus != nil {
+		comp = t.Corpus.Competition(code)
+	}
+	// The title is the source line of the post when the row has one, or else the text of the row, which is only a title in some rows.
+	title := r.Title
+	if title == "" {
+		title = r.Statement
+	}
+	year = r.Year
+	if comp != nil && comp.EditionForm == "year-letter" {
+		letter = Letter(r.Labels)
+	}
+	if year == 0 {
+		y, p, l, found := TitleAt(comp, title, pos)
+		if !found && letter == "" {
+			// The number of the title can differ from the number column. TitlePosition then reads the title.
+			if ys := titleYearRE.FindAllString(title, -1); len(ys) == 1 {
+				y, _ = strconv.Atoi(ys[0])
+				p = TitlePosition(comp, t.Aliases, y, pos, title)
+				found = p != "" && (comp == nil || comp.EditionForm != "year-letter")
+			}
+		}
+		if !found {
+			return
+		}
+		year, pos, letter = y, p, l
+	} else if p, _, found := PaperPosition(comp, year, title); found {
+		pos = p
+	} else if p, found := namedPaper(comp, year, title, pos); found {
+		pos = p
+	} else if p := TitlePosition(comp, t.Aliases, year, pos, title); p != "" {
+		pos = p
+	} else if n := titleNumber(title); n != "" && strings.HasPrefix(pos, "p") && n != pos {
+		// The title names a part, such as "China TST 1986 problem 5", so TitlePosition does not read it. Its number does not agree with the number of the row, so the topic gets no appearance. It still claims the appearance of its number, because the true position is not known.
+		unsure = true
+	}
+	return code, year, letter, pos, unsure, pos != ""
 }
 
 // Year gives the year of the topic of ref when the numbered source gives the topic one position of competition code. It gives 0 when it does not know the year.
