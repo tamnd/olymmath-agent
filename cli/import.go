@@ -290,6 +290,9 @@ func runImport(env Env, args []string) int {
 	if s.Numbered > 0 {
 		fmt.Fprintf(env.Stdout, "%d rows got a position from the number of their AoPS topic.\n", s.Numbered)
 	}
+	if s.Led > 0 {
+		fmt.Fprintf(env.Stdout, "%d rows got a position from the problem mark at the start of their text.\n", s.Led)
+	}
 	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d promoted statements, %d new problems not written because their text is in the content, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, promoted, dupes, len(items), strings.Join(reasons, ", "))
 	return ExitOK
 }
