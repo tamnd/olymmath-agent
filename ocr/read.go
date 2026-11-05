@@ -33,6 +33,8 @@ type Reader struct {
 	Limit int
 	// Log gets a line for each page, or nothing when it is nil.
 	Log io.Writer
+	// Variants keep the answers of some lanes apart in the cache, such as local/GLM-OCR-8bit for the local lane and the model GLM-OCR-8bit. Then the key of an image holds the variant too, and Read looks for an answer under each variant in order and keeps a new answer under the variant <lane>/<model> of the answer. When Variants is empty, the lanes share one cache, and an answer of one lane is an answer of each lane.
+	Variants []string
 }
 
 // Page is the text of one page.
@@ -129,6 +131,11 @@ func (r *Reader) Page(ctx context.Context, path string, n int) (Page, error) {
 		}
 	}
 	if best == nil {
+		if errors.Is(last, lane.ErrRefused) {
+			// The model did not read the page at any resolution. The page has no text and its flag tells why, and the batch goes on.
+			r.logf("page %d: %v", n, last)
+			return Page{N: n, Flags: []string{FlagRefusal}}, nil
+		}
 		return Page{}, last
 	}
 	return *best, nil
@@ -166,6 +173,10 @@ func (r *Reader) ReadImages(ctx context.Context, files []string) ([]Page, error)
 	var out []Page
 	for i, f := range files {
 		p, err := r.ask(ctx, f, CropPrompt, CropPromptVersion)
+		if errors.Is(err, lane.ErrRefused) {
+			r.logf("%s: %v", filepath.Base(f), err)
+			p, err = Page{Flags: []string{FlagRefusal}}, nil
+		}
 		if err != nil {
 			// A lane.ErrExhausted stays in the chain, so the caller can stop the batch.
 			return out, fmt.Errorf("%s: %w", f, err)
@@ -183,21 +194,36 @@ func (r *Reader) ask(ctx context.Context, img, prompt, version string) (Page, er
 	if err != nil {
 		return Page{}, err
 	}
-	key := KeyFor(version, b)
-	p := Page{Key: key}
-	e, ok, err := r.Cache.Get(key)
-	if err != nil {
-		return Page{}, err
+	keys := []string{KeyFor(version, b)}
+	if len(r.Variants) > 0 {
+		keys = keys[:0]
+		for _, v := range r.Variants {
+			keys = append(keys, KeyFor(version+" "+v, b))
+		}
 	}
-	if ok {
-		p.Cached = true
-	} else {
+	var p Page
+	var e Entry
+	for _, key := range keys {
+		got, ok, err := r.Cache.Get(key)
+		if err != nil {
+			return Page{}, err
+		}
+		if ok {
+			p.Key, p.Cached, e = key, true, got
+			break
+		}
+	}
+	if !p.Cached {
 		a, err := r.Asker.Ask(ctx, lane.Question{Prompt: prompt, Images: []string{img}})
 		if err != nil {
 			return Page{}, err
 		}
+		p.Key = keys[0]
+		if len(r.Variants) > 0 {
+			p.Key = KeyFor(version+" "+a.Lane+"/"+a.Model, b)
+		}
 		e = Entry{Text: a.Text, Lane: a.Lane, Model: a.Model, Version: a.Version, Prompt: version, At: now()}
-		if err := r.Cache.Put(key, e); err != nil {
+		if err := r.Cache.Put(p.Key, e); err != nil {
 			return Page{}, err
 		}
 	}

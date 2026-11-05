@@ -66,13 +66,27 @@ var fenceRE = regexp.MustCompile("(?s)^\\s*```[a-zA-Z]*\\s*\\n(.*?)\\n?```\\s*$"
 // refusals are phrases that start an answer that is not the text of a page.
 var refusals = []string{"i can't", "i cannot", "i'm unable", "i am unable", "i'm sorry", "i am sorry", "as an ai", "unfortunately, i", "here is the", "here's the", "the image shows", "the image contains"}
 
-// Clean takes a code fence off an answer and trims it. The flags tell what it found.
+// frontRE is a block of front matter at the start of an answer: lines of key: value between two lines of ---, with keys in lower case such as primary_language or running_head. Some OCR models write such a block above the page, and it is not a part of the page.
+var frontRE = regexp.MustCompile(`^---[ \t]*\n(?:[a-z][a-z0-9_]*:[^\n]*\n)+---[ \t]*(?:\n|$)`)
+
+// imageRE is a Markdown image, which some OCR models write for a figure.
+var imageRE = regexp.MustCompile(`!\[[^\]\n]*\]\([^)\n]*\)`)
+
+// Clean takes a code fence and a block of front matter off an answer and trims it, and it writes a Markdown image as [figure]. The flags tell what it found.
 func Clean(answer string) (string, []string) {
 	var flags []string
 	s := strings.TrimSpace(strings.ReplaceAll(answer, "\r\n", "\n"))
 	if m := fenceRE.FindStringSubmatch(s); m != nil {
 		s, flags = strings.TrimSpace(m[1]), append(flags, FlagFence)
 	}
+	s = strings.TrimSpace(frontRE.ReplaceAllString(s, ""))
+	if m := fenceRE.FindStringSubmatch(s); m != nil {
+		s = strings.TrimSpace(m[1])
+		if len(flags) == 0 {
+			flags = append(flags, FlagFence)
+		}
+	}
+	s = imageRE.ReplaceAllString(s, "[figure]")
 	low := strings.ToLower(s)
 	for _, r := range refusals {
 		if strings.HasPrefix(low, r) {

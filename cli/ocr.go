@@ -29,9 +29,9 @@ func init() {
 type ocrOptions struct {
 	root, source, paper, lang, file, pages, work string
 	images                                       string
-	lanes, dpi                                   string
+	lanes, dpi, local                            string
 	limit                                        int
-	dry, sequence                                bool
+	dry, sequence, check                         bool
 }
 
 func runOCR(env Env, args []string) int {
@@ -47,7 +47,9 @@ func runOCR(env Env, args []string) int {
 	fs.StringVar(&o.pages, "pages", "", "the pages to read, such as 1-2,4. All the pages up to -limit when it is not given")
 	fs.IntVar(&o.limit, "limit", ocr.DefaultLimit, "the largest number of pages to read when -pages is not given")
 	fs.StringVar(&o.work, "work", filepath.Join(os.TempDir(), "om-ocr"), "the directory for the PDF and the page images. om ocr deletes them when it ends")
-	fs.StringVar(&o.lanes, "lanes", "codex,gemini,claude", "the model clients to ask, in order")
+	fs.StringVar(&o.lanes, "lanes", "codex,gemini,claude", "the model clients to ask, in order, or local for the vision servers of -local")
+	fs.StringVar(&o.local, "local", envOr("OLYMMATH_LOCAL", lane.DefaultLocal), "the targets of the local lane, as a comma-separated list of MODEL=URL. URL is a base URL such as http://127.0.0.1:8079/v1, or ssh://HOST/URL for a server on the loopback address of an ssh host. $OLYMMATH_LOCAL sets the default")
+	fs.BoolVar(&o.check, "check", false, "ask each target of -local for one token, print which targets answer, and read no page")
 	fs.StringVar(&o.dpi, "dpi", "200,300", "the resolutions of the page images. A page whose text has a flag is read again at the next one")
 	fs.BoolVar(&o.dry, "dry", false, "print the problems and write no file")
 	fs.BoolVar(&o.sequence, "sequence", false, "number the problems 1, 2, 3 in the order of the paper, for a paper whose days each start at problem 1")
@@ -55,8 +57,11 @@ func runOCR(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
+	if o.check {
+		return checkLocal(env, o.local)
+	}
 	if len(pos) < 1 || len(pos) > 2 {
-		fmt.Fprintln(env.Stderr, "usage: om ocr [-source SOURCE] [-paper PAPER] [-pages PAGES] [-file FILE | -images DIR] [-dry] EDITION [URL]\nEDITION is an edition such as pl-om/1997. URL is the address of the official paper. It is the official paper of the edition from the source when it is not given, or the address of the source for the images of a dataset.")
+		fmt.Fprintln(env.Stderr, "usage: om ocr [-source SOURCE] [-paper PAPER] [-pages PAGES] [-file FILE | -images DIR] [-lanes LANES] [-local TARGETS] [-dry] EDITION [URL]\n       om ocr -check [-local TARGETS]\nEDITION is an edition such as pl-om/1997. URL is the address of the official paper. It is the official paper of the edition from the source when it is not given, or the address of the source for the images of a dataset.\nLANES is codex,gemini,claude by default. -lanes local reads with the vision servers of -local, which by default are "+lane.DefaultLocal+".")
 		return ExitUsage
 	}
 	if o.images != "" && (o.file != "" || o.pages != "") {
@@ -96,7 +101,7 @@ func runOCR(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om ocr: -dpi: %v\n", err)
 		return ExitUsage
 	}
-	lanes, err := lane.Select(lane.Defaults(), o.lanes)
+	lanes, variants, err := ocrLanes(o)
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om ocr: %v\n", err)
 		return ExitUsage
@@ -115,10 +120,11 @@ func runOCR(env Env, args []string) int {
 			fmt.Fprintf(env.Stderr, "om ocr: -images: %v\n", ferr)
 			return ExitUsage
 		}
-		r := &ocr.Reader{Asker: chain, Cache: cache, Log: env.Stderr}
+		r := &ocr.Reader{Asker: chain, Cache: cache, Log: env.Stderr, Variants: variants}
 		read, err = r.ReadImages(ctx, files)
 	} else {
-		read, err = readPDF(ctx, env, o, *dir, *remote, src.ID, paper.URL, chain, cache, dpi, pages)
+		r := &ocr.Reader{Asker: chain, Cache: cache, DPI: dpi, Limit: o.limit, Log: env.Stderr, Variants: variants}
+		read, err = readPDF(ctx, env, o, *dir, *remote, src.ID, paper.URL, r, pages)
 	}
 	if errors.Is(err, lane.ErrExhausted) {
 		// The batch stops here. The pages that were read are in the cache, so the next run asks only for the others.
@@ -391,8 +397,8 @@ func parseInts(s string) ([]int, error) {
 	return out, nil
 }
 
-// readPDF gets the PDF, from the local file or the URL, and reads its pages.
-func readPDF(ctx context.Context, env Env, o ocrOptions, dir string, remote bool, source, url string, chain *lane.Chain, cache *ocr.Cache, dpi, pages []int) ([]ocr.Page, error) {
+// readPDF gets the PDF, from the local file or the URL, and reads its pages with r. r gets the work directory.
+func readPDF(ctx context.Context, env Env, o ocrOptions, dir string, remote bool, source, url string, r *ocr.Reader, pages []int) ([]ocr.Page, error) {
 	pdf, err := ocrBytes(ctx, env, o, dir, remote, source, url)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", url, err)
@@ -409,7 +415,7 @@ func readPDF(ctx context.Context, env Env, o ocrOptions, dir string, remote bool
 	if err := os.WriteFile(file, pdf, 0o600); err != nil {
 		return nil, err
 	}
-	r := &ocr.Reader{Asker: chain, Cache: cache, Work: work, DPI: dpi, Limit: o.limit, Log: env.Stderr}
+	r.Work = work
 	return r.Read(ctx, file, pages)
 }
 
@@ -432,4 +438,55 @@ func imageFiles(dir string) ([]string, error) {
 		return nil, fmt.Errorf("%s has no image file", dir)
 	}
 	return out, nil
+}
+
+// ocrLanes gives the lanes of -lanes, and the variants of the cache for them. The local lane runs alone: its answers are kept apart in the cache under each model (ocr.Reader.Variants), and the key of a page must be known before a lane is asked.
+func ocrLanes(o ocrOptions) ([]lane.Named, []string, error) {
+	names := strings.Split(o.lanes, ",")
+	for i := range names {
+		names[i] = strings.TrimSpace(names[i])
+	}
+	if !slices.Contains(names, lane.LocalName) {
+		l, err := lane.Select(lane.Defaults(), o.lanes)
+		return l, nil, err
+	}
+	if len(names) > 1 {
+		return nil, nil, fmt.Errorf("-lanes: the local lane runs alone, so run the other lanes in another run")
+	}
+	l, err := lane.NewLocal(o.local)
+	if err != nil {
+		return nil, nil, err
+	}
+	var variants []string
+	for _, m := range l.Models() {
+		variants = append(variants, lane.LocalName+"/"+m)
+	}
+	return []lane.Named{l}, variants, nil
+}
+
+// checkLocal runs the health check of each target of the local lane.
+func checkLocal(env Env, spec string) int {
+	l, err := lane.NewLocal(spec)
+	if err != nil {
+		fmt.Fprintf(env.Stderr, "om ocr: %v\n", err)
+		return ExitUsage
+	}
+	code := ExitFailure
+	for i, err := range l.Check(context.Background()) {
+		if err != nil {
+			fmt.Fprintf(env.Stdout, "%s: %v\n", l.Targets[i].Name(), err)
+			continue
+		}
+		fmt.Fprintf(env.Stdout, "%s: answers\n", l.Targets[i].Name())
+		code = ExitOK
+	}
+	return code
+}
+
+// envOr gives the value of the environment variable, or def when it is not set.
+func envOr(name, def string) string {
+	if v := os.Getenv(name); v != "" {
+		return v
+	}
+	return def
 }
