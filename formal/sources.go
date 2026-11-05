@@ -135,9 +135,9 @@ var Sources = map[string]*Source{
 	},
 }
 
-// rename gives a patch that replaces each old with new. The patch keeps the number of lines, so the port diff shows the changed lines only.
-func rename(old, new string) func(string) string {
-	return func(src string) string { return strings.ReplaceAll(src, old, new) }
+// rename gives a patch that replaces each from with to. The patch keeps the number of lines, so the port diff shows the changed lines only.
+func rename(from, to string) func(string) string {
+	return func(src string) string { return strings.ReplaceAll(src, from, to) }
 }
 
 // formalConjecturesFiles are the files of formal-conjectures that formal-imo needs, with the files that they import.
