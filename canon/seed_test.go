@@ -222,6 +222,13 @@ func TestPaperPosition(t *testing.T) {
 	if pos, _, _ := PaperPosition(c, 2000, "Paper 2 P1"); pos != "p4" {
 		t.Errorf("after the era, paper 2 P1 gives %q", pos)
 	}
+	// Day 2 of the IMO 1960 has four problems, so "Day 2 P4" can be p4 or p7.
+	c.Eras = append(c.Eras, content.Era{From: 1960, To: 1960, Layout: []content.Layout{{Positions: []string{"p1", "p2", "p3"}}, {Positions: []string{"p4", "p5", "p6", "p7"}}}})
+	for text, want := range map[string]string{"Day 2 P1": "p4", "Day 2 P4": "", "Day 2 P5": "p5", "Day 2 P7": "p7"} {
+		if pos, _, ok := PaperPosition(c, 1960, text); pos != want || !ok {
+			t.Errorf("in 1960, %q gives %q, %v, want %q", text, pos, ok, want)
+		}
+	}
 }
 
 func TestNamedPaper(t *testing.T) {
