@@ -48,10 +48,21 @@ func (t *Topics) Add(r seed.Row) {
 	t.at[m[1]] = at
 }
 
-// Place gives the year, the letter of the paper and the position of a row of a numbered source, from its number and its title, by the rules of Add. The import uses it for the rows of the AoPS wiki themselves, so that a row gets the appearance that its topic gets. The result ok is false when the row has no position, or when its title names another number than the number column.
+// Place gives the year, the letter of the paper and the position of a row of a numbered source, from its number and its title, by the rules of Add. The import uses it for the rows of the AoPS wiki themselves, so that a row gets the appearance that its topic gets. The result ok is false when the row has no position, when its title names another number than the number column, or when another topic claims the same appearance, as in a year where the wiki numbers each day from 1. A topic can have appearances in two competitions, such as the IMO and the IMO Shortlist.
 func (t *Topics) Place(r seed.Row) (year int, letter, pos string, ok bool) {
-	_, year, letter, pos, unsure, ok := t.place(r)
-	return year, letter, pos, ok && !unsure
+	code, year, letter, pos, unsure, ok := t.place(r)
+	if !ok || unsure {
+		return 0, "", "", false
+	}
+	m := topicRE.FindStringSubmatch(r.Ref)
+	if m == nil {
+		return 0, "", "", false
+	}
+	at := code + "/" + strconv.Itoa(year) + letter + "/" + pos
+	if len(t.topics[at]) != 1 || !t.topics[at][m[1]] {
+		return 0, "", "", false
+	}
+	return year, letter, pos, true
 }
 
 // place gives the appearance of a row as Add describes it. unsure is true when the title names a part and its number does not agree with the number column.
