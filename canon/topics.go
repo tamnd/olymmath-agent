@@ -84,6 +84,10 @@ func (t *Topics) place(r seed.Row) (code string, year int, letter, pos string, u
 	if title == "" {
 		title = r.Statement
 	}
+	// Agent decision: a title that names the longlist and the number of a problem, such as "IMO LongList 1959 1966 P24", gives the number of the problem in the longlist. The AoPS wiki puts such rows on some shortlist pages with that number, so a row of a shortlist with such a title gives no position. A title that also names the shortlist, such as "IMO ShortList 1988 P15 Iceland 1 P34 of ILL", is read as before.
+	if comp != nil && comp.TopicPositions && longlistRE.MatchString(title) && !shortlistRE.MatchString(title) && titleMarkRE.MatchString(title) {
+		return
+	}
 	year = r.Year
 	if comp != nil && comp.EditionForm == "year-letter" {
 		letter = Letter(r.Labels)
@@ -427,6 +431,8 @@ var (
 	sectionRE = regexp.MustCompile(`(?i)(?:^|[^a-z])(algebra|combinatorics|geometry|number theory|[acgn])\s*(?:problem\s*)?#?\s*([0-9]{1,2})\b`)
 	// shortlistRE tells that a title names a shortlist.
 	shortlistRE = regexp.MustCompile(`(?i)short\s*list|\bisl\b`)
+	// longlistRE tells that a title names a longlist.
+	longlistRE = regexp.MustCompile(`(?i)long\s*list|\bill\b`)
 	// numberRE matches a title that ends with the number of the problem, for example "Vietnam MO 1982 P5" or "Iberoamerican 2004 problem 6". The name before the number has one year and no other digit.
 	numberRE = regexp.MustCompile(`(?i)^([^0-9]*?)\b((?:19|20)[0-9]{2})\b([^0-9]*?)(?:\bp|\bproblem|\bq|#)\s*\.?\s*([0-9]{1,2})\s*[.:]?$`)
 	// partRE finds a word that names a part of an edition, such as a day, a grade or a level. The number after the word "P" can then count from 1 in that part.
