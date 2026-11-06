@@ -24,11 +24,14 @@ const words = `Problem|Problema|Problème|Probleme|Aufgabe|Zadanie|Zadatak|За�
 // boldRE is a problem number in bold at the start of a line, as the prompt asks: **1.** or **Problem 1.** The label before the number can be any words, as in **IMO TST 4.**, because the number is in bold and the bold ends after it.
 var boldRE = regexp.MustCompile(`^\*\*\s*(?:\pL[\pL ]{0,23}\s)?([0-9]{1,2})\s*[.:)]?\s*\*\*\s*[.:]?\s*`)
 
-// wordRE is a problem number with a word and no bold: Problem 1. or Zadanie 1
-var wordRE = regexp.MustCompile(`^(?:` + words + `)\s+([0-9]{1,2})(?:\s*[.:)]\s*|\s*$)`)
+// wordRE is a problem number with a word and no bold: Problem 1. or Zadanie 1, or Problem 1 with the text after a space. The number can have the letter of its paper before it, as Problem T–1 or Problem I-2, or the sign №, as №1.
+var wordRE = regexp.MustCompile(`^(?:(?:` + words + `)\s+(?:\p{Lu}\s*[-–]\s*)?|№\s*)([0-9]{1,2})(?:\s*[.:)]\s*|\s+|\s*$)`)
 
 // bareRE is a bare number at the start of a line: 1.
 var bareRE = regexp.MustCompile(`^([0-9]{1,2})[.)]\s+`)
+
+// letterRE is a number with a capital letter before it, at the start of a line, as A1. or **B2.** in a paper whose problems are A1 to A4 and B1 to B4. The letter names the paper, so -paper gives the positions.
+var letterRE = regexp.MustCompile(`^(?:\*\*)?\s*\p{Lu}([0-9]{1,2})(?:\s*[.:)]\s*(?:\*\*)?|\s*\*\*\s*[.:]?)\s*`)
 
 // endRE is a line that ends the problem before it: a solution, an answer, a hint or a note to the marker. The prompt asks for a heading there, and this catches the answers that do not obey.
 var endRE = regexp.MustCompile(`(?i)^(?:\*\*|\*|_)?\s*(?:solution|answer|hint|rozwiązanie|odpowiedź|lösung|antwort|řešení|riešenie|решение|ответ|rješenje|решење|megoldás|soluzione|solución|solução|lời giải|çözüm)\b`)
@@ -89,9 +92,9 @@ func split(pages []Page, sequence bool) []Problem {
 	return out
 }
 
-// pick gives the marker of the text: bold numbers when the text has them, or else numbers with a word, or else bare numbers.
+// pick gives the marker of the text: bold numbers when the text has them, or else numbers with a word, or else bare numbers, or else numbers with a letter.
 func pick(pages []Page) *regexp.Regexp {
-	for _, re := range []*regexp.Regexp{boldRE, wordRE, bareRE} {
+	for _, re := range []*regexp.Regexp{boldRE, wordRE, bareRE, letterRE} {
 		for _, p := range pages {
 			for _, line := range strings.Split(p.Text, "\n") {
 				if re.MatchString(strings.TrimSpace(line)) {
