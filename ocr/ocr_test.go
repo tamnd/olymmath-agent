@@ -81,6 +81,19 @@ func TestSplit(t *testing.T) {
 		t.Errorf("labels: %+v", got)
 	}
 
+	more := []Page{{N: 1, Text: "Problem 1 Does there exist a sequence of integers?\nProblem T–2\nLet $a, b$ be positive.\n№3. Positive integer $d$ is not a square.\n№1. Алфавит состоит из $n$ букв."}}
+	if got := Split(more); len(got) != 3 || got[0].Text != "Does there exist a sequence of integers?" || got[1].Number != 2 || got[1].Text != "Let $a, b$ be positive." || got[2].Number != 3 {
+		t.Errorf("words with a space, a letter or №: %+v", got)
+	}
+
+	letters := []Page{{N: 2, Text: "# 2022 PAPER A: PROBLEMS\n**A1.** Let $ABCD$ be a unit square here.\n\nA2. Let $n$ be a positive integer there.\n**A3**. Show that $f$ has two roots."}}
+	if got := Split(letters); len(got) != 3 || got[0].Number != 1 || got[0].Text != "Let $ABCD$ be a unit square here." || got[1].Text != "Let $n$ be a positive integer there." || got[2].Number != 3 {
+		t.Errorf("letters: %+v", got)
+	}
+	if got := Split([]Page{{N: 1, Text: "1. Let $A_1$ be a point.\nA1. is a line of the problem.\n2. Show it."}}); len(got) != 2 || !strings.Contains(got[0].Text, "A1. is a line") {
+		t.Errorf("letters after bare numbers: %+v", got)
+	}
+
 	days := []Page{{N: 1, Text: "# Day 1\n**1.** First problem of the first day.\n# Day 2\n**1.** First problem of the second day."}}
 	if got := Sequence(days); len(got) != 2 || got[1].Number != 2 || !strings.Contains(got[1].Text, "second day") {
 		t.Errorf("Sequence = %+v", got)
