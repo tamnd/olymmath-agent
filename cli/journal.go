@@ -109,7 +109,7 @@ func runJournal(env Env, args []string) int {
 		}
 		return ExitOK
 	}
-	if err := writeJournal(*root, corpus, original(corpus.Competition(j.Comp)), news); err != nil {
+	if err := writeJournal(*root, corpus, news); err != nil {
 		fmt.Fprintf(env.Stderr, "om journal: %v\n", err)
 		return ExitFailure
 	}
@@ -146,8 +146,8 @@ func journalIssue(ctx context.Context, fc *fetch.Client, id string, j archive.Jo
 	return marks, pdf, nil
 }
 
-// writeJournal writes a link-only problem for each new problem number.
-func writeJournal(root string, corpus *content.Corpus, lang string, news []journalLink) error {
+// writeJournal writes a link-only problem for each new position. The rule of each statement comes from the original language of its competition.
+func writeJournal(root string, corpus *content.Corpus, news []journalLink) error {
 	if len(news) == 0 {
 		return nil
 	}
@@ -156,7 +156,8 @@ func writeJournal(root string, corpus *content.Corpus, lang string, news []journ
 		return err
 	}
 	for i, n := range news {
-		_, rule := canon.Rank(&canon.Candidate{Origin: n.cand.Origin, Lang: n.cand.Lang}, lang)
+		comp, _, _ := strings.Cut(n.at, "/")
+		_, rule := canon.Rank(&canon.Candidate{Origin: n.cand.Origin, Lang: n.cand.Lang}, original(corpus.Competition(comp)))
 		b, err := canon.RenderLink(n.at, tags[i], &n.cand, n.page, rule)
 		if err != nil {
 			return err
