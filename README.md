@@ -300,6 +300,18 @@ The secondary school page of the Mathematical Society of Serbia, dms.rs/matemati
 
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
+### Journals
+
+```sh
+om journal -content olymmath -dry -from 2026 crux
+om journal -content olymmath crux
+om journal -content olymmath mathreflections
+```
+
+The `om journal` command reads the issues of a problem journal and makes a new problem for each problem number that the content does not have. The problem has no text. Its only statement links to the PDF of the issue and the page of the problem, because the terms of these journals do not let the content hold their text. The locator is the year of the issue and the number, such as `journal-crux/2026/p5171` or `journal-mr/2026/j745`. The fetcher keeps robots.txt and waits the crawl delay of the source register between requests.
+
+`crux` reads the archive page of Crux Mathematicorum on cms.math.ca, then the page of each issue, then its PDF. It takes only the main problem series: the range under "Problems" in the contents, or else the numbers of the section under the heading PROBLEMS. It leaves out the Olympiad Corner, MathemAttic, Mayhem and Skoliad. The PDFs of volumes 1 to 21 (1975 to 1995) are scans, and some later PDFs have no text layer, so the command lists them for the vision lane. `mathreflections` reads the archive page of Mathematical Reflections on awesomemath.org, which links the problem column of each issue from 2022, with the junior, senior, undergraduate and olympiad problems (J, S, U and O).
+
 ### Scanned papers
 
 ```sh
