@@ -140,6 +140,8 @@ type Options struct {
 	Licence string
 	// Fresh sends a request with no condition.
 	Fresh bool
+	// MaxAge lets Get use a capture of the local store that is younger than MaxAge, with no request. Zero means that Get always asks the server.
+	MaxAge time.Duration
 }
 
 // Get gets u for source and puts the body in the store.
@@ -153,6 +155,9 @@ func (c *Client) Get(ctx context.Context, source, u string, opt Options) (Result
 		return Result{}, err
 	}
 	if opt.Hash != "" && have && prev.Hash == opt.Hash && (prev.Local || prev.Remote) {
+		return Result{Capture: prev}, nil
+	}
+	if opt.MaxAge > 0 && !opt.Fresh && have && prev.Local && time.Since(prev.Fetched) < opt.MaxAge {
 		return Result{Capture: prev}, nil
 	}
 	rules, err := c.rules(ctx, pu)

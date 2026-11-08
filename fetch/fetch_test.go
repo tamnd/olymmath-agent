@@ -106,6 +106,12 @@ func TestGet(t *testing.T) {
 	if _, err := c.Get(ctx, "test", srv.URL+"/page", Options{Hash: r1.Capture.Hash}); err != nil || hits.Load() != 2 {
 		t.Fatalf("a known hash must not send a request: %d hits, %v", hits.Load(), err)
 	}
+	if r, err := c.Get(ctx, "test", srv.URL+"/page", Options{MaxAge: time.Hour}); err != nil || r.Capture.Hash != r1.Capture.Hash || hits.Load() != 2 {
+		t.Fatalf("a young capture must not send a request: %d hits, %v", hits.Load(), err)
+	}
+	if _, err := c.Get(ctx, "test", srv.URL+"/page", Options{MaxAge: time.Nanosecond}); err != nil || hits.Load() != 3 {
+		t.Fatalf("an old capture must send a request: %d hits, %v", hits.Load(), err)
+	}
 	if _, err := c.Get(ctx, "test", srv.URL+"/no/x", Options{}); !errors.Is(err, ErrRobots) {
 		t.Errorf("want ErrRobots, got %v", err)
 	}
