@@ -26,6 +26,8 @@ type PRProblem struct {
 	// Number is the number of the problem in its paper, or 0 when the listing does not give it.
 	Number int
 	Text   string
+	// Figure tells that the statement has a picture. Text is then the statement without the picture, so it is good for a link and a match, not for a copy.
+	Figure bool
 	// Err tells why the problem has no Markdown form. Text is empty when Err is not nil.
 	Err error
 }
@@ -41,13 +43,10 @@ var (
 	prBodyRE = regexp.MustCompile(`(?s)<td class="problemsmalldifficulty">.*?</table>(.*?)<table class="problemfootertable">`)
 	// prAuthorRE is the line of the author above a statement.
 	prAuthorRE = regexp.MustCompile(`(?s)<div class="catalogueproblemauthor[^"]*">.*?</div>`)
-	prImageRE  = regexp.MustCompile(`(?i)<img\b`)
+	prImageRE  = regexp.MustCompile(`(?i)<img\b[^>]*>`)
 	prYearRE   = regexp.MustCompile(`^(\d{4}) год$`)
 	prPaperRE  = regexp.MustCompile(`^(\d{1,2}) класс(?:\. (Первый|Второй) день)?$`)
 )
-
-// errPRFigure tells that a statement of problems.ru has a picture. The pictures are under a path that robots.txt of the site disallows.
-var errPRFigure = errors.New("the problem has a picture")
 
 // PRNodeURL gives the page of a node of the source catalogue, from the problem start of its listing.
 func PRNodeURL(id, start int) string {
@@ -117,7 +116,7 @@ func PRPaper(name string) (grade, day int, ok bool) {
 	return grade, day, true
 }
 
-// ParsePRListing reads the problems of one page of the listing of a node. A statement keeps its TeX. The author line, the topics and the difficulty are not part of it: the topics and the difficulty are the work of MCCME and stay on problems.ru.
+// ParsePRListing reads the problems of one page of the listing of a node. A statement keeps its TeX. The author line, the topics and the difficulty are not part of it: the topics and the difficulty are the work of MCCME and stay on problems.ru. A picture is left out of the text and is never fetched, because its path (/show_document.php?) is disallowed by robots.txt; the problem gets Figure.
 func ParsePRListing(page string) []PRProblem {
 	var out []PRProblem
 	heads := prHeadRE.FindAllStringSubmatchIndex(page, -1)
@@ -139,9 +138,8 @@ func ParsePRListing(page string) []PRProblem {
 		}
 		body := prAuthorRE.ReplaceAllString(b[1], "")
 		if prImageRE.MatchString(body) {
-			p.Err = errPRFigure
-			out = append(out, p)
-			continue
+			p.Figure = true
+			body = prImageRE.ReplaceAllString(body, " ")
 		}
 		body = komalItalic.ReplaceAllString(body, "\x02$1\x02")
 		if p.Text = htmlText(body); p.Text == "" {

@@ -83,7 +83,7 @@ func TestParsePRListing(t *testing.T) {
 	if ps[0].ID != 501 || ps[0].Number != 1 || ps[0].Err != nil || ps[0].Text != `Докажите, что $n^2 \geqslant n$ для числа $n$.` {
 		t.Errorf("first %+v", ps[0])
 	}
-	if ps[1].Number != 2 || ps[1].Err == nil || ps[1].Text != "" {
+	if ps[1].Number != 2 || ps[1].Err != nil || !ps[1].Figure || ps[1].Text != "Найдите $x^2$ на рисунке." || ps[0].Figure {
 		t.Errorf("a problem with a picture: %+v", ps[1])
 	}
 	if ps[2].Number != 0 || ps[2].Err != nil || !strings.HasPrefix(ps[2].Text, "Задача без номера. а)") {
