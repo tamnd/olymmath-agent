@@ -46,7 +46,7 @@ var (
 	// prAuthorRE is the line of the author above a statement.
 	prAuthorRE = regexp.MustCompile(`(?s)<div class="catalogueproblemauthor[^"]*">.*?</div>`)
 	prImageRE  = regexp.MustCompile(`(?i)<img\b[^>]*>`)
-	prYearRE   = regexp.MustCompile(`^(\d{4}) год$`)
+	prYearRE   = regexp.MustCompile(`^(\d{4}) год$|^[IVXLC]+ .*\((\d{4}) г\.\)$`)
 	prPaperRE  = regexp.MustCompile(`^(\d{1,2}) класс(?:\. (Первый|Второй) день)?$`)
 )
 
@@ -92,13 +92,13 @@ func PRTotal(page string) int {
 	return 0
 }
 
-// PRYear reads the year of a year node, for example "2025 год".
+// PRYear reads the year of a year node, for example "2025 год", or "XV Олимпиада по геометрии имени И.Ф. Шарыгина (2019 г.)" for an olympiad that numbers its years.
 func PRYear(name string) (int, bool) {
 	m := prYearRE.FindStringSubmatch(strings.TrimSpace(name))
 	if m == nil {
 		return 0, false
 	}
-	y, _ := strconv.Atoi(m[1])
+	y, _ := strconv.Atoi(m[1] + m[2])
 	return y, true
 }
 
