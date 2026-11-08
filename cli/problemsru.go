@@ -131,8 +131,8 @@ func readPRPaper(get, detail func(string) (string, error), node int, label strin
 				fmt.Fprintf(log, "%s: %d: the listing gives no number\n", problemsRu, p.ID)
 				skipped++
 				continue
-			case p.Year != 0 && (p.Year != year || p.Grade != grade):
-				fmt.Fprintf(log, "%s: %d: the number %d.%d.%d does not fit the paper %q of %d\n", problemsRu, p.ID, p.Year, p.Grade, p.Number, pn.Name, year)
+			case (p.Year != 0 && p.Year != year) || (p.Grade != 0 && p.Grade != grade):
+				fmt.Fprintf(log, "%s: %d: the number of year %d and grade %d does not fit the paper %q of %d\n", problemsRu, p.ID, p.Year, p.Grade, pn.Name, year)
 				skipped++
 				continue
 			}

@@ -83,8 +83,9 @@ func TestSeedProblemsRu(t *testing.T) {
 		"parent=20": prBox() + prListing([2]string{"201", "1"}, [2]string{"202", "2"}, [2]string{"203", "1"}),
 		"parent=30": prBox() + prListing([2]string{"301", "1"}, [2]string{"302", "2"}),
 		// 2017 gives no numbers in its listing. The page of a problem gives it, unless it names more than the grade.
-		"parent=40": prBox(prLink("41", "9 класс", "3")),
+		"parent=40": prBox(prLink("41", "9 класс", "3"), prLink("42", "10 класс", "2")),
 		"parent=41": prListing([2]string{"401", ""}, [2]string{"402", ""}, [2]string{"403", ""}),
+		"parent=42": prListing([2]string{"421", "10.1"}, [2]string{"422", "9.2"}),
 		"id=401":    prSources("2017", "9", "", "2"),
 		"id=402":    prSources("2017", "9", "День", "1"),
 		"id=403":    prSources("2016", "9", "", "3"),
@@ -115,7 +116,7 @@ func TestSeedProblemsRu(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if kept != 5 || skipped != 7 {
+	if kept != 6 || skipped != 8 {
 		t.Errorf("kept %d, skipped %d", kept, skipped)
 	}
 	got := map[string]string{}
@@ -126,7 +127,7 @@ func TestSeedProblemsRu(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]string{"101": "p111", "102": "d111", "301": "p1", "302": "p2", "401": "p92"}
+	want := map[string]string{"101": "p111", "102": "d111", "301": "p1", "302": "p2", "401": "p92", "421": "p101"}
 	if len(got) != len(want) {
 		t.Errorf("rows %v", got)
 	}
