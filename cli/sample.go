@@ -169,7 +169,7 @@ func sampleResult(it sampleItem) string {
 }
 
 // sampleDecide writes the review of the canonical text of the appearance at of the sample.
-func sampleDecide(env Env, root, source string, items []sampleItem, at, as, by, note string) int {
+func sampleDecide(env Env, root, _ string, items []sampleItem, at, as, by, note string) int {
 	if !slices.Contains(SampleDecisions, as) || by == "" {
 		fmt.Fprintf(env.Stderr, "om sample: -decide needs -as %s and -by\n", strings.Join(SampleDecisions, " or "))
 		return ExitUsage

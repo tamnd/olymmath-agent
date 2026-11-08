@@ -29,6 +29,9 @@ func runSeed(env Env, args []string) int {
 	out := fs.String("out", seed.DefaultDir(), "the directory of the seed rows")
 	wave := fs.Int("wave", -1, "read each source of this wave that has a manifest in the raw store")
 	limit := fs.Int("limit", 0, "read at most this number of rows of each file; 0 means all rows")
+	node := fs.Int("node", prMoscow, "problems-ru: the olympiad node of the source catalogue of problems.ru")
+	from := fs.Int("from", 0, "problems-ru: the first year")
+	to := fs.Int("to", time.Now().Year(), "problems-ru: the last year")
 	pos, err := parseMixed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -61,6 +64,21 @@ func runSeed(env Env, args []string) int {
 	code := ExitOK
 	for _, id := range ids {
 		start := time.Now()
+		if id == problemsRu {
+			fc := fetch.New(st)
+			fc.Agent = agent
+			if src := corpus.Source(id); src != nil && src.CrawlDelay > 0 {
+				fc.Delay = time.Duration(src.CrawlDelay) * time.Second
+			}
+			n, skipped, err := seedProblemsRu(context.Background(), fc, *out, *node, *from, *to, env.Stderr)
+			if err != nil {
+				fmt.Fprintf(env.Stderr, "om seed: %s: %v\n", id, err)
+				code = ExitFailure
+				continue
+			}
+			fmt.Fprintf(env.Stdout, "%s: %d rows kept, %d problems left out, %s\n", id, n, skipped, time.Since(start).Round(time.Second))
+			continue
+		}
 		if lane, ok := archive.Lanes[id]; ok {
 			fc := fetch.New(st)
 			fc.Agent = agent

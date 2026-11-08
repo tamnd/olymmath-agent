@@ -132,6 +132,15 @@ om import -content olymmath -comp putnam -promote
 
 An import never changes the canonical text of an existing problem, unless you give `-promote`. With `-promote`, a candidate of class H1 or H2 becomes the canonical statement when it ranks above the canonical statement, its text agrees with the canonical text (the signal T is 0.5 or more) and the answers do not disagree. The old text stays in the file as another statement. Each other better candidate goes to the review queue.
 
+### Read problems.ru
+
+```sh
+om seed -content olymmath -node 164898 -from 2015 -to 2025 problems-ru
+om import -content olymmath -comp ru-moscow
+```
+
+problems.ru, the problem base of MCCME, sorts its olympiad problems in a source catalogue: an olympiad, then a year, then the paper of each grade. `om seed problems-ru` walks one olympiad node (`-node`, the Moscow Mathematical Olympiad by default) for the years from `-from` to `-to`. It reads the listing of each paper, five problems a page, and writes a seed row for each problem whose listing gives its number. The position of problem N of grade G is pG followed by N, as in `ru-moscow/2025/p81`. The second day of a grade has no position yet, so it is left out. The label of the rows is the name of the olympiad node, so the alias table must map it. A statement keeps its TeX, and its link is the page of the problem, with its unique number, as the terms of the site ask. The topics, the difficulty and the grades are the work of MCCME and are not copied. A problem with a picture is left out, because robots.txt disallows the pictures. robots.txt asks for 20 s between requests, so a year takes about four minutes.
+
 ### Record the USA TST papers
 
 ```sh

@@ -28,7 +28,7 @@ func TestSampleResult(t *testing.T) {
 }
 
 func TestSampleRankAndID(t *testing.T) {
-	if sampleRank(1, "imo/1985/p4") != sampleRank(1, "imo/1985/p4") {
+	if first := sampleRank(1, "imo/1985/p4"); first != sampleRank(1, "imo/1985/p4") {
 		t.Error("the rank of a position changes between calls")
 	}
 	if sampleRank(1, "imo/1985/p4") == sampleRank(2, "imo/1985/p4") {
