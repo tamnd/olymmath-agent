@@ -99,3 +99,38 @@ func TestParsePRListing(t *testing.T) {
 		}
 	}
 }
+
+func prSourceHead(id, name string) string {
+	return `<tr class="problemdetailssourcetablecell"><td class="problemdetailssourcetablecellhead" colspan=2>
+<a class="componentboxlink" href="/view_by_source_new.php?parent=` + id + `">` + name + `</a>	</td></tr>`
+}
+
+func prSourceCell(k, v string) string {
+	return `<tr class="problemdetailssourcetablecell">	<td class="problemdetailssourcetablecell">
+` + k + `	</td>
+	<td class="problemdetailssourcetablecell">
+` + v + `	</td></tr>`
+}
+
+func TestParsePRSources(t *testing.T) {
+	use := func(grade, extra string) string {
+		return prSourceHead("204563", "") + prSourceHead("164898", "олимпиада") + prSourceCell("Название", "Московская математическая олимпиада") +
+			prSourceHead("200267", "год") + prSourceCell("Номер", "67") + prSourceCell("Год", "2004") +
+			prSourceHead("200289", "вариант") + prSourceCell("Класс", grade) + extra +
+			prSourceHead("200295", "задача") + prSourceCell("Номер", "6")
+	}
+	page := `<h3>Источники и прецеденты использования</h3><table class="problemdetailssourcetable">` +
+		use("11", "") + use("10", prSourceCell("День", "2")) +
+		prSourceHead("204563", "") + prSourceHead("5", "олимпиада") + prSourceCell("Название", "Другая олимпиада") + prSourceHead("6", "задача") + prSourceCell("Номер", "3") +
+		`</table>`
+	got := ParsePRSources(page, 164898)
+	want := []PRSource{{Year: 2004, Grade: 11, Number: 6}, {Year: 2004, Grade: 10, Number: 6, Other: true}}
+	if len(got) != len(want) {
+		t.Fatalf("sources %+v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("source %d: %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}

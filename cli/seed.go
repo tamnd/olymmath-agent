@@ -33,6 +33,7 @@ func runSeed(env Env, args []string) int {
 	from := fs.Int("from", 0, "problems-ru: the first year")
 	to := fs.Int("to", time.Now().Year(), "problems-ru: the last year")
 	maxAge := fs.Duration("max-age", 24*time.Hour, "problems-ru: use a page of the raw store that is younger than this, with no request; 0 asks the site for each page")
+	details := fs.Bool("details", false, "problems-ru: when the listing of a one-day paper gives no number, read it from the page of the problem, at one more request a problem")
 	pos, err := parseMixed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -71,7 +72,7 @@ func runSeed(env Env, args []string) int {
 			if src := corpus.Source(id); src != nil && src.CrawlDelay > 0 {
 				fc.Delay = time.Duration(src.CrawlDelay) * time.Second
 			}
-			n, skipped, err := seedProblemsRu(context.Background(), fc, *out, *node, *from, *to, *maxAge, env.Stderr)
+			n, skipped, err := seedProblemsRu(context.Background(), fc, *out, *node, *from, *to, *maxAge, *details, env.Stderr)
 			if err != nil {
 				fmt.Fprintf(env.Stderr, "om seed: %s: %v\n", id, err)
 				code = ExitFailure
