@@ -25,7 +25,9 @@ type PRProblem struct {
 	ID int
 	// Number is the number of the problem in its paper, or 0 when the listing does not give it.
 	Number int
-	Text   string
+	// Year and Grade are given by a listing that writes the number as year.grade.number, such as (#2010.8.1), and are 0 otherwise.
+	Year, Grade int
+	Text        string
 	// Figure tells that the statement has a picture. Text is then the statement without the picture, so it is good for a link and a match, not for a copy.
 	Figure bool
 	// Err tells why the problem has no Markdown form. Text is empty when Err is not nil.
@@ -38,8 +40,8 @@ var (
 	// prCrumbRE is a link of the path at the top of a node page.
 	prCrumbRE = regexp.MustCompile(`<a class="componentboxheaderlink" href="/view_by_source_new\.php\?parent=(\d+)">\s*([^<]*?)\s*</a>`)
 	prTotalRE = regexp.MustCompile(`Всего задач: (\d+)`)
-	// prHeadRE is the head of a problem of a listing, for example Задача <a ...id=67463">67463</a>&nbsp;(#1).
-	prHeadRE = regexp.MustCompile(`(?s)<td class="problemsmallnumber">.*?view_problem_details_new\.php\?id=(\d+)">\s*\d+</a>\s*(?:&nbsp;\(#(\d+)\))?`)
+	// prHeadRE is the head of a problem of a listing, for example Задача <a ...id=67463">67463</a>&nbsp;(#1). Some years write the number as year.grade.number, for example (#2010.8.1).
+	prHeadRE = regexp.MustCompile(`(?s)<td class="problemsmallnumber">.*?view_problem_details_new\.php\?id=(\d+)">\s*\d+</a>\s*(?:&nbsp;\(#(?:(\d{4})\.(\d{1,2})\.)?(\d+)\))?`)
 	prBodyRE = regexp.MustCompile(`(?s)<td class="problemsmalldifficulty">.*?</table>(.*?)<table class="problemfootertable">`)
 	// prAuthorRE is the line of the author above a statement.
 	prAuthorRE = regexp.MustCompile(`(?s)<div class="catalogueproblemauthor[^"]*">.*?</div>`)
@@ -127,8 +129,12 @@ func ParsePRListing(page string) []PRProblem {
 		}
 		p := PRProblem{}
 		p.ID, _ = strconv.Atoi(page[h[2]:h[3]])
+		if h[8] >= 0 {
+			p.Number, _ = strconv.Atoi(page[h[8]:h[9]])
+		}
 		if h[4] >= 0 {
-			p.Number, _ = strconv.Atoi(page[h[4]:h[5]])
+			p.Year, _ = strconv.Atoi(page[h[4]:h[5]])
+			p.Grade, _ = strconv.Atoi(page[h[6]:h[7]])
 		}
 		b := prBodyRE.FindStringSubmatch(page[h[1]:end])
 		if b == nil {

@@ -75,9 +75,10 @@ func TestPRNodes(t *testing.T) {
 func TestParsePRListing(t *testing.T) {
 	page := prItem("501", "&nbsp;(#1)", `<p/>Докажите, что $n^2 \geqslant n$ для числа <I>n</I>.`) +
 		prItem("502", "&nbsp;(#2)", `<p/>Найдите <I>x</I><sup>2</sup> на рисунке.<div align="center"><img src="/show_document.php?id=1"></div>`) +
-		prItem("503", "", `<p/>Задача без номера.<br/>а) первая часть; б) вторая.`)
+		prItem("503", "", `<p/>Задача без номера.<br/>а) первая часть; б) вторая.`) +
+		prItem("504", "&nbsp;(#2010.10.4)", `<p/>Задача с полным номером.`)
 	ps := ParsePRListing(page)
-	if len(ps) != 3 {
+	if len(ps) != 4 {
 		t.Fatalf("problems %+v", ps)
 	}
 	if ps[0].ID != 501 || ps[0].Number != 1 || ps[0].Err != nil || ps[0].Text != `Докажите, что $n^2 \geqslant n$ для числа $n$.` {
@@ -88,6 +89,9 @@ func TestParsePRListing(t *testing.T) {
 	}
 	if ps[2].Number != 0 || ps[2].Err != nil || !strings.HasPrefix(ps[2].Text, "Задача без номера. а)") {
 		t.Errorf("third %+v", ps[2])
+	}
+	if ps[3].Number != 4 || ps[3].Year != 2010 || ps[3].Grade != 10 || ps[0].Year != 0 {
+		t.Errorf("a number with the year and the grade: %+v", ps[3])
 	}
 	for _, p := range ps {
 		if strings.Contains(p.Text, "Иванов") || strings.Contains(p.Text, "Сложность") || strings.Contains(p.Text, "Тема") {
