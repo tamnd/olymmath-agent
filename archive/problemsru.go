@@ -155,3 +155,57 @@ func ParsePRListing(page string) []PRProblem {
 	}
 	return out
 }
+
+// PRSource is one use of a problem in an olympiad, read from the table of sources of its own page.
+type PRSource struct {
+	Year, Grade, Number int
+	// Other is true when the source names more than the year, the grade and the number, for example a day or a variant. Such a source does not tell the paper well enough.
+	Other bool
+}
+
+var (
+	// prSourceRowRE is a row of the table of sources: a head with a node link and its name, or a key and its value.
+	prSourceRowRE = regexp.MustCompile(`(?s)<td class="problemdetailssourcetablecellhead" colspan=2>\s*<a class="componentboxlink" href="/view_by_source_new\.php\?parent=(\d+)">([^<]*)</a>|<td class="problemdetailssourcetablecell">\s*([^<]*?)\s*</td>\s*<td class="problemdetailssourcetablecell">\s*([^<]*?)\s*</td>`)
+)
+
+// ParsePRSources reads the table of sources of the page of a problem and gives each use of the problem in the olympiad of node. A use is a head that links to node, then the heads год, вариант and задача, which give Год, Класс and Номер. Anything else before Номер makes the use Other, and anything after it ends the use.
+func ParsePRSources(page string, node int) []PRSource {
+	var out []PRSource
+	var cur *PRSource
+	section, done := "", false
+	for _, m := range prSourceRowRE.FindAllStringSubmatch(page, -1) {
+		if m[1] != "" {
+			id, _ := strconv.Atoi(m[1])
+			name := strings.TrimSpace(m[2])
+			switch {
+			case id == node:
+				out = append(out, PRSource{})
+				cur, section, done = &out[len(out)-1], "", false
+			case cur == nil || done:
+				cur = nil
+			case name == "год" || name == "вариант" || name == "задача":
+				section = name
+			default:
+				cur.Other = true
+			}
+			continue
+		}
+		if cur == nil || done {
+			continue
+		}
+		v, err := strconv.Atoi(m[4])
+		switch {
+		case section == "" && m[3] == "Название":
+		case section == "год" && m[3] == "Номер":
+		case section == "год" && m[3] == "Год" && err == nil:
+			cur.Year = v
+		case section == "вариант" && m[3] == "Класс" && err == nil:
+			cur.Grade = v
+		case section == "задача" && m[3] == "Номер" && err == nil:
+			cur.Number, done = v, true
+		default:
+			cur.Other = true
+		}
+	}
+	return out
+}

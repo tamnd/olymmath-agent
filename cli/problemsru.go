@@ -30,8 +30,8 @@ func prPosition(g, d, n int) string {
 	return fmt.Sprintf("p%d%d", g, n)
 }
 
-// seedProblemsRu walks the node of one olympiad of problems.ru, its years from from to to, and the paper of each grade, and writes one seed row for each problem whose paper gives its number. The label of the rows is the name of the olympiad node, and the position comes from prPosition. A paper whose name gives no grade is left out, and so is a year in which two problems would get the same position, because then the numbers start again in a way that the names do not tell. A page of the raw store that is younger than maxAge is used with no request.
-func seedProblemsRu(ctx context.Context, fc *fetch.Client, dir string, node, from, to int, maxAge time.Duration, log io.Writer) (kept, skipped int, err error) {
+// seedProblemsRu walks the node of one olympiad of problems.ru, its years from from to to, and the paper of each grade, and writes one seed row for each problem whose paper gives its number. The label of the rows is the name of the olympiad node, and the position comes from prPosition. A paper whose name gives no grade is left out, and so is a year in which two problems would get the same position, because then the numbers start again in a way that the names do not tell. A page of the raw store that is younger than maxAge is used with no request. With details, a problem of a one-day paper whose listing gives no number takes its number from its own page, at one request a problem.
+func seedProblemsRu(ctx context.Context, fc *fetch.Client, dir string, node, from, to int, maxAge time.Duration, details bool, log io.Writer) (kept, skipped int, err error) {
 	get := func(url string) (string, error) {
 		res, err := fc.Get(ctx, problemsRu, url, fetch.Options{MaxAge: maxAge})
 		if err != nil {
@@ -80,7 +80,11 @@ func seedProblemsRu(ctx context.Context, fc *fetch.Client, dir string, node, fro
 						continue
 					}
 				}
-				rs, s := readPRPaper(get, label, year, grade, day, pn, log)
+				var detail func(string) (string, error)
+				if details && day == 0 {
+					detail = get
+				}
+				rs, s := readPRPaper(get, detail, node, label, year, grade, day, pn, log)
 				rows, skipped = append(rows, rs...), skipped+s
 			}
 			seen := map[string]bool{}
@@ -105,8 +109,8 @@ func seedProblemsRu(ctx context.Context, fc *fetch.Client, dir string, node, fro
 	return kept, skipped, err
 }
 
-// readPRPaper reads the listing of one paper node, page by page, and gives a seed row for each problem with a number.
-func readPRPaper(get func(string) (string, error), label string, year, grade, day int, pn archive.PRNode, log io.Writer) (rows []seed.Row, skipped int) {
+// readPRPaper reads the listing of one paper node, page by page, and gives a seed row for each problem with a number. When detail is not nil, a problem whose listing gives no number takes it from its own page.
+func readPRPaper(get, detail func(string) (string, error), node int, label string, year, grade, day int, pn archive.PRNode, log io.Writer) (rows []seed.Row, skipped int) {
 	for start := 0; ; {
 		page, err := get(archive.PRNodeURL(pn.ID, start))
 		if err != nil {
@@ -115,6 +119,9 @@ func readPRPaper(get func(string) (string, error), label string, year, grade, da
 		}
 		ps := archive.ParsePRListing(page)
 		for _, p := range ps {
+			if p.Err == nil && p.Number == 0 && detail != nil {
+				p.Number = prDetailNumber(detail, node, year, grade, p.ID, log)
+			}
 			switch {
 			case p.Err != nil:
 				fmt.Fprintf(log, "%s: %d: %v\n", problemsRu, p.ID, p.Err)
@@ -136,4 +143,25 @@ func readPRPaper(get func(string) (string, error), label string, year, grade, da
 			return rows, skipped
 		}
 	}
+}
+
+// prDetailNumber reads the number of problem id from the table of sources of its own page. The table must give the problem one number in the year and the grade of its paper and nothing more, such as a day or a variant. It gives 0 otherwise.
+func prDetailNumber(get func(string) (string, error), node, year, grade, id int, log io.Writer) int {
+	page, err := get(archive.PRProblemURL(id))
+	if err != nil {
+		fmt.Fprintf(log, "%s: %d: %v\n", problemsRu, id, err)
+		return 0
+	}
+	n := 0
+	for _, s := range archive.ParsePRSources(page, node) {
+		if s.Year != year || s.Grade != grade || s.Number == 0 {
+			continue
+		}
+		if s.Other || (n != 0 && n != s.Number) {
+			fmt.Fprintf(log, "%s: %d: its page does not give one number in grade %d of %d\n", problemsRu, id, grade, year)
+			return 0
+		}
+		n = s.Number
+	}
+	return n
 }
