@@ -58,7 +58,7 @@ func TestSeedProblemsRu(t *testing.T) {
 		"/robots.txt": "User-agent: *\nDisallow: /show_document.php?\n",
 		"parent=1":    prBox(prLink("10", "2020 год", "3"), prLink("20", "2019 год", "4"), prLink("30", "2018 год", "2")),
 		"parent=10":   prBox(prLink("11", "11 класс. Первый день", "1"), prLink("12", "11 класс. Второй день", "1"), prLink("13", "Устный тур", "1")),
-		"parent=11":   prListing([2]string{"101", "1"}),
+		"parent=11":   prListing([2]string{"101", "2020.11.1"}, [2]string{"103", "2019.11.2"}),
 		"parent=12":   prListing([2]string{"102", "1"}),
 		// 2019 has no papers and its numbers start again, so it gives no row.
 		"parent=20": prBox() + prListing([2]string{"201", "1"}, [2]string{"202", "2"}, [2]string{"203", "1"}),
@@ -90,7 +90,7 @@ func TestSeedProblemsRu(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if kept != 4 || skipped != 4 {
+	if kept != 4 || skipped != 5 {
 		t.Errorf("kept %d, skipped %d", kept, skipped)
 	}
 	got := map[string]string{}

@@ -124,6 +124,10 @@ func readPRPaper(get func(string) (string, error), label string, year, grade, da
 				fmt.Fprintf(log, "%s: %d: the listing gives no number\n", problemsRu, p.ID)
 				skipped++
 				continue
+			case p.Year != 0 && (p.Year != year || p.Grade != grade):
+				fmt.Fprintf(log, "%s: %d: the number %d.%d.%d does not fit the paper %q of %d\n", problemsRu, p.ID, p.Year, p.Grade, p.Number, pn.Name, year)
+				skipped++
+				continue
 			}
 			rows = append(rows, seed.Row{Source: problemsRu, File: "parent=" + strconv.Itoa(pn.ID), Row: len(rows), ID: strconv.Itoa(p.ID), Labels: []string{label}, Year: year, Number: prPosition(grade, day, p.Number), Lang: "ru", Statement: p.Text, Ref: archive.PRProblemURL(p.ID)})
 		}
