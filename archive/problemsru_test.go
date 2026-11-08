@@ -52,6 +52,12 @@ func TestPRNodes(t *testing.T) {
 	if y, ok := PRYear(ns[0].Name); !ok || y != 2024 {
 		t.Fatalf("year %d %v", y, ok)
 	}
+	if y, ok := PRYear("XV Олимпиада по геометрии имени И.Ф. Шарыгина (2019 г.)"); !ok || y != 2019 {
+		t.Errorf("a numbered year gives %d, %v", y, ok)
+	}
+	if _, ok := PRYear("2 турнир (1980/1981 год)"); ok {
+		t.Error("a year that spans two years is read")
+	}
 	if _, ok := PRYear("Отборочный тур"); ok {
 		t.Fatal("a tour is not a year")
 	}
