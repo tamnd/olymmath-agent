@@ -226,7 +226,7 @@ var (
 	prGradeNumberRE = regexp.MustCompile(`^(\d{1,2})\.(\d{1,2})$`)
 )
 
-// ParsePRSources reads the table of sources of the page of a problem and gives each use of the problem in the olympiad of node. A use is a head that links to node, then the heads год, вариант (or класс) and задача, which give Год, Класс and Номер. A Номер written as grade.number, such as 10.4, must name the grade of the use. Anything else before Номер makes the use Other, and anything after it ends the use.
+// ParsePRSources reads the table of sources of the page of a problem and gives each use of the problem in the olympiad of node. A use is a head that links to node, then the heads год, вариант (or класс) and задача, which give Год, Класс and Номер. A Номер written as grade.number, such as 10.4, must name the grade of the use, and a Номер that is the grade followed by one digit, such as 106 in grade 10, gives that digit. Anything else before Номер makes the use Other, and anything after it ends the use.
 func ParsePRSources(page string, node int) []PRSource {
 	var out []PRSource
 	var cur *PRSource
@@ -260,6 +260,9 @@ func ParsePRSources(page string, node int) []PRSource {
 			cur.Year = v
 		case (section == "вариант" || section == "класс") && m[3] == "Класс" && err == nil:
 			cur.Grade = v
+		case section == "задача" && m[3] == "Номер" && err == nil && cur.Grade > 0 && v/10 == cur.Grade && v%10 != 0:
+			// The pages of 2006 and 2007 write grade and number with no dot, as 106 in grade 10.
+			cur.Number, done = v%10, true
 		case section == "задача" && m[3] == "Номер" && err == nil:
 			cur.Number, done = v, true
 		case section == "задача" && m[3] == "Номер" && prGradeNumberRE.MatchString(m[4]):

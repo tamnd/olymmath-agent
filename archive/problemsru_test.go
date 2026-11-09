@@ -187,6 +187,10 @@ func TestParsePRSources(t *testing.T) {
 		{"9", "задача", "10.4", PRSource{Year: 2025, Grade: 9, Other: true}},
 		{"8", "задача", "3", PRSource{Year: 2025, Grade: 8, Number: 3}},
 		{"9", "Задача", "4", PRSource{Year: 2025, Grade: 9, Number: 4}},
+		{"10", "задача", "106", PRSource{Year: 2025, Grade: 10, Number: 6}},
+		{"8", "задача", "81", PRSource{Year: 2025, Grade: 8, Number: 1}},
+		{"8", "задача", "80", PRSource{Year: 2025, Grade: 8, Number: 80}},
+		{"9", "задача", "81", PRSource{Year: 2025, Grade: 9, Number: 81}},
 	} {
 		if got := ParsePRSources(shar(c.grade, c.head, c.number), 206102); len(got) != 1 || got[0] != c.want {
 			t.Errorf("grade %s, head %s, number %s: %+v, want %+v", c.grade, c.head, c.number, got, c.want)
