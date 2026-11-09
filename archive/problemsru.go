@@ -167,25 +167,27 @@ type PRSource struct {
 
 var (
 	// prSourceRowRE is a row of the table of sources: a head with a node link and its name, or a key and its value.
-	prSourceRowRE = regexp.MustCompile(`(?s)<td class="problemdetailssourcetablecellhead" colspan=2>\s*<a class="componentboxlink" href="/view_by_source_new\.php\?parent=(\d+)">([^<]*)</a>|<td class="problemdetailssourcetablecell">\s*([^<]*?)\s*</td>\s*<td class="problemdetailssourcetablecell">\s*([^<]*?)\s*</td>`)
+	prSourceRowRE = regexp.MustCompile(`(?s)<td class="problemdetailssourcetablecellhead" colspan=2>\s*<a class="componentboxlink" href="/view_by_source_new\.php\?parent=(\d+)">([^<]*)</a>|<td class="problemdetailssourcetablecell">\s*([^<]*?)\s*</td>\s*<td class="problemdetailssourcetablecell">\s*([^<]*?)\s*</td>|<td class="problemdetailssourcetablecellhead" colspan=2>\s*([^<]*?)\s*</td>`)
+	// prGradeNumberRE is a number of a problem written as grade.number, for example 10.4.
+	prGradeNumberRE = regexp.MustCompile(`^(\d{1,2})\.(\d{1,2})$`)
 )
 
-// ParsePRSources reads the table of sources of the page of a problem and gives each use of the problem in the olympiad of node. A use is a head that links to node, then the heads год, вариант and задача, which give Год, Класс and Номер. Anything else before Номер makes the use Other, and anything after it ends the use.
+// ParsePRSources reads the table of sources of the page of a problem and gives each use of the problem in the olympiad of node. A use is a head that links to node, then the heads год, вариант (or класс) and задача, which give Год, Класс and Номер. A Номер written as grade.number, such as 10.4, must name the grade of the use. Anything else before Номер makes the use Other, and anything after it ends the use.
 func ParsePRSources(page string, node int) []PRSource {
 	var out []PRSource
 	var cur *PRSource
 	section, done := "", false
 	for _, m := range prSourceRowRE.FindAllStringSubmatch(page, -1) {
-		if m[1] != "" {
+		if m[1] != "" || m[3] == "" {
 			id, _ := strconv.Atoi(m[1])
-			name := strings.TrimSpace(m[2])
+			name := strings.TrimSpace(m[2] + m[5])
 			switch {
 			case id == node:
 				out = append(out, PRSource{})
 				cur, section, done = &out[len(out)-1], "", false
 			case cur == nil || done:
 				cur = nil
-			case name == "год" || name == "вариант" || name == "задача":
+			case name == "год" || name == "вариант" || name == "класс" || name == "задача":
 				section = name
 			default:
 				cur.Other = true
@@ -201,10 +203,19 @@ func ParsePRSources(page string, node int) []PRSource {
 		case section == "год" && m[3] == "Номер":
 		case section == "год" && m[3] == "Год" && err == nil:
 			cur.Year = v
-		case section == "вариант" && m[3] == "Класс" && err == nil:
+		case (section == "вариант" || section == "класс") && m[3] == "Класс" && err == nil:
 			cur.Grade = v
 		case section == "задача" && m[3] == "Номер" && err == nil:
 			cur.Number, done = v, true
+		case section == "задача" && m[3] == "Номер" && prGradeNumberRE.MatchString(m[4]):
+			gn := prGradeNumberRE.FindStringSubmatch(m[4])
+			g, _ := strconv.Atoi(gn[1])
+			cur.Number, done = 0, true
+			if g == cur.Grade {
+				cur.Number, _ = strconv.Atoi(gn[2])
+			} else {
+				cur.Other = true
+			}
 		default:
 			cur.Other = true
 		}
