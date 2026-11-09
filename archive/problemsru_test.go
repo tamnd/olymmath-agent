@@ -61,7 +61,7 @@ func TestPRNodes(t *testing.T) {
 	if _, ok := PRYear("Отборочный тур"); ok {
 		t.Fatal("a tour is not a year")
 	}
-	for name, want := range map[string][3]int{"8 класс": {8, 0, 1}, "11 класс. Первый день": {11, 1, 1}, "11 класс. Второй день": {11, 2, 1}, "Устный тур": {0, 0, 0}} {
+	for name, want := range map[string][3]int{"8 класс": {8, 0, 1}, "10 Класс": {10, 0, 1}, "11 класс. Первый день": {11, 1, 1}, "11 класс. Второй день": {11, 2, 1}, "Устный тур": {0, 0, 0}} {
 		g, d, ok := PRPaper(name)
 		if g != want[0] || d != want[1] || ok != (want[2] == 1) {
 			t.Errorf("%s: %d %d %v", name, g, d, ok)
