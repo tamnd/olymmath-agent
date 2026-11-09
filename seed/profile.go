@@ -14,12 +14,14 @@ type Row struct {
 	Row    int    `json:"row"`
 	ID     string `json:"id,omitempty"`
 	// Labels are the competition labels of the row, the most exact first. The locator resolves them through the alias table.
-	Labels    []string `json:"labels"`
-	Year      int      `json:"year,omitempty"`
-	Number    string   `json:"number,omitempty"`
-	Country   string   `json:"country,omitempty"`
-	Lang      string   `json:"lang,omitempty"`
-	Statement string   `json:"statement"`
+	Labels []string `json:"labels"`
+	Year   int      `json:"year,omitempty"`
+	// Edition is the edition part of the locator when the year alone does not name the edition, as 2024-fall of the Tournament of Towns. Number is then the exact position in that edition, such as ja3.
+	Edition   string `json:"edition,omitempty"`
+	Number    string `json:"number,omitempty"`
+	Country   string `json:"country,omitempty"`
+	Lang      string `json:"lang,omitempty"`
+	Statement string `json:"statement"`
 	// Title is the source line of an AoPS post, such as "IMO Shortlist 2013 Combinatorics #3", when the statement is the text of the post.
 	Title     string `json:"title,omitempty"`
 	Answer    string `json:"answer,omitempty"`
