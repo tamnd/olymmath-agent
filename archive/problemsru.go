@@ -25,7 +25,7 @@ type PRProblem struct {
 	ID int
 	// Number is the number of the problem in its paper, or 0 when the listing does not give it.
 	Number int
-	// Year and Grade are given by a listing that writes the number as year.grade.number, such as (#2010.8.1), or as grade.number, such as (#8.1). They are 0 when the listing does not give them.
+	// Year and Grade are given by a listing that writes the number as year.grade.number, such as (#2010.8.1), as grade.number, such as (#8.1), or as year.stage.grade.number, such as (#04.5.9.1). They are 0 when the listing does not give them.
 	Year, Grade int
 	Text        string
 	// Figure tells that the statement has a picture. Text is then the statement without the picture, so it is good for a link and a match, not for a copy.
@@ -40,8 +40,8 @@ var (
 	// prCrumbRE is a link of the path at the top of a node page.
 	prCrumbRE = regexp.MustCompile(`<a class="componentboxheaderlink" href="/view_by_source_new\.php\?parent=(\d+)">\s*([^<]*?)\s*</a>`)
 	prTotalRE = regexp.MustCompile(`Всего задач: (\d+)`)
-	// prHeadRE is the head of a problem of a listing, for example Задача <a ...id=67463">67463</a>&nbsp;(#1). Some listings write the number as year.grade.number, for example (#2010.8.1), or as grade.number, for example (#8.1).
-	prHeadRE = regexp.MustCompile(`(?s)<td class="problemsmallnumber">.*?view_problem_details_new\.php\?id=(\d+)">\s*\d+</a>\s*(?:&nbsp;\(#(?:(\d{4})\.)?(?:(\d{1,2})\.)?(\d+)\))?`)
+	// prHeadRE is the head of a problem of a listing, for example Задача <a ...id=67463">67463</a>&nbsp;(#1). Some listings write the number as year.grade.number, for example (#2010.8.1), or as grade.number, for example (#8.1). The All-Russian listings write it as two digits of the year, the stage, the grade and the number, for example (#04.5.9.1).
+	prHeadRE = regexp.MustCompile(`(?s)<td class="problemsmallnumber">.*?view_problem_details_new\.php\?id=(\d+)">\s*\d+</a>\s*(?:&nbsp;\(#(?:(\d{2})\.\d\.(\d{1,2})\.(\d{1,2})|(?:(\d{4})\.)?(?:(\d{1,2})\.)?(\d+))\))?`)
 	prBodyRE = regexp.MustCompile(`(?s)<td class="problemsmalldifficulty">.*?</table>(.*?)<table class="problemfootertable">`)
 	// prAuthorRE is the line of the author above a statement.
 	prAuthorRE = regexp.MustCompile(`(?s)<div class="catalogueproblemauthor[^"]*">.*?</div>`)
@@ -183,14 +183,21 @@ func ParsePRListing(page string) []PRProblem {
 		}
 		p := PRProblem{}
 		p.ID, _ = strconv.Atoi(page[h[2]:h[3]])
-		if h[8] >= 0 {
-			p.Number, _ = strconv.Atoi(page[h[8]:h[9]])
+		num := func(k int) int {
+			if h[2*k] < 0 {
+				return 0
+			}
+			n, _ := strconv.Atoi(page[h[2*k]:h[2*k+1]])
+			return n
 		}
 		if h[4] >= 0 {
-			p.Year, _ = strconv.Atoi(page[h[4]:h[5]])
-		}
-		if h[6] >= 0 {
-			p.Grade, _ = strconv.Atoi(page[h[6]:h[7]])
+			// Two digits of the year, as 04 for 2004 and 93 for 1993.
+			p.Year, p.Grade, p.Number = 2000+num(2), num(3), num(4)
+			if p.Year > 2050 {
+				p.Year -= 100
+			}
+		} else {
+			p.Year, p.Grade, p.Number = num(5), num(6), num(7)
 		}
 		b := prBodyRE.FindStringSubmatch(page[h[1]:end])
 		if b == nil {

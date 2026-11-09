@@ -120,9 +120,11 @@ func TestParsePRListing(t *testing.T) {
 		prItem("502", "&nbsp;(#2)", `<p/>Найдите <I>x</I><sup>2</sup> на рисунке.<div align="center"><img src="/show_document.php?id=1"></div>`) +
 		prItem("503", "", `<p/>Задача без номера.<br/>а) первая часть; б) вторая.`) +
 		prItem("504", "&nbsp;(#2010.10.4)", `<p/>Задача с полным номером.`) +
-		prItem("505", "&nbsp;(#8.7)", `<p/>Задача с номером класса.`)
+		prItem("505", "&nbsp;(#8.7)", `<p/>Задача с номером класса.`) +
+		prItem("506", "&nbsp;(#04.5.9.1)", `<p/>Задача Всероссийской олимпиады.`) +
+		prItem("507", "&nbsp;(#93.5.11.8)", `<p/>Задача 1993 года.`)
 	ps := ParsePRListing(page)
-	if len(ps) != 5 {
+	if len(ps) != 7 {
 		t.Fatalf("problems %+v", ps)
 	}
 	if ps[0].ID != 501 || ps[0].Number != 1 || ps[0].Err != nil || ps[0].Text != `Докажите, что $n^2 \geqslant n$ для числа $n$.` {
@@ -139,6 +141,9 @@ func TestParsePRListing(t *testing.T) {
 	}
 	if ps[4].Number != 7 || ps[4].Year != 0 || ps[4].Grade != 8 {
 		t.Errorf("a number with the grade: %+v", ps[4])
+	}
+	if ps[5].Number != 1 || ps[5].Year != 2004 || ps[5].Grade != 9 || ps[6].Number != 8 || ps[6].Year != 1993 || ps[6].Grade != 11 {
+		t.Errorf("a number with the year, the stage and the grade: %+v %+v", ps[5], ps[6])
 	}
 	for _, p := range ps {
 		if strings.Contains(p.Text, "Иванов") || strings.Contains(p.Text, "Сложность") || strings.Contains(p.Text, "Тема") {
