@@ -346,10 +346,13 @@ func Trace(file []byte, id, official, rule string) ([]byte, error) {
 	return content.Format(buf.Bytes())
 }
 
-// RenderLink writes the file of a new problem whose only statement is a link with no text to page of the official paper of c. rule is the rule that makes the link canonical. A problem such as this comes from a paper whose text the content may not hold.
-func RenderLink(at, tag string, c *Candidate, page int, rule string) ([]byte, error) {
+// RenderLink writes the file of a new problem whose only statement is a link with no text to page of the official paper of c. rule is the rule that makes the link canonical. A problem such as this comes from a paper whose text the content may not hold. The problem appears at at, its primary appearance, and at each locator of also.
+func RenderLink(at, tag string, c *Candidate, page int, rule string, also ...string) ([]byte, error) {
 	p := outProblem{Tag: tag, Kind: "problem"}
 	p.Appearances = []outAppearance{{At: at, Primary: true}}
+	for _, a := range also {
+		p.Appearances = append(p.Appearances, outAppearance{At: a})
+	}
 	p.Canonical.Statement = "S1"
 	p.Canonical.Rule = rule
 	p.Status.Statement = "sourced"

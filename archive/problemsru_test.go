@@ -61,6 +61,42 @@ func TestPRNodes(t *testing.T) {
 	if _, ok := PRYear("Отборочный тур"); ok {
 		t.Fatal("a tour is not a year")
 	}
+	for name, want := range map[string]int{"44 (2021), математика": 2021, "30 (2007), математические игры": 0, "27 (2004)": 0} {
+		if y, ok := PRYear(name); y != want || ok != (want != 0) {
+			t.Errorf("%s: %d %v", name, y, ok)
+		}
+	}
+	for name, want := range map[string][2]int{"46 турнир (2024/2025 год)": {2024, 2025}, "1 турнир (1980 год)": {1980, 1980}, "1992-1993": {1992, 1993}, "2 турнир (1980/1982 год)": {0, 0}, "2025 год": {0, 0}} {
+		first, last, ok := PRSpan(name)
+		if ok != (want[0] != 0) || (ok && (first != want[0] || last != want[1])) {
+			t.Errorf("%s: %d %d %v", name, first, last, ok)
+		}
+	}
+	if !PRFinal("Заключительный этап") || PRFinal("Региональный этап") {
+		t.Error("the final round is not told from the regional round")
+	}
+	for name, want := range map[string]string{
+		"осенний тур, базовый вариант, 8-9 класс":            "fall jo",
+		"весенний тур, сложный вариант, 10-11 класс":         "spring sa",
+		"осенний тур, тренировочный вариант, 7-8 класс":      "fall jo",
+		"весенний тур, основной вариант, 9-10 класс":         "spring sa",
+		"весенний тур, подготовительный вариант, 9-10 класс": "spring so",
+		"весенний тур, вариант для москвичей, 7-8 класс":     "",
+		"осенний тур, 7-8 класс":                             "",
+		"устный тур":                                         "",
+	} {
+		tp, ok := PRTourPaper(name)
+		got := ""
+		if ok {
+			got = "fall " + tp.Prefix()
+			if tp.Spring {
+				got = "spring " + tp.Prefix()
+			}
+		}
+		if got != want {
+			t.Errorf("%s: %q, want %q", name, got, want)
+		}
+	}
 	for name, want := range map[string][3]int{"8 класс": {8, 0, 1}, "10 Класс": {10, 0, 1}, "11 класс. Первый день": {11, 1, 1}, "11 класс. Второй день": {11, 2, 1}, "Устный тур": {0, 0, 0}} {
 		g, d, ok := PRPaper(name)
 		if g != want[0] || d != want[1] || ok != (want[2] == 1) {

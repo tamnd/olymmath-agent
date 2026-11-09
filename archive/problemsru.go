@@ -46,8 +46,12 @@ var (
 	// prAuthorRE is the line of the author above a statement.
 	prAuthorRE = regexp.MustCompile(`(?s)<div class="catalogueproblemauthor[^"]*">.*?</div>`)
 	prImageRE  = regexp.MustCompile(`(?i)<img\b[^>]*>`)
-	prYearRE   = regexp.MustCompile(`^(\d{4}) год$|^[IVXLC]+ .*\((\d{4}) г\.\)$`)
+	prYearRE   = regexp.MustCompile(`^(\d{4}) год$|^[IVXLC]+ .*\((\d{4}) г\.\)$|^\d{2} \((\d{4})\), математика$`)
 	prPaperRE  = regexp.MustCompile(`^(\d{1,2}) [кК]ласс(?:\. (Первый|Второй) день)?$`)
+	// prSpanRE is a year node of an olympiad whose year runs over a school year: "46 турнир (2024/2025 год)" or "1 турнир (1980 год)" of the Tournament of Towns, or "1992-1993" of the All-Russian olympiad.
+	prSpanRE = regexp.MustCompile(`^\d+ турнир \((\d{4})(?:/(\d{4}))? год\)$|^(\d{4})-(\d{4})$`)
+	// prTourPaperRE is a paper of the Tournament of Towns: the tour, the level and the grades, as in "осенний тур, базовый вариант, 8-9 класс".
+	prTourPaperRE = regexp.MustCompile(`^(осенний|весенний) тур, (базовый|тренировочный|подготовительный|сложный|основной) вариант, (7-8|8-9|9-10|10-11) класс$`)
 )
 
 // PRNodeURL gives the page of a node of the source catalogue, from the problem start of its listing.
@@ -92,13 +96,13 @@ func PRTotal(page string) int {
 	return 0
 }
 
-// PRYear reads the year of a year node, for example "2025 год", or "XV Олимпиада по геометрии имени И.Ф. Шарыгина (2019 г.)" for an olympiad that numbers its years.
+// PRYear reads the year of a year node, for example "2025 год", "XV Олимпиада по геометрии имени И.Ф. Шарыгина (2019 г.)" for an olympiad that numbers its years, or "44 (2021), математика" for the mathematics of the Lomonosov tournament. A year of the Lomonosov tournament that does not name its subject, or names another one such as "математические игры", gives false.
 func PRYear(name string) (int, bool) {
 	m := prYearRE.FindStringSubmatch(strings.TrimSpace(name))
 	if m == nil {
 		return 0, false
 	}
-	y, _ := strconv.Atoi(m[1] + m[2])
+	y, _ := strconv.Atoi(m[1] + m[2] + m[3])
 	return y, true
 }
 
@@ -116,6 +120,56 @@ func PRPaper(name string) (grade, day int, ok bool) {
 		day = 2
 	}
 	return grade, day, true
+}
+
+// PRSpan reads the years of a year node that runs over a school year, for example 2024 and 2025 for "46 турнир (2024/2025 год)" or "2024-2025". A tournament of one year gives that year two times.
+func PRSpan(name string) (first, last int, ok bool) {
+	m := prSpanRE.FindStringSubmatch(strings.TrimSpace(name))
+	if m == nil {
+		return 0, 0, false
+	}
+	first, _ = strconv.Atoi(m[1] + m[3])
+	last = first
+	if m[2]+m[4] != "" {
+		last, _ = strconv.Atoi(m[2] + m[4])
+	}
+	return first, last, last == first || last == first+1
+}
+
+// PRFinal tells that a paper node is the final round of the All-Russian olympiad, "Заключительный этап", whose child nodes are the papers of the grades.
+func PRFinal(name string) bool {
+	return strings.TrimSpace(name) == "Заключительный этап"
+}
+
+// PRTour is a paper of the Tournament of Towns.
+type PRTour struct {
+	// Spring is true for the spring tour (весенний тур) and false for the autumn tour (осенний тур).
+	Spring bool
+	// Senior is true for the older grades, 10-11 (9-10 before 1990), and false for the younger grades, 8-9 (7-8 before 1990).
+	Senior bool
+	// Advanced is true for the hard level: сложный вариант, and основной вариант in the early years. It is false for the base level: базовый, тренировочный or подготовительный вариант.
+	Advanced bool
+}
+
+// Prefix gives the start of the positions of the paper: j or s for the tier, then o or a for the level, as in the English names of the papers (Junior O-Level, Senior A-Level). Problem 3 of the senior A-level paper is sa3.
+func (t PRTour) Prefix() string {
+	p := "j"
+	if t.Senior {
+		p = "s"
+	}
+	if t.Advanced {
+		return p + "a"
+	}
+	return p + "o"
+}
+
+// PRTourPaper reads a paper node of the Tournament of Towns, for example "весенний тур, сложный вариант, 10-11 класс". A paper that does not name the tour, one of the two levels and the grades of one tier, such as "устный тур" or "весенний тур, вариант для москвичей, 7-8 класс", gives false.
+func PRTourPaper(name string) (PRTour, bool) {
+	m := prTourPaperRE.FindStringSubmatch(strings.TrimSpace(name))
+	if m == nil {
+		return PRTour{}, false
+	}
+	return PRTour{Spring: m[1] == "весенний", Senior: m[3] == "9-10" || m[3] == "10-11", Advanced: m[2] == "сложный" || m[2] == "основной"}, true
 }
 
 // ParsePRListing reads the problems of one page of the listing of a node. A statement keeps its TeX. The author line, the topics and the difficulty are not part of it: the topics and the difficulty are the work of MCCME and stay on problems.ru. A picture is left out of the text and is never fetched, because its path (/show_document.php?) is disallowed by robots.txt; the problem gets Figure.

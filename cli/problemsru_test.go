@@ -1,7 +1,9 @@
 package cli
 
 import (
+	"cmp"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -140,5 +142,68 @@ func TestSeedProblemsRu(t *testing.T) {
 	before := hits
 	if _, _, err := seedProblemsRu(context.Background(), fc, dir, 1, 2017, 2020, time.Hour, true, io.Discard); err != nil || hits != before {
 		t.Errorf("a second run sent %d requests: %v", hits-before, err)
+	}
+}
+
+// TestSeedProblemsRuSpans walks a node whose years are school years: the tours of the Tournament of Towns and the final round of the All-Russian olympiad.
+func TestSeedProblemsRuSpans(t *testing.T) {
+	pages := map[string]string{
+		"/robots.txt": "User-agent: *\nDisallow: /show_document.php?\n",
+		"parent=1":    prBox(prLink("10", "46 турнир (2024/2025 год)", "4"), prLink("20", "2016-2017", "3"), prLink("30", "45 турнир (2023/2024 год)", "2")),
+		"parent=10":   prBox(prLink("11", "осенний тур, сложный вариант, 10-11 класс", "2"), prLink("12", "весенний тур, базовый вариант, 8-9 класс", "1"), prLink("13", "устный тур", "1")),
+		"parent=11":   prListing([2]string{"101", "1"}, [2]string{"102", "7"}),
+		"parent=12":   prListing([2]string{"103", "1"}),
+		// The final round holds the grade papers. The regional round is left out with no request.
+		"parent=20": prBox(prLink("21", "Региональный этап", "1"), prLink("22", "Заключительный этап", "2")),
+		"parent=22": prBox(prLink("23", "9 класс", "1"), prLink("24", "11 Класс", "1")),
+		"parent=23": prListing([2]string{"201", "5"}),
+		"parent=24": prListing([2]string{"202", "8"}),
+		// Two problems of one paper with one number: the tournament gives no row.
+		"parent=30": prBox(prLink("31", "осенний тур, базовый вариант, 8-9 класс", "2")),
+		"parent=31": prListing([2]string{"301", "1"}, [2]string{"302", "1"}),
+	}
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p, ok := pages[cmp.Or(r.URL.RawQuery, r.URL.Path)]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_, _ = io.WriteString(w, p)
+	})
+	st, err := store.Open(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fc := fetch.New(st)
+	fc.Delay = 0
+	fc.HTTP = &http.Client{Transport: prSite{h}}
+	dir := t.TempDir()
+	kept, skipped, err := seedProblemsRu(context.Background(), fc, dir, 1, 2017, 2025, time.Hour, false, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if kept != 5 || skipped != 4 {
+		t.Errorf("kept %d, skipped %d", kept, skipped)
+	}
+	got := map[string]string{}
+	err = seed.Read(dir, problemsRu, func(r seed.Row) error {
+		got[r.ID] = fmt.Sprintf("%d %s %s", r.Year, r.Edition, r.Number)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"101": "2024 2024-fall sa1", "102": "2024 2024-fall sa7", "103": "2025 2025-spring jo1", "201": "2017  p95", "202": "2017  p118"}
+	if len(got) != len(want) {
+		t.Errorf("rows %v", got)
+	}
+	for id, w := range want {
+		if got[id] != w {
+			t.Errorf("%s: %q, want %q", id, got[id], w)
+		}
+	}
+	// A node counts by its last year: 2024/2025 is out of 2026 to 2026.
+	if kept, _, err := seedProblemsRu(context.Background(), fc, dir, 1, 2026, 2026, time.Hour, false, io.Discard); err != nil || kept != 0 {
+		t.Errorf("a node out of the range gave %d rows: %v", kept, err)
 	}
 }

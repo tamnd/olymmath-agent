@@ -24,6 +24,8 @@ type journalLink struct {
 	at   string
 	cand canon.Candidate
 	page int
+	// also are the other appearances of the problem, such as the paper of another grade that has the same problem.
+	also []string
 }
 
 func runJournal(env Env, args []string) int {
@@ -158,11 +160,15 @@ func writeJournal(root string, corpus *content.Corpus, news []journalLink) error
 	for i, n := range news {
 		comp, _, _ := strings.Cut(n.at, "/")
 		_, rule := canon.Rank(&canon.Candidate{Origin: n.cand.Origin, Lang: n.cand.Lang}, original(corpus.Competition(comp)))
-		b, err := canon.RenderLink(n.at, tags[i], &n.cand, n.page, rule)
+		b, err := canon.RenderLink(n.at, tags[i], &n.cand, n.page, rule, n.also...)
 		if err != nil {
 			return err
 		}
-		if err := writeNew(root, corpus, &canon.Record{Primary: canon.Choice{At: n.at}}, tags[i], b); err != nil {
+		rec := &canon.Record{Primary: canon.Choice{At: n.at}}
+		for _, a := range n.also {
+			rec.Merged = append(rec.Merged, canon.Merge{At: a})
+		}
+		if err := writeNew(root, corpus, rec, tags[i], b); err != nil {
 			return fmt.Errorf("%s: %w", n.at, err)
 		}
 	}
