@@ -50,8 +50,8 @@ var (
 	prPaperRE  = regexp.MustCompile(`^(\d{1,2}) [кК]ласс(?:\. (Первый|Второй) день)?$`)
 	// prSpanRE is a year node of an olympiad whose year runs over a school year: "46 турнир (2024/2025 год)" or "1 турнир (1980 год)" of the Tournament of Towns, or "1992-1993" of the All-Russian olympiad.
 	prSpanRE = regexp.MustCompile(`^\d+ турнир \((\d{4})(?:/(\d{4}))? год\)$|^(\d{4})-(\d{4})$`)
-	// prTourPaperRE is a paper of the Tournament of Towns: the tour, the level and the grades, as in "осенний тур, базовый вариант, 8-9 класс".
-	prTourPaperRE = regexp.MustCompile(`^(осенний|весенний) тур, (базовый|тренировочный|подготовительный|сложный|основной) вариант, (7-8|8-9|9-10|10-11) класс$`)
+	// prTourPaperRE is a paper of the Tournament of Towns: the tour, the level and the grades, as in "осенний тур, базовый вариант, 8-9 класс" (some years write классы).
+	prTourPaperRE = regexp.MustCompile(`^(осенний|весенний) тур, (базовый|тренировочный|подготовительный|сложный|основной) вариант, (7-8|8-9|9-10|10-11) классы?$`)
 )
 
 // PRNodeURL gives the page of a node of the source catalogue, from the problem start of its listing.
