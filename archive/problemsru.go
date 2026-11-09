@@ -47,7 +47,7 @@ var (
 	prAuthorRE = regexp.MustCompile(`(?s)<div class="catalogueproblemauthor[^"]*">.*?</div>`)
 	prImageRE  = regexp.MustCompile(`(?i)<img\b[^>]*>`)
 	prYearRE   = regexp.MustCompile(`^(\d{4}) год$|^[IVXLC]+ .*\((\d{4}) г\.\)$`)
-	prPaperRE  = regexp.MustCompile(`^(\d{1,2}) класс(?:\. (Первый|Второй) день)?$`)
+	prPaperRE  = regexp.MustCompile(`^(\d{1,2}) [кК]ласс(?:\. (Первый|Второй) день)?$`)
 )
 
 // PRNodeURL gives the page of a node of the source catalogue, from the problem start of its listing.
@@ -102,7 +102,7 @@ func PRYear(name string) (int, bool) {
 	return y, true
 }
 
-// PRPaper reads the grade and the day of a paper node, for example "8 класс" or "11 класс. Второй день". The day is 0 for a paper of one day.
+// PRPaper reads the grade and the day of a paper node, for example "8 класс", "8 Класс" or "11 класс. Второй день". The day is 0 for a paper of one day.
 func PRPaper(name string) (grade, day int, ok bool) {
 	m := prPaperRE.FindStringSubmatch(strings.TrimSpace(name))
 	if m == nil {
