@@ -6,7 +6,7 @@ require (
 	github.com/dop251/goja v0.0.0-20261024144015-2a9269b6b6de
 	github.com/parquet-go/parquet-go v0.32.0
 	github.com/yuin/goldmark v1.8.7
-	go.yaml.in/yaml/v3 v3.0.5
+	go.yaml.in/yaml/v3 v3.0.6
 	golang.org/x/text v0.43.0
 )
 
