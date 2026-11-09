@@ -172,18 +172,24 @@ func TestParsePRSources(t *testing.T) {
 	got := ParsePRSources(page, 164898)
 	want := []PRSource{{Year: 2004, Grade: 11, Number: 6}, {Year: 2004, Grade: 10, Number: 6, Other: true}}
 	// The Sharygin olympiad has the head класс, a head задача with no link and a number such as 10.4.
-	shar := func(grade, number string) string {
+	// The 2005 pages write the head as Задача, with a capital.
+	shar := func(grade, head, number string) string {
 		return prSourceHead("204563", "") + prSourceHead("206102", "олимпиада") + prSourceCell("Название", "Олимпиада по геометрии имени И.Ф. Шарыгина") +
 			prSourceHead("216766", "год") + prSourceCell("Год", "2025") + prSourceHead("216770", "класс") + prSourceCell("Класс", grade) +
 			`<tr class="problemdetailssourcetablecell"><td class="problemdetailssourcetablecellhead" colspan=2>
-задача	</td></tr>` + prSourceCell("Номер", number)
+` + head + `	</td></tr>` + prSourceCell("Номер", number)
 	}
 	for _, c := range []struct {
-		grade, number string
-		want          PRSource
-	}{{"10", "10.4", PRSource{Year: 2025, Grade: 10, Number: 4}}, {"9", "10.4", PRSource{Year: 2025, Grade: 9, Other: true}}, {"8", "3", PRSource{Year: 2025, Grade: 8, Number: 3}}} {
-		if got := ParsePRSources(shar(c.grade, c.number), 206102); len(got) != 1 || got[0] != c.want {
-			t.Errorf("grade %s, number %s: %+v, want %+v", c.grade, c.number, got, c.want)
+		grade, head, number string
+		want                PRSource
+	}{
+		{"10", "задача", "10.4", PRSource{Year: 2025, Grade: 10, Number: 4}},
+		{"9", "задача", "10.4", PRSource{Year: 2025, Grade: 9, Other: true}},
+		{"8", "задача", "3", PRSource{Year: 2025, Grade: 8, Number: 3}},
+		{"9", "Задача", "4", PRSource{Year: 2025, Grade: 9, Number: 4}},
+	} {
+		if got := ParsePRSources(shar(c.grade, c.head, c.number), 206102); len(got) != 1 || got[0] != c.want {
+			t.Errorf("grade %s, head %s, number %s: %+v, want %+v", c.grade, c.head, c.number, got, c.want)
 		}
 	}
 	if len(got) != len(want) {

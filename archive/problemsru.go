@@ -234,7 +234,8 @@ func ParsePRSources(page string, node int) []PRSource {
 	for _, m := range prSourceRowRE.FindAllStringSubmatch(page, -1) {
 		if m[1] != "" || m[3] == "" {
 			id, _ := strconv.Atoi(m[1])
-			name := strings.TrimSpace(m[2] + m[5])
+			// A head with no link may start with a capital, as in Задача.
+			name := strings.ToLower(strings.TrimSpace(m[2] + m[5]))
 			switch {
 			case id == node:
 				out = append(out, PRSource{})
