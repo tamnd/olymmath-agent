@@ -138,6 +138,12 @@ An import never changes the canonical text of an existing problem, unless you gi
 om import -content olymmath -comp tot,sharygin -fill -existing
 ```
 
+Many rows of a licensed source name no position, or no competition at all, such as the `numina:olympiads` rows of NuminaMath. With `-match`, the import places such a row by its content. It reads the problems.ru pages of the raw store and takes the text of each problem of `-comp` that has only a problems.ru link. That text is a private match key: it never goes into a file of the content, a review or a report. The row and the key are often in two languages, so the command compares only what a translation keeps (package `keymatch`): the numbers, number words such as "three" or "три", the letters of the formulas, the names of points such as ABC, the functions and the symbols, and the runs of three of them in the order of the text. Each token weighs more when fewer keys have it. The score is the mean of the weighted Jaccard index of the tokens and the Jaccard index of the runs. A row is compared only with the keys of its competition and year, or of the year before for an edition from fall to spring; a row of a `-match-open` label is compared with all keys. A pair is placed only when the row and the key are the best of each other, the score is at least 0.55, the gap to the next key of the row and to the next row of the key is at least 0.15, and the pair shares at least 3 tokens (5 for a row with no competition and no year) with a weight of at least 6. Two rows of one text do not compete. A pair with a score from 0.35 to 0.55 is doubtful: it is placed only when a review of kind `match` accepts it. With `-match-lane codex`, the command asks the lane whether each doubtful pair states one problem, one question at a time and at most `-match-asks` questions, and writes the answer as a review of the agent. A review of kind `match` that rejects a pair keeps it out, even a strong one. The text of a placed row loses its head, such as the name of the author or the topic that some datasets translate from the problems.ru page. `-match-out` writes the pairs and their scores to a TSV file with no text:
+
+```sh
+om import -content olymmath -comp ru-allrussian -fill -existing -match -match-out pairs.tsv
+```
+
 ### Read problems.ru
 
 ```sh

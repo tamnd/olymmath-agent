@@ -65,6 +65,11 @@ type Seeds struct {
 	// Confirm, when it is not nil, can refuse the position that a row got from Topics. It gives false when the official paper of the edition has another problem at that position.
 	Confirm func(code string, year int, text, pos string) bool
 
+	// Matched, when it is not nil, gives the appearance of a row that the content match placed (package keymatch), by the reference of the row (source|file#row). Such a row takes that appearance and no other rule reads its labels, its number or its title.
+	Matched map[string]string
+	// Matches counts the rows that got an appearance from Matched.
+	Matches int
+
 	// Topics, when it is not nil, gives the numbers of AoPS topics. A row with no number and the reference of a topic takes the number of the topic when the topic has the same competition and year, and the letter of the paper when the row has none.
 	Topics *Topics
 
@@ -111,8 +116,15 @@ func (s *Seeds) skip(r seed.Row, code, reason string) {
 	}
 }
 
+// MatchRef gives the reference of a row in Seeds.Matched.
+func MatchRef(r seed.Row) string { return r.Source + "|" + r.File + "#" + strconv.Itoa(r.Row) }
+
 // Add reads one seed row.
 func (s *Seeds) Add(r seed.Row) {
+	if at, ok := s.Matched[MatchRef(r)]; ok {
+		s.addMatched(r, at)
+		return
+	}
 	code := s.Aliases.Code(r.Labels)
 	if code == "" || code == "-" {
 		s.skip(r, code, "no competition")
@@ -206,23 +218,8 @@ func (s *Seeds) Add(r seed.Row) {
 		s.skip(r, code, "no valid position")
 		return
 	}
-	src := s.Corpus.Source(r.Source)
-	if src == nil || src.Origin == "M" || src.DoNotRepublish {
-		s.skip(r, code, "source not usable")
-		return
-	}
-	// A text in zone Z3 is a link only (spec 11.2), so the import does not take it.
-	if a := s.Corpus.Source(r.Author); src.Zone.Statement == "Z3" || (a != nil && a.Zone.Statement == "Z3") {
-		s.skip(r, code, "text in zone Z3")
-		return
-	}
-	text := normalize.Statement(r.Statement, pos)
-	if utf8.RuneCountInString(text) < MinText || titleRE.MatchString(text) || isRef(text) || (len(strings.Fields(text)) < MinWords && !strings.Contains(text, "$")) || !strings.ContainsAny(text, "$.?!:") || (strings.Contains(text, ";") && !strings.Contains(text, "$") && len(strings.Fields(text)) < 30) {
-		s.skip(r, code, "not a statement")
-		return
-	}
-	if s.Accept != nil && !s.Accept(text) {
-		s.skip(r, code, "does not render")
+	c, ok := s.candidate(r, code, pos)
+	if !ok {
 		return
 	}
 	letter := ""
@@ -253,14 +250,29 @@ func (s *Seeds) Add(r seed.Row) {
 		s.skip(r, code, "edition form not supported")
 		return
 	}
-	if len(comp.Shape(r.Year).Positions()) == 0 && pos[0] != 'p' {
-		if s.sections == nil {
-			s.sections = map[string]map[int]bool{}
-		}
-		if s.sections[code] == nil {
-			s.sections[code] = map[int]bool{}
-		}
-		s.sections[code][r.Year] = true
+	s.pend(r, c, comp, pos, letter, lead, leadK)
+}
+
+// candidate makes the candidate of a row at the position pos, or gives false when the source of the row or its text is not usable.
+func (s *Seeds) candidate(r seed.Row, code, pos string) (*Candidate, bool) {
+	src := s.Corpus.Source(r.Source)
+	if src == nil || src.Origin == "M" || src.DoNotRepublish {
+		s.skip(r, code, "source not usable")
+		return nil, false
+	}
+	// A text in zone Z3 is a link only (spec 11.2), so the import does not take it.
+	if a := s.Corpus.Source(r.Author); src.Zone.Statement == "Z3" || (a != nil && a.Zone.Statement == "Z3") {
+		s.skip(r, code, "text in zone Z3")
+		return nil, false
+	}
+	text := normalize.Statement(r.Statement, pos)
+	if utf8.RuneCountInString(text) < MinText || titleRE.MatchString(text) || isRef(text) || (len(strings.Fields(text)) < MinWords && !strings.Contains(text, "$")) || !strings.ContainsAny(text, "$.?!:") || (strings.Contains(text, ";") && !strings.Contains(text, "$") && len(strings.Fields(text)) < 30) {
+		s.skip(r, code, "not a statement")
+		return nil, false
+	}
+	if s.Accept != nil && !s.Accept(text) {
+		s.skip(r, code, "does not render")
+		return nil, false
 	}
 	key := match.WeakKey
 	if src.Origin == "H1" || src.Origin == "H2" {
@@ -274,12 +286,70 @@ func (s *Seeds) Add(r seed.Row) {
 	if lang == "" {
 		lang = "en"
 	}
-	c := &Candidate{
+	return &Candidate{
 		Source: r.Source, Origin: src.Origin, Zone: src.Zone.Statement, Lang: lang,
 		Name: src.Name, URL: url, Ref: r.File + "#" + strconv.Itoa(r.Row),
 		Text: text, Answer: Answer(r.Answer), Key: key, Reworded: src.Reworded,
+	}, true
+}
+
+// pend keeps the candidate of a row for Candidates.
+func (s *Seeds) pend(r seed.Row, c *Candidate, comp *content.Competition, pos, letter string, lead *leadRow, leadK int) {
+	code := comp.Code
+	if len(comp.Shape(r.Year).Positions()) == 0 && pos[0] != 'p' {
+		if s.sections == nil {
+			s.sections = map[string]map[int]bool{}
+		}
+		if s.sections[code] == nil {
+			s.sections[code] = map[int]bool{}
+		}
+		s.sections[code][r.Year] = true
 	}
 	s.pending = append(s.pending, pendingRow{row: r, c: c, comp: comp, year: r.Year, letter: letter, pos: pos, lead: lead, k: leadK, one: onePaper(comp, r.Year)})
+}
+
+// addMatched reads a row that the content match placed at the appearance at. The edition of at gives the year and, for a competition with seasons, the season, as 2024-fall.
+func (s *Seeds) addMatched(r seed.Row, at string) {
+	parts := strings.Split(at, "/")
+	if len(parts) != 3 || len(parts[1]) < 4 {
+		s.skip(r, "", "no valid position")
+		return
+	}
+	code, pos := parts[0], parts[2]
+	comp := s.Corpus.Competition(code)
+	year, err := strconv.Atoi(parts[1][:4])
+	if comp == nil || err != nil {
+		s.skip(r, code, "no competition")
+		return
+	}
+	letter := parts[1][4:]
+	switch comp.EditionForm {
+	case "", "year":
+		if letter != "" {
+			s.skip(r, code, "no valid position")
+			return
+		}
+	case "year-season":
+		if !seasonLetterRE.MatchString(letter) {
+			s.skip(r, code, "no season")
+			return
+		}
+	default:
+		s.skip(r, code, "edition form not supported")
+		return
+	}
+	r.Year = year
+	if !validPosition(comp, year, pos) {
+		s.skip(r, code, "no valid position")
+		return
+	}
+	r.Statement = CleanHead(r.Statement)
+	c, ok := s.candidate(r, code, pos)
+	if !ok {
+		return
+	}
+	s.Matches++
+	s.pend(r, c, comp, pos, letter, nil, 0)
 }
 
 // Candidates returns the candidates of each appearance. A position such as p3 is dropped when another row of the same year has a position with a section letter, such as c3, because the two numberings do not agree. For a competition with two papers each year, a row with no letter is dropped when a row of the same year or of an earlier year has a letter, because the paper of the row is not known.
