@@ -483,6 +483,12 @@ func TestGradePosition(t *testing.T) {
 		{2017, "24", "Sharygin Geometry Olympiad 2017    P4", "", true},
 		{2017, "8", "Sharygin 2017   P8 (Grade (a)8 9 (b)10 11)", "", true},
 		{2017, "3", "Sharygin 2017 Final Round Grade 8 P3", "p83", true},
+		// The number after a mark is not read as a grade, so "problem 1 grade 8" names grade 8.
+		{2017, "1", "2017 Sharygin Geometry Olympiad Final Round problem 1 grade 8", "p81", true},
+		{2017, "6", "Sharygin Geometry Olympiad 2017 Final Round problem 6 grade 10", "p106", true},
+		{2017, "2", "2017 Sharygin Geometry Olympiad Final Round problem 1 grade 8", "", true},
+		// The first round is the other paper, so its grade is the grade that the problem is meant for.
+		{2017, "P1", "Sharygin Geometry Olympiad 2017 First Round P1  grade8", "", false},
 		{2019, "1", "Kosovo MO 2019 Grade 10 P1", "p101", true},
 		{2019, "5", "Kosovo MO 2019 Grade 9 P5", "p95", true},
 		{2019, "3", "Kosovo MO 2019 grade XI problem 3", "p113", true},
