@@ -164,7 +164,7 @@ Many national olympiads, all journals and the official IMO texts are PDF. The `o
 | model clients | `codex,gemini,claude` (the default) | the command-line client of each model, with its own login. A client whose allowance is spent rests until the time that it gives |
 | local servers | `local` | vision servers of the user through the OpenAI chat-completions API (package `vision`): GLM-OCR under MLX on this Mac, and olmOCR 2 under vLLM on the GPU host gpc through `ssh` and `curl`. Targets are `MODEL=URL` in `-local` or `$OLYMMATH_LOCAL`. The targets of one model share the pages in turns, a 429 rests a target, a target that does not answer rests for 5 minutes, and a health check asks each target for one token. The cache keeps the answers of each model apart |
 
-Every OCR text records `extraction: <lane>/<tool>@<version>`, a confidence, and the page image crop. It goes through the no-rewrite guard of 06.4 step 6. OCR statements below the confidence threshold go to review before they can be canonical.
+Every OCR text records `extraction: <lane>/<tool>@<version>`, a confidence, and the page image crop. It goes through the no-rewrite guard of 06.4 step 6. OCR statements below the confidence threshold go to review before they can be canonical. A text of the native lane whose formulas a model put into TeX from the page image records its extraction in the same way, such as `native/pdftotext@26.10.0 (claude-opus-5-5)`.
 
 ## 5.8 Adapters and libraries
 

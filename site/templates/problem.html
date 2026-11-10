@@ -8,7 +8,7 @@
   <div class="card statement-card">
     {{if .Statement}}<div class="statement">{{.Statement}}</div>{{else}}<p class="muted">The text of this problem is not here. Read it in the official paper below.</p>{{end}}
     {{if .Source.Traced}}<p class="source"><span class="badge badge-{{.Source.Origin}}">{{origin .Source.Origin}}</span> Transcription from <a href="{{.Source.URL}}" rel="noopener">{{.Source.Name}}</a>, checked word for word against the official paper. {{zone .Source.Zone}}.</p>{{else}}<p class="source"><span class="badge badge-{{.Source.Origin}}">{{origin .Source.Origin}}</span> <a href="{{.Source.URL}}" rel="noopener">{{.Source.Name}}</a>{{if .Source.Page}}, page {{.Source.Page}}{{end}}. {{zone .Source.Zone}}.</p>{{end}}
-    {{if and .Statement .Source.Extraction}}<p class="source">A model read this text from the scan of the paper by OCR, with {{.Source.Extraction}}. No person has checked it against the paper yet.</p>{{end}}
+    {{if and .Statement .Source.Extraction}}<p class="source">{{readby .Source.Extraction}}</p>{{end}}
     {{with .Official}}<p class="source">Official text: <a href="{{.URL}}" rel="noopener">{{.Name}}</a>{{if .Page}}, page {{.Page}}{{end}}.</p>{{end}}
     {{with .Also}}<p class="source">Also {{range $i, $a := .}}{{if $i}}, {{end}}<a href="{{$a.Link}}">{{$a.Title}}</a>{{end}}.</p>{{end}}
   </div>

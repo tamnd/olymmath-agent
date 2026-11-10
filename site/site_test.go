@@ -281,3 +281,14 @@ func TestOlderThan(t *testing.T) {
 		t.Fatal("a problem of the year of the cutoff with no dates is not older")
 	}
 }
+
+func TestReadBy(t *testing.T) {
+	for _, c := range []struct{ in, want string }{
+		{"native/pdftotext@26.10.0 (claude-opus-5-5)", "A model put the text layer of the paper into Markdown and TeX, with native/pdftotext@26.10.0 (claude-opus-5-5)."},
+		{"vision/codex@0.167.0 (gpt-5.5)", "A model read this text from the scan of the paper by OCR, with vision/codex@0.167.0 (gpt-5.5)."},
+	} {
+		if got := readBy(c.in); !strings.HasPrefix(got, c.want) || !strings.HasSuffix(got, "No person has checked it against the paper yet.") {
+			t.Errorf("readBy(%q) = %q", c.in, got)
+		}
+	}
+}

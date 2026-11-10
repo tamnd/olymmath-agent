@@ -205,7 +205,7 @@ type Source struct {
 	Zone   string
 	// Traced tells that the text is a transcription that agrees with an official text. Origin is then the class of the official text.
 	Traced bool
-	// Extraction is the tool that read the text from a scan of the paper, as in vision/claude@2.1.318. It is "" for a text that a person typed.
+	// Extraction is the tool that read the text from the paper, as in vision/claude@2.1.318 or native/pdftotext@26.10.0. It is "" for a text that a person typed.
 	Extraction string
 }
 
@@ -233,7 +233,7 @@ type Statement struct {
 	DiffFrom string `yaml:"diff_from"`
 	// Traced is the id of the official statement that this transcription agrees with, word for word and number for number. A traced text takes the class of that statement (spec 06.2).
 	Traced string `yaml:"traced"`
-	// Extraction tells how the text came out of a scan: <lane>/<tool>@<version>, as in vision/claude@2.1.318 (spec 05.7). The words are the words of the source, but a model read them from the page image, and no person typed them. It is "" for a text that a person typed or that came from a text layer.
+	// Extraction tells how the text came out of the paper: <lane>/<tool>@<version>, and the model in brackets, as in vision/claude@2.1.318 (spec 05.7). The words are the words of the source, but no person typed them. In the vision lane a model read them from the page image. In the native lane they came from the text layer of the PDF (native/pdftotext@26.10.0), and a model put the formulas into TeX from the page image. It is "" for a text that a person typed.
 	Extraction string `yaml:"extraction"`
 	// Confidence is the confidence of the extraction, from 0 to 1. It is 0 when Extraction is "".
 	Confidence float64 `yaml:"confidence"`
