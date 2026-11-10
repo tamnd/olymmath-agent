@@ -40,6 +40,8 @@ func runImport(env Env, args []string) int {
 	doubts := fs.Bool("doubts", false, "print each doubt with its source and the source of the canonical candidate, to show why a competition is skipped")
 	promote := fs.Bool("promote", false, "make a candidate of class H1 or H2 the canonical statement of an existing problem when it ranks above the canonical statement and its text agrees with it")
 	explain := fs.String("explain", "", "write each seed row of a known competition to this TSV file with the appearance that it gives, or the reason why it gives none")
+	fill := fs.Bool("fill", false, "give the text of the canonical candidate to an existing problem that has no text, such as a problem with only a link of zone Z3, when its appearance has no doubt and no other problem has the text; the other problems do not change")
+	existing := fs.Bool("existing", false, "write no new problem: only add statements to the problems of the content")
 	maxDoubt := fs.Float64("max-doubt", canon.MaxDoubt, "skip a competition whose review doubts per appearance are above this share")
 	if _, err := parseMixed(fs, args); err != nil {
 		return ExitUsage
@@ -169,14 +171,36 @@ func runImport(env Env, args []string) int {
 			texts.Add(p.Appearances[0].At, match.Shingles(p.Statement))
 		}
 	}
-	var created, updated, merged, promoted, dupes int
+	var created, updated, merged, promoted, dupes, fills int
+	// filled holds the problems that got a text from -fill, so that a problem with two appearances gets one text.
+	filled := map[string]bool{}
 	var mergeRows []string
 	var newRecs []*canon.Record
 	for _, r := range recs {
 		if p := owner[r.Primary.At]; p != nil {
 			comp := corpus.Competition(strings.SplitN(r.Primary.At, "/", 2)[0])
 			add := canon.Add(p, r, original(comp))
-			up := add.Better != nil && *promote && canon.Agrees(add.Better, p)
+			best := r.Primary.Best
+			fillID := add.ID(best)
+			give := *fill && p.Statement == "" && !filled[p.Tag] && len(r.Primary.Doubts) == 0 && !best.Reworded && best.Text != "" && best.Zone != "Z3" && fillID != ""
+			if give {
+				// A text that another problem has already is not given, because rule D01 does not allow two problems with one text. A review item names the pair.
+				if h, ok := duplicateOf(texts, best.Shingles()); ok {
+					items = append(items, canon.Item{ID: canon.ItemID("pair", h.ID, r.Primary.At), Kind: "pair", At: h.ID, With: r.Primary.At, T: math.Round(h.T*1000) / 1000, Text: owner[h.ID].Statement, Other: best.Text})
+					dupes++
+					give = false
+				}
+			}
+			if *fill && !give {
+				// A fill pass changes only the problems that get a text.
+				continue
+			}
+			if give {
+				filled[p.Tag] = true
+				fills++
+				texts.Add(p.Appearances[0].At, best.Shingles())
+			}
+			up := !give && add.Better != nil && *promote && canon.Agrees(add.Better, p)
 			if add.Better != nil && !up {
 				items = append(items, canon.Item{ID: "better-" + p.Tag, Kind: "canonical", At: r.Primary.At, Source: add.Better.Source, Ref: add.Better.Ref, Text: p.Statement, Other: add.Better.Text})
 			}
@@ -192,6 +216,9 @@ func runImport(env Env, args []string) int {
 			if err == nil {
 				b, err = canon.Apply(b, add)
 			}
+			if err == nil && give {
+				b, err = canon.Fill(b, fillID, best.Text, r.Primary.Rule, r.Primary.Status())
+			}
 			if err == nil && up {
 				_, rule := canon.Rank(add.Better, original(comp))
 				b, err = canon.Promote(b, p.Canonical.Statement, add.ID(add.Better), add.Better.Text, rule)
@@ -204,6 +231,9 @@ func runImport(env Env, args []string) int {
 				fmt.Fprintf(env.Stderr, "om import: %s: %v\n", p.Path, err)
 				return ExitFailure
 			}
+			continue
+		}
+		if *existing {
 			continue
 		}
 		// An appearance that already belongs to a problem does not merge into a new problem.
@@ -293,7 +323,7 @@ func runImport(env Env, args []string) int {
 	if s.Led > 0 {
 		fmt.Fprintf(env.Stdout, "%d rows got a position from the problem mark at the start of their text.\n", s.Led)
 	}
-	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d promoted statements, %d new problems not written because their text is in the content, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, promoted, dupes, len(items), strings.Join(reasons, ", "))
+	fmt.Fprintf(env.Stdout, "%d appearances with a candidate. %d new problems, %d merged appearances, %d problems with new links, %d promoted statements, %d problems that got a text, %d texts not written because they are in the content, %d review items. Rows skipped: %s.\n", len(choices), created, merged, updated, promoted, fills, dupes, len(items), strings.Join(reasons, ", "))
 	return ExitOK
 }
 

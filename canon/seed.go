@@ -21,7 +21,7 @@ const MinWords = 10
 
 var (
 	letterRE   = regexp.MustCompile(`(?i)(?:^|[\s\d])(ii|i|a|b)\s*$`)
-	positionRE = regexp.MustCompile(`^[a-z][0-9]{1,4}$`)
+	positionRE = regexp.MustCompile(`^[a-z]{1,2}[0-9]{1,4}$`)
 	// titleRE matches a text that names a problem instead of stating it.
 	// refRE matches a short text with no formula that names the source of a problem, for example "Tuymaada 2002 day 1 problem 1. Author : A. Golovanov." or "Kvant M1467 (Sol: 3/1995) IMO 1994 P1 IMO Shortlist 1994 A2".
 	refRE   = regexp.MustCompile(`(?i)\b(19|20)[0-9]{2}\b.*\b(problem|shortlist|olympiad|tst|authors?|grade|round|day|kvant)\b|\b(problem|shortlist|olympiad|tst|authors?|grade|round|day|kvant)\b.*\b(19|20)[0-9]{2}\b`)
@@ -127,7 +127,12 @@ func (s *Seeds) Add(r seed.Row) {
 		s.skip(r, code, "no competition")
 		return
 	}
-	if r.Year == 0 && r.Number == "" && s.Topics != nil {
+	if comp.EditionForm == "year-season" && r.Number == "" && r.Title == "" && s.Topics != nil {
+		// The year of a collection of a competition with seasons, such as "2020 Tournament of Towns", can be the year of either edition of a tournament that runs from fall to spring. The title that the numbered source gives the topic names the edition, so its year is used.
+		if y := s.Topics.Year(r.Ref, code); y != 0 {
+			r.Year = y
+		}
+	} else if r.Year == 0 && r.Number == "" && s.Topics != nil {
 		// A collection such as the AoPS AHSME set has no year in its labels. The topic of the row gives the year when the numbered source knows the topic.
 		r.Year = s.Topics.Year(r.Ref, code)
 	}
@@ -223,6 +228,12 @@ func (s *Seeds) Add(r seed.Row) {
 	letter := ""
 	switch comp.EditionForm {
 	case "", "year":
+	case "year-season":
+		// The season of the edition comes only from the title that the numbered source gives the row or its topic, as described at SeasonPosition.
+		if letter = topicLetter; !seasonLetterRE.MatchString(letter) {
+			s.skip(r, code, "no season")
+			return
+		}
 	case "year-letter":
 		letter = Letter(r.Labels)
 		// A row with no letter, such as a row of the AoPS collection "2009 AMC 10" that holds both papers, takes the letter that the AoPS wiki gives its topic. A row of a collection that names a season, such as "2021 AMC 10 Fall", does not, because that year had four papers.
@@ -300,6 +311,9 @@ func (s *Seeds) Candidates() map[string][]*Candidate {
 				s.skip(p.row, p.comp.Code, "no edition letter")
 				continue
 			}
+			ed += p.letter
+		}
+		if p.comp.EditionForm == "year-season" {
 			ed += p.letter
 		}
 		p.c.At = p.comp.Code + "/" + ed + "/" + p.pos
