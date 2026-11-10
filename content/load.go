@@ -23,6 +23,7 @@ import (
 // Load reads the content at root. It returns the corpus and the findings of the files that it cannot read. The corpus is usable when there are findings, but it does not have the files with errors. The audit package checks the rules of spec 09.3 on the corpus.
 func Load(root string) (*Corpus, Findings) {
 	l := &loader{root: root, corpus: newCorpus()}
+	l.corpus.Root = root
 	l.sources()
 	l.competitions()
 	l.editions()

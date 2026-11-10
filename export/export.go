@@ -69,12 +69,14 @@ type Row struct {
 	// Appearances are the locators of the problem, the primary first.
 	Appearances []string `parquet:"appearances,list"`
 	// Source, Zone and Licence are those of the statement.
-	Source    string     `parquet:"source"`
-	Zone      string     `parquet:"zone"`
-	Licence   string     `parquet:"licence"`
-	SourceURL string     `parquet:"source_url,optional"`
-	Origin    string     `parquet:"origin,optional"`
-	Statement string     `parquet:"statement,optional"`
+	Source    string `parquet:"source"`
+	Zone      string `parquet:"zone"`
+	Licence   string `parquet:"licence"`
+	SourceURL string `parquet:"source_url,optional"`
+	Origin    string `parquet:"origin,optional"`
+	Statement string `parquet:"statement,optional"`
+	// Figures are the URLs of the figures of the statement on the site, as https://olymmath.tamnd.com/imo/2024/p1.fig1.svg. A figure is part of the statement, so a row whose statement is left out has none. The statement links to a figure by the name of its file.
+	Figures   []string   `parquet:"figures,list"`
 	LeftOut   string     `parquet:"left_out,optional"`
 	Solutions []Solution `parquet:"solutions,list"`
 }
@@ -162,7 +164,7 @@ func (x *exporter) row(p *content.Problem) Row {
 		Tag: p.Tag, Locator: rec.Locator, URL: rec.URL, Title: rec.Title, Competition: p.Competition,
 		Year: int32(p.Year), Position: p.Position, Type: p.Type, Topics: p.Topics, // #nosec G115 -- a year fits in 32 bits.
 		Band: int32(rec.Band), Answer: p.Answer, Zone: p.Source.Zone, SourceURL: p.Source.URL, Origin: p.Source.Origin, // #nosec G115 -- a band is 1 to 10.
-		Solutions: []Solution{},
+		Solutions: []Solution{}, Figures: []string{},
 	}
 	if r.Topics == nil {
 		r.Topics = []string{}
@@ -183,6 +185,7 @@ func (x *exporter) row(p *content.Problem) Row {
 	r.Licence = x.licence(r.Source)
 	if r.LeftOut = x.leftOut(r.Source, r.Zone, true); r.LeftOut == "" {
 		r.Statement = p.Statement
+		r.Figures = append(r.Figures, rec.Figures...)
 	} else {
 		x.stats.LeftOut[r.LeftOut]++
 	}
@@ -270,6 +273,7 @@ func Card(st Stats, opts Options) string {
 	fmt.Fprintf(&b, "\n- `%s` (%d texts): the holder asked that the text is not published.\n", LeftNoRepub, st.LeftOut[LeftNoRepub])
 	fmt.Fprintf(&b, "- `%s` (%d texts): the source allows a link only.\n", LeftLinkOnly, st.LeftOut[LeftLinkOnly])
 	fmt.Fprintf(&b, "- `%s` (%d texts): the site shows only a short excerpt of the solution, so the export has the link.\n", LeftExcerpted, st.LeftOut[LeftExcerpted])
+	b.WriteString("\nA figure is part of its statement. The field `figures` of a row has the URLs of the figures of the statement, and it is empty when the statement is left out.\n")
 	b.WriteString("\nThe facts of a problem (its competition, year, position, answer, topics and difficulty) are CC0 1.0. A text keeps the licence of its source. A text with no stated licence is quoted as a reference, and its copyright stays with its holder. AI solutions are labelled with `origin: ai` and the model.\n")
 	return b.String()
 }

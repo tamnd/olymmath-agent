@@ -132,6 +132,8 @@ type builder struct {
 	moved map[string]string
 	// similar gives the similar problems of each problem.
 	similar map[*content.Problem][]*content.Problem
+	// figure gives the URL path of each figure in the site by its path in the content, or "" when the figure has no file.
+	figure map[string]string
 	// rendered keeps the HTML of each Markdown text. A problem shows on its page and on the page of its edition, so each text renders once.
 	rendered map[string]renderedText
 	// records gives the records of the API and of the machine copies.
@@ -211,6 +213,7 @@ func shortHash(s string) string {
 
 func (b *builder) all() error {
 	steps := []func() error{
+		b.figures,
 		b.prerender,
 		b.assets,
 		b.home,
@@ -423,7 +426,8 @@ func (b *builder) html(src, where string) template.HTML {
 func (b *builder) prerender() error {
 	var texts []string
 	seen := map[string]bool{}
-	add := func(s string) {
+	add := func(s, file string) {
+		s = b.text(s, file)
 		if s != "" && !seen[s] {
 			seen[s] = true
 			texts = append(texts, s)
@@ -431,10 +435,10 @@ func (b *builder) prerender() error {
 	}
 	for _, ps := range [][]*content.Problem{b.corpus.All(), b.corpus.Loose} {
 		for _, p := range ps {
-			add(p.Statement)
-			add(p.Answer)
+			add(p.Statement, p.Path)
+			add(p.Answer, p.Path)
 			for _, s := range p.Solutions {
-				add(s.Body)
+				add(s.Body, s.Path)
 			}
 		}
 	}
@@ -545,14 +549,14 @@ func (b *builder) view(p *content.Problem) *problemView {
 		Problem:   p,
 		Title:     problemTitle(p),
 		Link:      b.link(problemPath(p)),
-		Statement: b.html(p.Statement, p.Path),
+		Statement: b.html(b.text(p.Statement, p.Path), p.Path),
 		Label:     positionLabel(p.Position),
 	}
 	if p.Answer != "" {
-		v.Answer = b.html(p.Answer, p.Path)
+		v.Answer = b.html(b.text(p.Answer, p.Path), p.Path)
 	}
 	for _, s := range p.Solutions {
-		sv := solutionView{Solution: s, Body: b.html(s.Body, s.Path), SourceName: s.Source}
+		sv := solutionView{Solution: s, Body: b.html(b.text(s.Body, s.Path), s.Path), SourceName: s.Source}
 		if r := b.corpus.Source(s.Source); r != nil {
 			sv.SourceName = r.Name
 		}

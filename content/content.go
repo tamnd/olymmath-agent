@@ -441,6 +441,8 @@ var SolutionOrigins = []string{"official", "human", "human+ai", "ai"}
 
 // Corpus is all the content.
 type Corpus struct {
+	// Root is the directory that Load read, or "" for a corpus that is not from a directory. The figure files of the problems are under it.
+	Root         string
 	Competitions []*Competition
 	Sources      []*SourceRecord
 	// Loose are the problems with no known appearance.

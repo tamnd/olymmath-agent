@@ -134,6 +134,7 @@ func TestSplit(t *testing.T) {
 	write(t, dir, "nz/2020/index.html", "edition")
 	write(t, dir, "nz/2020/p1.html", "problem")
 	write(t, dir, "nz/2020/p1.json", "{}")
+	write(t, dir, "nz/2020/p1.fig1.svg", "<svg/>")
 	write(t, dir, "api/index.json", "{}")
 	write(t, dir, "api/problem/ABC.json", "{}")
 	write(t, dir, "api/edition/imo/2024.json", "{}")
@@ -147,7 +148,8 @@ func TestSplit(t *testing.T) {
 	if err != nil || deleted != 2 || moved != 6 {
 		t.Fatalf("%d %d %v", deleted, moved, err)
 	}
-	for _, rel := range []string{"imo/2024/p1.html", "imo/2024/index.json", "nz/index.html", "nz/2020/index.html", "api/index.json"} {
+	// A figure stays a static asset, even in a folder that moves.
+	for _, rel := range []string{"imo/2024/p1.html", "imo/2024/index.json", "nz/index.html", "nz/2020/index.html", "nz/2020/p1.fig1.svg", "api/index.json"} {
 		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
 			t.Errorf("%s: %v", rel, err)
 		}

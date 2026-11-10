@@ -131,3 +131,59 @@ func Render(ctx context.Context, r Runner, path string, page, dpi int, dir strin
 	}
 	return img, nil
 }
+
+// Layout gives the text layer of one page with the box of each block, line and word, as the XHTML of pdftotext -bbox-layout. The boxes are in points from the top left corner of the page.
+func Layout(ctx context.Context, r Runner, path string, page int) ([]byte, error) {
+	if page < 1 {
+		return nil, fmt.Errorf("layout: page %d is not a page", page)
+	}
+	p := strconv.Itoa(page)
+	return r.Run(ctx, "pdftotext", "-bbox-layout", "-f", p, "-l", p, path, "-")
+}
+
+// Crop is a part of a page in pixels, from the top left corner. A Crop with no width is the whole page.
+type Crop struct {
+	X, Y, W, H int
+}
+
+// Image gives one page, or the part of it in crop, as a PNG image at dpi. It writes no file.
+func Image(ctx context.Context, r Runner, path string, page, dpi int, crop Crop) ([]byte, error) {
+	if page < 1 {
+		return nil, fmt.Errorf("image: page %d is not a page", page)
+	}
+	if dpi < 36 || dpi > MaxDPI {
+		return nil, fmt.Errorf("image: %d dpi is not in 36..%d", dpi, MaxDPI)
+	}
+	p := strconv.Itoa(page)
+	args := []string{"-r", strconv.Itoa(dpi), "-png", "-f", p, "-l", p, "-singlefile"}
+	if crop.W > 0 && crop.H > 0 {
+		args = append(args, "-x", strconv.Itoa(crop.X), "-y", strconv.Itoa(crop.Y), "-W", strconv.Itoa(crop.W), "-H", strconv.Itoa(crop.H))
+	}
+	out, err := r.Run(ctx, "pdftoppm", append(args, path)...)
+	if err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("image: pdftoppm gave no image for page %d", page)
+	}
+	return out, nil
+}
+
+// SVG gives the part of one page in crop as SVG, with crop in points. The paper of the SVG has the size of the crop, so the SVG shows only the crop: pdftocairo puts the crop in the middle of the paper, and leaves out what is outside it.
+func SVG(ctx context.Context, r Runner, path string, page int, crop Crop) ([]byte, error) {
+	if page < 1 {
+		return nil, fmt.Errorf("svg: page %d is not a page", page)
+	}
+	if crop.W <= 0 || crop.H <= 0 {
+		return nil, fmt.Errorf("svg: the crop %dx%d is empty", crop.W, crop.H)
+	}
+	p := strconv.Itoa(page)
+	out, err := r.Run(ctx, "pdftocairo", "-svg", "-f", p, "-l", p, "-x", strconv.Itoa(crop.X), "-y", strconv.Itoa(crop.Y), "-W", strconv.Itoa(crop.W), "-H", strconv.Itoa(crop.H), "-paperw", strconv.Itoa(crop.W), "-paperh", strconv.Itoa(crop.H), path, "-")
+	if err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("svg: pdftocairo gave no SVG for page %d", page)
+	}
+	return out, nil
+}
