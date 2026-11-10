@@ -49,3 +49,23 @@ func TestDuplicateOf(t *testing.T) {
 		t.Fatalf("a new text gives %+v", h)
 	}
 }
+
+func TestWriteQueueOnce(t *testing.T) {
+	root := t.TempDir()
+	items := []canon.Item{
+		{ID: "a1", Kind: "pair", At: "hu-komal/2022/a834", With: "nemotron-imo-bench/2026/g17", Text: "new"},
+		{ID: "b2", Kind: "pair", At: "cono-sur/1997/p1", With: "cono-sur/1998/p1"},
+		{ID: "a1", Kind: "pair", At: "hu-komal/2022/a834", With: "nemotron-imo-bench/2026/g17", Text: "old"},
+	}
+	if err := writeQueue(root, items); err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(root, "reports", "review", "queue.jsonl")) // #nosec G304 -- a test file.
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	if len(lines) != 2 || !strings.Contains(lines[0], `"text":"new"`) {
+		t.Errorf("the queue:\n%s", b)
+	}
+}

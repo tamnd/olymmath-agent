@@ -3,6 +3,8 @@ package canon
 import (
 	"strings"
 	"testing"
+
+	"github.com/tamnd/olymmath-agent/content"
 )
 
 const linkOnly = `---
@@ -64,5 +66,28 @@ func TestAddAppearances(t *testing.T) {
 	}
 	if _, err := AddAppearances([]byte("---\ntag: ABCDEFGHJK\nkind: problem\n---\n"), "tot/2024-fall/sa3"); err == nil {
 		t.Errorf("a file with no appearances gave no error")
+	}
+}
+
+func TestLinkID(t *testing.T) {
+	url := "https://artofproblemsolving.com/community/c6h33973p210877"
+	p := &content.Problem{Statements: []content.Statement{
+		{ID: "S1", Source: "imojp", URL: "https://www.imojp.org/archive/mo2005/jmo2005/problems/jmo15mq.html", Zone: "Z3"},
+		{ID: "S2", Source: "hf-aops-wiki", URL: url, Zone: "Z2"},
+	}}
+	c := &Candidate{Source: "hf-aops-wiki", URL: url, Text: "Let $P(x,y)$ and $Q(x,y)$ be polynomials with integer coefficients."}
+	if id := LinkID(p, c); id != "S2" {
+		t.Errorf("LinkID = %q, want S2", id)
+	}
+	// Another page of the same source, another source, or a problem with a text gives no id.
+	if id := LinkID(p, &Candidate{Source: "hf-aops-wiki", URL: url + "0"}); id != "" {
+		t.Errorf("another page gives %q", id)
+	}
+	if id := LinkID(p, &Candidate{Source: "hf-ai-mo-aops", URL: url}); id != "" {
+		t.Errorf("another source gives %q", id)
+	}
+	p.Statement = "A text."
+	if id := LinkID(p, c); id != "" {
+		t.Errorf("a problem with a text gives %q", id)
 	}
 }

@@ -164,6 +164,19 @@ func (a Additions) ID(c *Candidate) string {
 	return ""
 }
 
+// LinkID gives the id of a statement of p that is a link with no text to the page of c: the same source and the same URL. An earlier import adds such a link to a problem whose canonical statement is a link of zone Z3, so the text of c can fill that statement. It gives "" when p has no such statement, or when p has a text.
+func LinkID(p *content.Problem, c *Candidate) string {
+	if p.Statement != "" || c.URL == "" {
+		return ""
+	}
+	for _, s := range p.Statements {
+		if s.Source == c.Source && s.URL == c.URL && s.Text == "" && s.DiffFrom == "" {
+			return s.ID
+		}
+	}
+	return ""
+}
+
 // Agrees tells if the text of c is the problem p: the signal T of the two texts is at least match.Doubt, and the answers do not disagree.
 func Agrees(c *Candidate, p *content.Problem) bool {
 	if p.Statement == "" || c.Text == "" {

@@ -174,8 +174,12 @@ func (t *Topics) Position(ref, code string, year int) (pos, letter string) {
 }
 
 var (
-	titleYearRE   = regexp.MustCompile(`\b(?:19|20)[0-9]{2}\b`)
-	titleNumRE    = regexp.MustCompile(`(?i)(?:#|/|\bp#?|\bproblem\s*|\bpb\s*)([0-9]{1,2})\b`)
+	titleYearRE = regexp.MustCompile(`\b(?:19|20)[0-9]{2}\b`)
+	titleNumRE  = regexp.MustCompile(`(?:#|/|(?i:\bp#?|\bproblem\s*|\bpb\s*|\bq\.?\s*)|Q\.)([0-9]{1,2})\b`)
+	// titleBareRE finds a problem number with no mark at the end of a title, as in "Japan MO Finals 2020 1" or "2019 Japan Junior MO (JJMO) Finals 1". The word before the number must be the year or "Finals". After other words, such as "Algebra 1", "Level 2" or "Day 2", the number is often not the number of a problem in the paper of the competition.
+	titleBareRE = regexp.MustCompile(`(?i)(?:^|\s)(?:(?:19|20)[0-9]{2}|finals?)\s+([0-9]{1,2})$`)
+	// prelimRE finds a title that names a preliminary round, such as "2016 JMO Preliminary #4" (the wiki also misspells it, with "mi" and "li" swapped). That paper is not the final round, so its number gives no position of the final round.
+	prelimRE      = regexp.MustCompile(`(?i)\bpre(?:liminary|milinary)\b|\bprelims?\b`)
 	titleLetterRE = regexp.MustCompile(`(?i)\b(?:1[02]\s?([ab])|aime\s*(ii|i))\b`)
 	laterPaperRE  = regexp.MustCompile(`(?i)\b(?:round|day|paper|part|exam)\s*(?:[2-9]|ii)\b`)
 	seasonRE      = regexp.MustCompile(`(?i)\b(?:fall|spring|autumn)\b`)
@@ -217,7 +221,14 @@ func TitleAt(c *content.Competition, title, pos string) (year int, at, letter st
 	if p, _, ok := PaperPosition(c, year, title); ok {
 		return year, p, letter, p != ""
 	}
+	if prelimRE.MatchString(title) {
+		return 0, "", "", false
+	}
 	nums := titleNumRE.FindAllStringSubmatch(title, -1)
+	if m := titleBareRE.FindStringSubmatch(title); len(nums) == 0 && m != nil {
+		// Agent decision: a title with no mark can end with the problem number, as in "Japan Junior MO Finals 2018 1". It must agree with the number column like a marked number.
+		nums = [][]string{{m[1], m[1]}}
+	}
 	if len(nums) == 0 || laterPaperRE.MatchString(title) {
 		return 0, "", "", false
 	}
