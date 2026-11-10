@@ -52,3 +52,17 @@ func TestFill(t *testing.T) {
 		t.Error("a statement that the problem does not have became canonical")
 	}
 }
+
+func TestAddAppearances(t *testing.T) {
+	out, err := AddAppearances([]byte(linkOnly), "ru-moscow/2024/p93", "tot/2024-fall/sa3", "ru-moscow/2024/p93")
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(out)
+	if !strings.Contains(s, "    primary: true\n  - at: ru-moscow/2024/p93\ncanonical:") || strings.Count(s, "- at: ") != 2 || strings.Count(s, "url: ") != 1 {
+		t.Errorf("the file:\n%s", s)
+	}
+	if _, err := AddAppearances([]byte("---\ntag: ABCDEFGHJK\nkind: problem\n---\n"), "tot/2024-fall/sa3"); err == nil {
+		t.Errorf("a file with no appearances gave no error")
+	}
+}

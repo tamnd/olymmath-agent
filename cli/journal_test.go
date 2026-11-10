@@ -11,6 +11,7 @@ import (
 	"github.com/tamnd/olymmath-agent/canon"
 	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/official"
+	"github.com/tamnd/olymmath-agent/review"
 	"github.com/tamnd/olymmath-agent/seed"
 )
 
@@ -114,5 +115,25 @@ func TestLinks(t *testing.T) {
 	}
 	if code, out, errs := run("links", "-content", root, "-seed", dir, "evanchen"); code != ExitOK || !strings.Contains(out, "0 new link-only problems") || !strings.Contains(out, "problem in the content at another position 1") {
 		t.Errorf("a second run gave %d %q %q", code, out, errs)
+	}
+	// With -appear, the page that the content links at another position gives one more appearance of that problem, a merge row and a review, and no second link.
+	if code, out, errs := run("links", "-content", root, "-seed", dir, "-appear", "-date", "2032-01-02", "evanchen"); code != ExitOK || !strings.Contains(out, "0 new link-only problems, 1 appearances added") {
+		t.Fatalf("om links -appear gave %d %q %q", code, out, errs)
+	}
+	corpus, f := content.Load(root)
+	p := official.Owners(corpus)["imo/2032-fall/sa2"]
+	if f.Errors() > 0 || p == nil || p.Locator() != "imo/2032-fall/ja3" || len(p.Statements) != 1 {
+		t.Fatalf("the appearance is not on the problem of the page: %+v %v", p, f)
+	}
+	ms, err := review.Merges(root)
+	if err != nil || len(ms) == 0 || ms[len(ms)-1].At != "imo/2032-fall/sa2" || ms[len(ms)-1].Into != "imo/2032-fall/ja3" {
+		t.Fatalf("merges %+v %v", ms, err)
+	}
+	revs, _ := review.Load(root)
+	if r := revs[ms[len(ms)-1].Review]; r == nil || r.Kind != "merge" || r.Decision != "accept" || r.By != "agent" || !strings.HasPrefix(r.Note, "Agent decision, not a person's review.") || !strings.Contains(r.Note, "problem 505") {
+		t.Errorf("review %+v", r)
+	}
+	if code, out, _ := run("links", "-content", root, "-seed", dir, "-appear", "evanchen"); code != ExitOK || !strings.Contains(out, "0 appearances added") {
+		t.Errorf("a second run of -appear gave %d %q", code, out)
 	}
 }
