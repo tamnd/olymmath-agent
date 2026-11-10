@@ -43,6 +43,11 @@ func runImport(env Env, args []string) int {
 	fill := fs.Bool("fill", false, "give the text of the canonical candidate to an existing problem that has no text, such as a problem with only a link of zone Z3, when its appearance has no doubt and no other problem has the text; the other problems do not change")
 	existing := fs.Bool("existing", false, "write no new problem: only add statements to the problems of the content")
 	maxDoubt := fs.Float64("max-doubt", canon.MaxDoubt, "skip a competition whose review doubts per appearance are above this share")
+	matchOn := fs.Bool("match", false, "place the rows of licensed sources that get no position by their content: compare them with the problems.ru texts in the raw store of the problems of -comp that have no text, by their numbers, formulas and letters, and place a row only when it and its problem are the best of each other by a clear margin (package keymatch). The problems.ru texts are only a match key")
+	matchOpen := fs.String("match-open", "numina:olympiads", "a comma-separated list of the labels of rows that name no competition and can still be matched")
+	matchOut := fs.String("match-out", "", "write the pairs of the content match to this TSV file, with their scores and no text")
+	matchLane := fs.String("match-lane", "", "ask this lane, such as codex, whether each doubtful pair of the content match is one problem, one question at a time, and write the answer as a review of kind match")
+	matchAsks := fs.Int("match-asks", 20, "ask the lane at most this number of questions")
 	if _, err := parseMixed(fs, args); err != nil {
 		return ExitUsage
 	}
@@ -118,6 +123,21 @@ func runImport(env Env, args []string) int {
 		s.Topics = &canon.Topics{Aliases: al, Corpus: corpus}
 		if err := seed.Read(*dir, "hf-aops-wiki", func(r seed.Row) error { s.Topics.Add(r); return nil }); err != nil {
 			fmt.Fprintf(env.Stderr, "om import: hf-aops-wiki: %v\n", err)
+			return ExitFailure
+		}
+	}
+	if *matchOn && *dry && *matchLane != "" {
+		fmt.Fprintln(env.Stderr, "om import: -match-lane writes the answers as reviews, so it does not run with -dry")
+		return ExitUsage
+	}
+	if *matchOn {
+		st, err := openStore(*dir2, *remote)
+		if err == nil {
+			o := matchOptions{open: strings.Split(*matchOpen, ","), out: *matchOut, lane: *matchLane, asks: *matchAsks, root: *root, dir: *dir, today: time.Now().Format(time.DateOnly)}
+			s.Matched, err = contentMatch(context.Background(), env, s, st, sources, o)
+		}
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
 			return ExitFailure
 		}
 	}
@@ -319,6 +339,9 @@ func runImport(env Env, args []string) int {
 	}
 	if s.Numbered > 0 {
 		fmt.Fprintf(env.Stdout, "%d rows got a position from the number of their AoPS topic.\n", s.Numbered)
+	}
+	if *matchOn {
+		fmt.Fprintf(env.Stdout, "%d rows got a position from the content match.\n", s.Matches)
 	}
 	if s.Led > 0 {
 		fmt.Fprintf(env.Stdout, "%d rows got a position from the problem mark at the start of their text.\n", s.Led)

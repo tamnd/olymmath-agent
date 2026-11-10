@@ -642,3 +642,38 @@ func TestTopicsSeason(t *testing.T) {
 		t.Errorf("candidates %v, skipped %v", got, s.Skipped)
 	}
 }
+
+func TestAddMatched(t *testing.T) {
+	corpus, fs := content.Load("../content/testdata/valid")
+	if fs.Errors() > 0 {
+		t.Fatal(fs)
+	}
+	al, err := seed.LoadAliases("../content/testdata/valid", corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := "Let $n$ be a positive integer. Prove that the sum of the first $n$ odd numbers is a square."
+	rows := []seed.Row{
+		// A row with no labels and no year that the content match placed. Its head names the author.
+		{Source: "imo-official", File: "f", Row: 1, Statement: "Bogdanov I.I.\n\n" + text},
+		{Source: "imo-official", File: "f", Row: 2, Statement: text + " Show it."},
+		{Source: "imo-official", File: "f", Row: 3, Statement: text + " Prove it."},
+		// A row that the content match did not place goes the usual way, and has no competition.
+		{Source: "imo-official", File: "f", Row: 4, Statement: text + " Is it so?"},
+	}
+	s := &Seeds{Corpus: corpus, Aliases: al, Matched: map[string]string{
+		MatchRef(rows[0]): "imo/2023/p4",
+		MatchRef(rows[1]): "imo/2023/9",
+		MatchRef(rows[2]): "imo/2023-fall/p1",
+	}}
+	for _, r := range rows {
+		s.Add(r)
+	}
+	got := s.Candidates()
+	if len(got) != 1 || len(got["imo/2023/p4"]) != 1 || got["imo/2023/p4"][0].Text != text || s.Matches != 1 {
+		t.Fatalf("candidates %v, matches %d, skipped %v", got, s.Matches, s.Skipped)
+	}
+	if s.Skipped["no valid position"] != 2 {
+		t.Errorf("skipped %v", s.Skipped)
+	}
+}
