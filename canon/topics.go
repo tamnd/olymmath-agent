@@ -502,6 +502,8 @@ var (
 	gradeTokenRE = regexp.MustCompile(`(?:^|[^0-9.])([0-9]{1,2})\.([0-9]{1,2})(?:[^0-9.]|$)`)
 	// gradeMarkRE finds the number after a mark of a problem number in a title, as titleMarkNumRE does, and also after "problem nr.", as in "Moldova NMO 2002 grade 7 problem nr.5".
 	gradeMarkRE = regexp.MustCompile(`(?i)(?:\bp|#|\bproblem(?:\s*nr)?|\bq|\bpb|/)\s*\.?\s*([0-9]{1,2})\b`)
+	// firstRoundRE finds a title that names the first round, such as "Sharygin Geometry Olympiad 2016 First Round P1 grade8". In a layout with papers of the grades and one other paper, the first round is the other paper.
+	firstRoundRE = regexp.MustCompile(`(?i)\b(?:first|1st)\s+round\b`)
 	// bracketRE finds a part of a title in brackets with no bracket inside, such as "(Grade 8 9)".
 	bracketRE = regexp.MustCompile(`\([^()]*\)`)
 	// gradePaperRE matches the name of a paper of one grade, such as "Grade 10".
@@ -569,8 +571,8 @@ func gradePosition(c *content.Competition, year int, number, title string) (pos 
 	}
 	// other tells that the layout has a paper that is not a paper of a grade, such as the correspondence round of the Sharygin Olympiad.
 	other := len(grades) < len(layout)
-	if i := namedIndex(layout, title); other && i >= 0 && gradePaperRE.FindStringSubmatch(layout[i].Name) == nil {
-		// Agent decision: a title that names the other paper, such as "Sharygin Geometry Olympiad Correspondence round 2016 P 6 Grade 8", is read by the other rules, because a grade in such a title is the grade that the problem is meant for, not a paper.
+	if i := namedIndex(layout, title); other && ((i >= 0 && gradePaperRE.FindStringSubmatch(layout[i].Name) == nil) || firstRoundRE.MatchString(title)) {
+		// Agent decision: a title that names the other paper, such as "Sharygin Geometry Olympiad Correspondence round 2016 P 6 Grade 8" or "Sharygin Geometry Olympiad 2016 First Round P1 grade8", is read by the other rules, because a grade in such a title is the grade that the problem is meant for, not a paper.
 		return "", false
 	}
 	// t is the number of the problem that the title names, 0 when it names none.
@@ -590,6 +592,8 @@ func gradePosition(c *content.Competition, year int, number, title string) (pos 
 	}
 	// The day is also taken out of the grade words, so that "Day 2 Grade 10" does not read as grade 2.
 	words := dayRE.ReplaceAllString(title, " ")
+	// The marks of the problem number are taken out too, so that "problem 1 grade 8" does not read as grade 1. The marks are read from the title below.
+	words = gradeMarkRE.ReplaceAllString(words, " ")
 	if other {
 		// Agent decision: when the layout has another paper, a grade in brackets, as in "Sharygin 2023 P1 (Grade 8)", is the grade that a problem of that paper is meant for, so it does not name a paper.
 		for w := ""; w != words; {
