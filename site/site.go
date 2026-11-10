@@ -275,6 +275,7 @@ func (b *builder) funcs() template.FuncMap {
 		"problems":  competitionProblems,
 		"solorigin": solutionOrigin,
 		"lower":     strings.ToLower,
+		"readby":    readBy,
 	}
 }
 
@@ -334,6 +335,14 @@ func solutionOrigin(o string) string {
 		return "AI solution"
 	}
 	return "Solution"
+}
+
+// readBy gives the sentence of a problem page that tells how a text came out of the paper, from the extraction of its statement (spec 05.7). A text of the native lane came from the text layer of the PDF, and a model put it into Markdown and TeX. A text of the vision lane came from the page images by OCR.
+func readBy(extraction string) string {
+	if strings.HasPrefix(extraction, "native/") {
+		return "A model put the text layer of the paper into Markdown and TeX, with " + extraction + ". No person has checked it against the paper yet."
+	}
+	return "A model read this text from the scan of the paper by OCR, with " + extraction + ". No person has checked it against the paper yet."
 }
 
 func zoneName(z string) string {
