@@ -204,6 +204,11 @@ func TestTitleAt(t *testing.T) {
 		{"2023 Olympic Revenge problem 2", "p2", 2023, "p2", true},
 		{"P3 Francophone MO Junior 2023", "p3", 2023, "j3", true},
 		{"2021 Francophone MO Seniors p4", "p4", 2021, "s4", true},
+		{"Sharygin 2010 grade 9", "p9", 0, "", false},
+		{"Tuymaada 2014 Day 2", "p2", 0, "", false},
+		{"BMT 2019 Spring Algebra 1", "p1", 0, "", false},
+		{"Greece JMO 2018 pr 4", "p4", 0, "", false},
+		{"Brazil NMO 2020 Level 2 1", "p1", 0, "", false},
 		// The number column and the title do not agree.
 		{"Germany 2013/5", "p2", 0, "", false},
 		// No number, no year, two years, a later round, a statement.
@@ -212,6 +217,37 @@ func TestTitleAt(t *testing.T) {
 		{"ITAMO 1998 p2 Bundeswettbewerb Mathematik 1975 R1 p2", "p2", 0, "", false},
 		{"Bundeswettbewerb Mathematik 2023 Round 2 P1", "p1", 0, "", false},
 		{"Find all $n$ such that $2023 \\mid n$ #1", "p1", 0, "", false},
+	}
+	for _, tc := range cases {
+		year, at, _, ok := TitleAt(c, tc.title, tc.pos)
+		if year != tc.year || at != tc.at || ok != tc.ok {
+			t.Errorf("TitleAt(%q, %q) = %d, %q, %v, want %d, %q, %v", tc.title, tc.pos, year, at, ok, tc.year, tc.at, tc.ok)
+		}
+	}
+}
+
+// TestTitleAtJapan reads the titles of the Japan MO and the Japan Junior MO rows of the AoPS wiki: a number with no mark at the end, the marks Q1, Q.1 and "FinalsQ.2", and the title of a preliminary round, which is another paper.
+func TestTitleAtJapan(t *testing.T) {
+	c := &content.Competition{Code: "jp-jjmo", EditionForm: "year"}
+	cases := []struct {
+		title, pos string
+		year       int
+		at         string
+		ok         bool
+	}{
+		// Japan MO and Japan Junior MO titles: a number with no mark at the end, and the marks Q1, Q.1 and "FinalsQ.2".
+		{"Japan Junior MO Finals 2018 1", "p1", 2018, "p1", true},
+		{"2019 Japan Junior MO (JJMO) Finals 3", "p3", 2019, "p3", true},
+		{"JJMO 2015 3", "p3", 2015, "p3", true},
+		{"Japan MO Finals 2016 Q1", "p1", 2016, "p1", true},
+		{"2017 Japan MO Finals Q.4", "p4", 2017, "p4", true},
+		{"2015 Japan Junior MO FinalsQ.2", "p2", 2015, "p2", true},
+		{"2009 JJMO p2   Junior Japan MO Finals", "p2", 2009, "p2", true},
+		{"Japan MO Finals 2020 2", "p1", 0, "", false},
+		// The wiki misspells the word, with "mi" and "li" swapped.
+		{"2016 JMO Pre" + "milinary #1", "p1", 0, "", false},
+		{"2022 Japanese MO Preliminary P3", "p3", 0, "", false},
+		{"Japan MO Finals 2020", "p2", 0, "", false},
 	}
 	for _, tc := range cases {
 		year, at, _, ok := TitleAt(c, tc.title, tc.pos)

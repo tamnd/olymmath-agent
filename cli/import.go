@@ -202,6 +202,10 @@ func runImport(env Env, args []string) int {
 			add := canon.Add(p, r, original(comp))
 			best := r.Primary.Best
 			fillID := add.ID(best)
+			if fillID == "" {
+				// An earlier import can have added the link of the row already, as a statement with no text. The text fills that statement.
+				fillID = canon.LinkID(p, best)
+			}
 			give := *fill && p.Statement == "" && !filled[p.Tag] && len(r.Primary.Doubts) == 0 && !best.Reworded && best.Text != "" && best.Zone != "Z3" && fillID != ""
 			if give {
 				// A text that another problem has already is not given, because rule D01 does not allow two problems with one text. A review item names the pair.
@@ -224,10 +228,12 @@ func runImport(env Env, args []string) int {
 			if add.Better != nil && !up {
 				items = append(items, canon.Item{ID: "better-" + p.Tag, Kind: "canonical", At: r.Primary.At, Source: add.Better.Source, Ref: add.Better.Ref, Text: p.Statement, Other: add.Better.Text})
 			}
-			if len(add.Statements) == 0 {
+			if len(add.Statements) == 0 && !give {
 				continue
 			}
-			updated++
+			if len(add.Statements) > 0 {
+				updated++
+			}
 			if *dry {
 				continue
 			}
@@ -457,7 +463,13 @@ func writeQueue(root string, items []canon.Item) error {
 	var b strings.Builder
 	enc := json.NewEncoder(&b)
 	enc.SetEscapeHTML(false)
+	// An item can come twice: from this import and from the old queue, when this import read the competition of its pair but not the competition of its appearance. Only the first one is kept.
+	seen := map[string]bool{}
 	for _, it := range items {
+		if seen[it.ID] {
+			continue
+		}
+		seen[it.ID] = true
 		if err := enc.Encode(it); err != nil {
 			return err
 		}
