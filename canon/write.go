@@ -209,11 +209,48 @@ func Apply(file []byte, a Additions) ([]byte, error) {
 		}
 		list.Content = append(list.Content, &n)
 	}
+	return writeFront(&doc, body)
+}
+
+// AddAppearances adds the positions ats as appearances of an existing problem file that is not primary in any of them, for example a position of another olympiad that used the problem. A position that the problem has already is left out. The body and the statements do not change.
+func AddAppearances(file []byte, ats ...string) ([]byte, error) {
+	front, body, err := content.SplitFront(file)
+	if err != nil {
+		return nil, err
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(front, &doc); err != nil {
+		return nil, err
+	}
+	list := child(doc.Content[0], "appearances")
+	if list == nil || list.Kind != yaml.SequenceNode {
+		return nil, fmt.Errorf("the problem has no appearances")
+	}
+	have := map[string]bool{}
+	for _, a := range list.Content {
+		have[scalar(a, "at")] = true
+	}
+	for _, at := range ats {
+		if have[at] {
+			continue
+		}
+		have[at] = true
+		var n yaml.Node
+		if err := n.Encode(outAppearance{At: at}); err != nil {
+			return nil, err
+		}
+		list.Content = append(list.Content, &n)
+	}
+	return writeFront(&doc, body)
+}
+
+// writeFront gives a problem file with the front matter doc and the body.
+func writeFront(doc *yaml.Node, body string) ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteString("---\n")
 	enc := yaml.NewEncoder(&buf)
 	enc.SetIndent(2)
-	if err := enc.Encode(&doc); err != nil {
+	if err := enc.Encode(doc); err != nil {
 		return nil, err
 	}
 	if err := enc.Close(); err != nil {
