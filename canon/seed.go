@@ -104,6 +104,8 @@ type pendingRow struct {
 	lead *leadRow
 	k    int
 	one  bool
+	// matched is true for a row that the content match placed. Its position is the appearance of a record, so the numbering of other rows does not apply to it.
+	matched bool
 }
 
 func (s *Seeds) skip(r seed.Row, code, reason string) {
@@ -349,10 +351,11 @@ func (s *Seeds) addMatched(r seed.Row, at string) {
 		return
 	}
 	s.Matches++
-	s.pend(r, c, comp, pos, letter, nil, 0)
+	// The row takes the appearance of a record, so it does not mark its year as one with sections: a second day such as d113 sits next to p101 in the same year.
+	s.pending = append(s.pending, pendingRow{row: r, c: c, comp: comp, year: r.Year, letter: letter, pos: pos, one: onePaper(comp, r.Year), matched: true})
 }
 
-// Candidates returns the candidates of each appearance. A position such as p3 is dropped when another row of the same year has a position with a section letter, such as c3, because the two numberings do not agree. For a competition with two papers each year, a row with no letter is dropped when a row of the same year or of an earlier year has a letter, because the paper of the row is not known.
+// Candidates returns the candidates of each appearance. A position such as p3 is dropped when another row of the same year has a position with a section letter, such as c3, because the two numberings do not agree. A row that the content match placed is not dropped, because its position is the appearance of a record. For a competition with two papers each year, a row with no letter is dropped when a row of the same year or of an earlier year has a letter, because the paper of the row is not known.
 func (s *Seeds) Candidates() map[string][]*Candidate {
 	first := map[string]int{}
 	for code, ys := range s.lettered {
@@ -371,7 +374,7 @@ func (s *Seeds) Candidates() map[string][]*Candidate {
 			}
 			s.Led++
 		}
-		if p.pos[0] == 'p' && s.sections[p.comp.Code][p.year] {
+		if p.pos[0] == 'p' && !p.matched && s.sections[p.comp.Code][p.year] {
 			s.skip(p.row, p.comp.Code, "numbered position in a year with sections")
 			continue
 		}
