@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -331,8 +330,6 @@ func s07(c *Context) {
 }
 
 // figures matches the images of a Markdown text.
-var figures = regexp.MustCompile(`!\[[^\]]*\]\(([^)\s]+)`)
-
 func s08(c *Context) {
 	for _, p := range c.Corpus.All() {
 		texts := []string{p.Statement, p.Answer}
@@ -340,16 +337,10 @@ func s08(c *Context) {
 			texts = append(texts, s.Text)
 		}
 		for _, text := range texts {
-			for _, m := range figures.FindAllStringSubmatch(text, -1) {
-				ref := m[1]
-				if strings.Contains(ref, "://") {
+			for _, ref := range content.FigureRefs(text) {
+				rel := content.FigurePath(p.Path, ref)
+				if rel == "" {
 					continue
-				}
-				var rel string
-				if strings.HasPrefix(ref, "/") {
-					rel = strings.TrimPrefix(ref, "/")
-				} else {
-					rel = path.Join(path.Dir(p.Path), ref)
 				}
 				if _, err := os.Stat(filepath.Join(c.Root, filepath.FromSlash(rel))); err != nil {
 					c.add(p.Path, "the figure %s has no file", ref)

@@ -112,9 +112,9 @@ const (
 	All
 )
 
-// Moves tells if the rule moves the file with the base name name. An index page never moves.
+// Moves tells if the rule moves the file with the base name name. An index page never moves, and nor does the figure of a problem, as p1.fig1.svg: the Worker serves pages and records, and a figure is a static asset.
 func (r Rule) Moves(name string) bool {
-	if strings.HasPrefix(name, "index.") {
+	if strings.HasPrefix(name, "index.") || content.IsFigureName(name) {
 		return false
 	}
 	switch r {

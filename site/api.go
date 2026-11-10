@@ -2,6 +2,7 @@ package site
 
 import (
 	"encoding/json"
+	"path"
 	"sort"
 	"strings"
 
@@ -40,21 +41,23 @@ type SolutionRef struct {
 
 // ProblemRecord is a problem with no answer and no solution, so that a practice tool can hide them. HasAnswer and Solutions tell what SolutionsRecord holds.
 type ProblemRecord struct {
-	Tag         string     `json:"tag"`
-	Locator     string     `json:"locator,omitempty"`
-	URL         string     `json:"url"`
-	Title       string     `json:"title"`
-	Competition string     `json:"competition,omitempty"`
-	Edition     string     `json:"edition,omitempty"`
-	Year        int        `json:"year,omitempty"`
-	Position    string     `json:"position,omitempty"`
-	Type        string     `json:"type,omitempty"`
-	Topics      []string   `json:"topics,omitempty"`
-	Band        int        `json:"band,omitempty"`
-	Statement   string     `json:"statement"`
-	Source      SourceRef  `json:"source"`
-	Official    *SourceRef `json:"official,omitempty"`
-	Status      string     `json:"status,omitempty"`
+	Tag         string   `json:"tag"`
+	Locator     string   `json:"locator,omitempty"`
+	URL         string   `json:"url"`
+	Title       string   `json:"title"`
+	Competition string   `json:"competition,omitempty"`
+	Edition     string   `json:"edition,omitempty"`
+	Year        int      `json:"year,omitempty"`
+	Position    string   `json:"position,omitempty"`
+	Type        string   `json:"type,omitempty"`
+	Topics      []string `json:"topics,omitempty"`
+	Band        int      `json:"band,omitempty"`
+	Statement   string   `json:"statement"`
+	// Figures are the URLs of the figures that the statement shows. The statement links to them by the name of the file, next to the page of the problem.
+	Figures  []string   `json:"figures,omitempty"`
+	Source   SourceRef  `json:"source"`
+	Official *SourceRef `json:"official,omitempty"`
+	Status   string     `json:"status,omitempty"`
 	// Also are the locators of the other appearances of the problem.
 	Also      []string `json:"also,omitempty"`
 	HasAnswer bool     `json:"has_answer,omitempty"`
@@ -145,6 +148,11 @@ func (a *API) Problem(p *content.Problem) ProblemRecord {
 	}
 	if p.Edition != nil {
 		r.Edition = p.Edition.ID
+	}
+	for _, f := range p.Figures() {
+		if content.IsFigureName(path.Base(f)) {
+			r.Figures = append(r.Figures, a.url+figureURL(p, f))
+		}
 	}
 	if p.Official != nil {
 		o := sourceRef(*p.Official)

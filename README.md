@@ -360,6 +360,15 @@ OLYMMATH_LOCAL=GLM-OCR-8bit=http://127.0.0.1:8079/v1 om ocr -content olymmath -l
 
 The words of the text are the words of the organizer, so the statement has the class H1 and the kind `official`. But a model read them, and no person checked them. So the statement records `extraction` (the client, its version and the model) and a `confidence`, the status is `captured`, and the site says that a model read the text by OCR. A text that came from the text layer of a born-digital PDF, with formulas that a model put into TeX from the page image, records the native lane, such as `native/pdftotext@26.10.0 (claude-opus-5-5)`, and the site says that a model put the text layer into Markdown and TeX. The confidence is a score of the checks, not a measured probability. A text below 0.8, a text that does not render, and a text of a source whose register entry says that the content holds no text give a problem that only links to its page. A new paper goes into the `official` list of the edition. Use `-paper` for a paper of the layout, such as `day2`, `-pages` to read some pages only, and `-sequence` for a paper whose days each start at problem 1.
 
+### Figures
+
+```sh
+om figure -content olymmath -after "2. Na figura" -before "3. Seja" pt-opm/2008/p2
+om figure -content olymmath -page 3 -box 120,410,300,560 -insert tuymaada/2026/s7
+```
+
+Some statements need a figure. The `om figure` command crops it from the official PDF of the canonical statement and saves it next to the problem as `p2.fig1.svg` (spec 4.3). It gets the PDF through the fetch client, or reads a local copy with `-file`. Without `-box` it looks for the drawing in the band of the page from the line where the text `-after` starts to the line where the text `-before` starts: it reads the boxes of the words with `pdftotext -bbox-layout`, masks them out of a page image, and keeps the ink that is left, with the short labels next to it. A figure beside the text of the problem needs `-box`, in points from the top left corner of the page, and `-erase` takes out the words of the text that the box catches: the words on lines at least a third of the page wide, so the short labels of the figure stay. `-dry` prints the box and writes nothing. The figure is an SVG cut from the page with `pdftocairo`, or a PNG when it holds a raster image. A figure is part of the statement, so the command crops one only when the terms of the source allow the statement. `-insert` puts `![Figure 1](p2.fig1.svg)` at the end of the canonical statement; move it to its place in the text when the statement goes on after the figure. The site copies each figure next to the page of its problem, and the dataset lists the URLs of the figures of each statement that it carries.
+
 ### Link the human solutions
 
 ```sh

@@ -2,6 +2,7 @@ package export
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -126,6 +127,30 @@ func TestSameBytes(t *testing.T) {
 		y, _ := os.ReadFile(filepath.Join(b, rel)) // #nosec G304 -- the path is in the test.
 		if len(x) == 0 || !bytes.Equal(x, y) {
 			t.Errorf("%s differs between two exports", rel)
+		}
+	}
+}
+
+func TestFigures(t *testing.T) {
+	corpus := load(t)
+	p := corpus.ByTag("03JXB69J3N")
+	p.Statement += "\n\n![Figure 1](p2.fig1.svg)"
+	rows, _ := Rows(corpus, Options{URL: "https://example.org"})
+	for _, r := range rows["z2-facts"] {
+		want := "[]"
+		if r.Tag == p.Tag {
+			want = "[https://example.org/imo/2024/p2.fig1.svg]"
+		}
+		if got := fmt.Sprint(r.Figures); got != want || r.Figures == nil {
+			t.Errorf("%s: figures %s, want %s", r.Tag, got, want)
+		}
+	}
+	// A figure is part of the statement, so a source with ai-train=no leaves both out.
+	corpus.Source("imo-official").AITrain = "no"
+	rows, _ = Rows(corpus, Options{URL: "https://example.org"})
+	for _, r := range rows["z2-facts"] {
+		if len(r.Figures) != 0 || r.Figures == nil {
+			t.Errorf("%s: figures %v of an ai-train=no source", r.Tag, r.Figures)
 		}
 	}
 }

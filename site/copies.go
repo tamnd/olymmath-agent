@@ -19,6 +19,7 @@ type problemCopy struct {
 	Topics      []string      `json:"topics,omitempty"`
 	Band        int           `json:"band,omitempty"`
 	Statement   string        `json:"statement"`
+	Figures     []string      `json:"figures,omitempty"`
 	Source      SourceRef     `json:"source"`
 	Official    *SourceRef    `json:"official,omitempty"`
 	Answer      string        `json:"answer,omitempty"`
@@ -32,7 +33,7 @@ func (b *builder) copies(v *problemView, p string) error {
 	c := problemCopy{
 		Tag: r.Tag, Locator: r.Locator, URL: r.URL, Title: r.Title,
 		Competition: r.Competition, Year: r.Year, Position: r.Position, Type: r.Type,
-		Topics: r.Topics, Band: r.Band, Statement: r.Statement,
+		Topics: r.Topics, Band: r.Band, Statement: r.Statement, Figures: r.Figures,
 		Source: r.Source, Official: r.Official, Answer: sol.Answer, Status: r.Status,
 		Solutions: sol.Solutions,
 	}

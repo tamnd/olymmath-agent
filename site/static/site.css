@@ -160,6 +160,8 @@ main { flex: 1 0 auto; width: 100%; padding-bottom: 5rem; }
 .statement li { margin: 0.25rem 0; }
 .statement .katex { font-size: 1.02em; }
 .statement .katex-display { margin: 0.8rem 0; overflow-x: auto; overflow-y: hidden; padding: 0.2rem 0; }
+/* A figure of a problem is a file next to the page, drawn black on white. The field stays white in the dark theme too, so the lines show. */
+.statement img { display: block; max-width: 100%; height: auto; margin: 0.8rem 0; padding: 0.4rem; background: #fff; }
 .math-error { color: #b42318; }
 figure.asy { position: relative; max-width: 100%; margin: 1rem 0; container-type: inline-size; background: #fff; color: #000; border-radius: 4px; }
 figure.asy > svg { display: block; width: 100%; height: auto; }

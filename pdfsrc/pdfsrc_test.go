@@ -88,3 +88,40 @@ func TestRender(t *testing.T) {
 		t.Error("a missing image gave no error")
 	}
 }
+
+func TestLayoutImageSVG(t *testing.T) {
+	ctx := context.Background()
+	f := &fake{out: map[string]string{"pdftotext": "<page/>", "pdftoppm": "png", "pdftocairo": "<svg/>"}}
+	if _, err := Layout(ctx, f, "a.pdf", 2); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Image(ctx, f, "a.pdf", 2, 100, Crop{}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Image(ctx, f, "a.pdf", 2, 200, Crop{X: 1, Y: 2, W: 3, H: 4}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SVG(ctx, f, "a.pdf", 2, Crop{X: 10, Y: 20, W: 30, H: 40}); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"pdftotext -bbox-layout -f 2 -l 2 a.pdf -",
+		"pdftoppm -r 100 -png -f 2 -l 2 -singlefile a.pdf",
+		"pdftoppm -r 200 -png -f 2 -l 2 -singlefile -x 1 -y 2 -W 3 -H 4 a.pdf",
+		"pdftocairo -svg -f 2 -l 2 -x 10 -y 20 -W 30 -H 40 -paperw 30 -paperh 40 a.pdf -",
+	}
+	for i, c := range f.calls {
+		if got := strings.Join(c, " "); got != want[i] {
+			t.Errorf("call %d: %s", i, got)
+		}
+	}
+	for _, err := range []error{
+		func() error { _, err := Layout(ctx, f, "a.pdf", 0); return err }(),
+		func() error { _, err := Image(ctx, f, "a.pdf", 1, 10, Crop{}); return err }(),
+		func() error { _, err := SVG(ctx, f, "a.pdf", 1, Crop{W: 0, H: 5}); return err }(),
+	} {
+		if err == nil {
+			t.Error("no error for a bad page, resolution or crop")
+		}
+	}
+}

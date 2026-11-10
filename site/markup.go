@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"html"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -120,9 +121,12 @@ func (m *Markup) HTML(src string) (string, []error) {
 	return out, errs
 }
 
-// Plain returns the text of src for search and for descriptions: the formulas keep their TeX source, and the Markdown marks go.
+// imageMark is a Markdown image, as ![Figure 1](p1.fig1.svg).
+var imageMark = regexp.MustCompile(`!\[[^\]]*\]\([^)]*\)`)
+
+// Plain returns the text of src for search and for descriptions: the formulas keep their TeX source, and the Markdown marks and the images go.
 func Plain(src string) string {
-	text, spans := splitMath(asyBlock.ReplaceAllString(src, " "))
+	text, spans := splitMath(imageMark.ReplaceAllString(asyBlock.ReplaceAllString(src, " "), " "))
 	r := strings.NewReplacer("*", "", "_", " ", "`", "", "#", "", "\n", " ")
 	text = r.Replace(text)
 	for i := len(spans) - 1; i >= 0; i-- {
