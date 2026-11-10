@@ -677,3 +677,31 @@ func TestAddMatched(t *testing.T) {
 		t.Errorf("skipped %v", s.Skipped)
 	}
 }
+
+func TestAddMatchedSections(t *testing.T) {
+	corpus, fs := content.Load("../content/testdata/valid")
+	if fs.Errors() > 0 {
+		t.Fatal(fs)
+	}
+	al, err := seed.LoadAliases("../content/testdata/valid", corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := "Let $n$ be a positive integer. Prove that the sum of the first $n$ odd numbers is a square."
+	rows := []seed.Row{
+		// The content match places a row on a second day, d4, and another on p5 of the same year.
+		{Source: "imo-official", File: "f", Row: 1, Statement: text},
+		{Source: "imo-official", File: "f", Row: 2, Statement: text + " Show it."},
+	}
+	s := &Seeds{Corpus: corpus, Aliases: al, Matched: map[string]string{
+		MatchRef(rows[0]): "imo/2023/d4",
+		MatchRef(rows[1]): "imo/2023/p5",
+	}}
+	for _, r := range rows {
+		s.Add(r)
+	}
+	got := s.Candidates()
+	if len(got) != 2 || len(got["imo/2023/d4"]) != 1 || len(got["imo/2023/p5"]) != 1 || s.Matches != 2 {
+		t.Errorf("candidates %v, matches %d, skipped %v", got, s.Matches, s.Skipped)
+	}
+}
