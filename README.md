@@ -132,6 +132,12 @@ om import -content olymmath -comp putnam -promote
 
 An import never changes the canonical text of an existing problem, unless you give `-promote`. With `-promote`, a candidate of class H1 or H2 becomes the canonical statement when it ranks above the canonical statement, its text agrees with the canonical text (the signal T is 0.5 or more) and the answers do not disagree. The old text stays in the file as another statement. Each other better candidate goes to the review queue.
 
+`-fill` gives a text to an existing problem that has none, such as a problem with only a link to problems.ru, whose terms do not allow a copy. The canonical candidate of its appearance becomes the canonical statement, and the old statements stay as links. A problem gets a text only when the candidate has a text outside zone Z3, its appearance has no doubt, and no other problem has the same text (rule D01); such a pair goes to the review queue. A fill pass changes only the problems that get a text. `-existing` writes no new problem:
+
+```sh
+om import -content olymmath -comp tot,sharygin -fill -existing
+```
+
 ### Read problems.ru
 
 ```sh

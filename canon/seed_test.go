@@ -447,12 +447,42 @@ func TestGradePosition(t *testing.T) {
 			{From: 2002, To: 2002, Layout: []content.Layout{grade(7, 8, 2), grade(11, 8, 2)}},
 		},
 	}
+	corr := content.Layout{Paper: "correspondence", Name: "Correspondence"}
+	for i := 1; i <= 24; i++ {
+		corr.Positions = append(corr.Positions, "p"+strconv.Itoa(i))
+	}
+	c.Eras = append(c.Eras, content.Era{From: 2017, To: 2017, Layout: []content.Layout{corr, grade(8, 8, 2), grade(9, 8, 2), grade(10, 8, 2)}})
 	cases := []struct {
 		year          int
 		number, title string
 		pos           string
 		graded        bool
 	}{
+		// A title that names the day counts its number in the day or in the paper, and the number column must agree.
+		{2017, "8", "Sharygin 2017 Finals Day 2 Grade 10 P4", "p108", true},
+		{2017, "4", "Sharygin 2017 Finals Day 2 Grade 10 P4", "p108", true},
+		{2017, "8", "Sharygin 2017 Day 2 P10.8 Grade 10", "p108", true},
+		{2017, "7", "Sharygin 2017 Grade 9 Day 2 P9.7", "p97", true},
+		{2017, "5", "Sharygin contest 2017. Grade 10. Second day. P5", "p105", true},
+		{2017, "6", "Sharygin 2017 Finals Day 2 Grade 10 P4", "", true},
+		{2017, "4", "Sharygin 2017 Finals Day 1 Grade 10 P5", "", true},
+		// The mark of "P9.8" names the grade, and a number of the grade that counts in the day agrees with the number column.
+		{2017, "8", "Sharygin Finals 2017 P9.8", "p98", true},
+		{2017, "1", "Sharygin Finals 2017 9.5", "p95", true},
+		{2017, "8", "Sharygin Finals 2017 P9.7", "", true},
+		// A title that names another paper and no grade is read by the other rules. A title that names no paper gives no position.
+		{2017, "20", "2017 Sharygin Geometry Olympiad Correspondence Round P20", "", false},
+		{2017, "4", "Sharygin final round 2017", "", true},
+		{2017, "14", "Sharygin Geometry Olympiad Correspondence Round 2017 P 14 (Grade 9 11)", "", false},
+		{2017, "6", "Sharygin Geometry Olympiad Correspondence round 2017 P 6 Grade 8", "", false},
+		// A grade in brackets is the grade that a problem of the other paper is meant for.
+		{2017, "1", "Sharygin 2017   P1 (Grade 8)", "", true},
+		// A number that no paper of a grade has is a problem of the other paper.
+		{2017, "23", "Sharygin 2017   P23 (Grade 10 11)", "", false},
+		{2017, "24", "Sharygin Geometry Olympiad 2017    P24", "", false},
+		{2017, "24", "Sharygin Geometry Olympiad 2017    P4", "", true},
+		{2017, "8", "Sharygin 2017   P8 (Grade (a)8 9 (b)10 11)", "", true},
+		{2017, "3", "Sharygin 2017 Final Round Grade 8 P3", "p83", true},
 		{2019, "1", "Kosovo MO 2019 Grade 10 P1", "p101", true},
 		{2019, "5", "Kosovo MO 2019 Grade 9 P5", "p95", true},
 		{2019, "3", "Kosovo MO 2019 grade XI problem 3", "p113", true},
@@ -527,5 +557,82 @@ func TestTopicsGrade(t *testing.T) {
 	}
 	if p, _ := tp.Position("aops-topic:1", "imo", 2030); p != "p91" {
 		t.Errorf("topic 1 gives %q", p)
+	}
+}
+
+func TestSeasonPosition(t *testing.T) {
+	cases := []struct {
+		number, title string
+		year          int
+		season, pos   string
+	}{
+		{"3", "Tournament of Towns 2024 Fall Senior A-Level P3", 2024, "fall", "sa3"},
+		{"5", "Tournament of Towns Fall 2002 Junior A Level P5", 2002, "fall", "ja5"},
+		{"7", "Spring 2006 Tournament of Towns Junior A Level #7", 2006, "spring", "ja7"},
+		{"4", "Tournament Of Towns Spring 2000 Junior 0 Level p4", 2000, "spring", "jo4"},
+		{"P7", "42nd International Tournament of Towns Senior A Level P7 Spring 2021", 2021, "spring", "sa7"},
+		{"5", "ToT Junior O Level Autumn 1998", 1998, "fall", "jo5"},
+		{"7", "Tournament of Towns 2016 Fall Tour A Senior P#7", 2016, "fall", "sa7"},
+		{"7.", "Tournament of Towns Spring 2015 Senior A level", 2015, "spring", "sa7"},
+		{"", "Tournament of Towns Junior A Level  Fall 2019 p7", 2019, "fall", "ja7"},
+		// The title must name one season, one tier, one level and one number that agrees with the number column.
+		{"4", "Tournament of Towns 2007   Spring   Junior A Level   P7", 0, "", ""},
+		{"7", "ToT 2003 JA 7 SA 5", 0, "", ""},
+		{"7", "Tournament of towns Spring 2018 A level P7", 0, "", ""},
+		{"7", "Tournament of Towns Spring 2016", 0, "", ""},
+		{"1", "Tournament of Towns 2020 oral p1 (15 March 2020)", 0, "", ""},
+		{"5", "Fall 2007 Tournament of Towns Junior P Level #5", 0, "", ""},
+		{"5", "Tournament of towns Junior B Level paper Fall 2004", 0, "", ""},
+		{"5", "Tournament of Towns Junior A Level", 0, "", ""},
+		{"5", "Tournament of Towns 2020/2021 Junior A Level Fall", 0, "", ""},
+		{"", "Tournament of Towns Fall 2002 Junior A Level", 0, "", ""},
+		{"2", "Tournament of Towns Fall 2002 Junior A Level P2 Senior A Level P1", 0, "", ""},
+	}
+	for _, tc := range cases {
+		year, season, pos, ok := SeasonPosition(tc.number, tc.title)
+		if year != tc.year || season != tc.season || pos != tc.pos || ok != (tc.pos != "") {
+			t.Errorf("SeasonPosition(%q, %q) = %d %q %q %v, want %d %q %q", tc.number, tc.title, year, season, pos, ok, tc.year, tc.season, tc.pos)
+		}
+	}
+}
+
+func TestTopicsSeason(t *testing.T) {
+	corpus, fs := content.Load("../content/testdata/valid")
+	if fs.Errors() > 0 {
+		t.Fatal(fs)
+	}
+	al, err := seed.LoadAliases("../content/testdata/valid", corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := corpus.Competition("imo")
+	c.EditionForm = "year-season"
+	tp := &Topics{Aliases: al, Corpus: corpus}
+	url := "https://artofproblemsolving.com/community/c6h"
+	text := "Prove that among any $n+1$ of the numbers $1, 2, \\ldots, 2n$ there are two numbers such that one divides the other."
+	rows := []seed.Row{
+		// The collection year 2020 is the fall of the tournament, and the title names the spring of 2021.
+		{Source: "imo-official", Labels: []string{"IMO"}, Year: 2020, Number: "P3", Ref: url + "1p1", Title: "42nd International Tournament of Towns Senior A Level P3 Spring 2021", Statement: text},
+		{Source: "imo-official", Labels: []string{"IMO"}, Year: 2009, Number: "4", Ref: url + "2p1", Title: "Tournament of Towns 2009 Fall Junior O Level P4", Statement: text + " Find all $n$."},
+		// A row with no season and two topics that claim one appearance give nothing.
+		{Source: "imo-official", Labels: []string{"IMO"}, Year: 2009, Number: "5", Ref: url + "3p1", Statement: text + " Find $n$."},
+		{Source: "imo-official", Labels: []string{"IMO"}, Year: 2010, Number: "1", Ref: url + "4p1", Title: "Tournament of Towns Spring 2010 Senior A Level P1", Statement: text + " Is it true?"},
+		{Source: "imo-official", Labels: []string{"IMO"}, Year: 2010, Number: "1", Ref: url + "5p1", Title: "ToT Spring 2010 Senior A Level #1", Statement: text + " Is it so?"},
+	}
+	for _, r := range rows {
+		tp.Add(r)
+	}
+	if p, l := tp.Position("aops-topic:1", "imo", 2021); p != "sa3" || l != "-spring" {
+		t.Errorf("topic 1 gives %q %q", p, l)
+	}
+	s := &Seeds{Corpus: corpus, Aliases: al, Topics: tp}
+	for _, r := range rows {
+		s.Add(r)
+	}
+	// A row of the dataset with no number joins its topic, and the year of the title is used.
+	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO"}, Year: 2020, Ref: "aops-topic:1", Statement: text + " Show it."})
+	got := s.Candidates()
+	if len(got["imo/2021-spring/sa3"]) != 2 || len(got["imo/2009-fall/jo4"]) != 1 || len(got) != 2 {
+		t.Errorf("candidates %v, skipped %v", got, s.Skipped)
 	}
 }

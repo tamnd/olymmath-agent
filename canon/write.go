@@ -271,6 +271,62 @@ func Promote(file []byte, old, id, text, rule string) ([]byte, error) {
 	return content.Format(buf.Bytes())
 }
 
+// Fill gives a text to an existing problem that has none, such as a problem with only a link to a page whose terms do not allow a copy of the text. The statement id, which Apply has added, becomes the canonical statement with the rule and the status of the statement, and text becomes the body. The other statements stay as links. It fails when the problem has a body already, because the canonical text of a problem never changes by import.
+func Fill(file []byte, id, text, rule, status string) ([]byte, error) {
+	front, body, err := content.SplitFront(file)
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(body) != "" {
+		return nil, fmt.Errorf("the problem has a text already")
+	}
+	if strings.TrimSpace(text) == "" {
+		return nil, fmt.Errorf("the text is empty")
+	}
+	var doc yaml.Node
+	if err := yaml.Unmarshal(front, &doc); err != nil {
+		return nil, err
+	}
+	field := func(n *yaml.Node, key string) *yaml.Node {
+		for i := 0; n != nil && i+1 < len(n.Content); i += 2 {
+			if n.Content[i].Value == key {
+				return n.Content[i+1]
+			}
+		}
+		return nil
+	}
+	m := doc.Content[0]
+	canonical, status0 := field(m, "canonical"), field(m, "status")
+	if field(canonical, "statement") == nil || field(canonical, "rule") == nil || field(status0, "statement") == nil {
+		return nil, fmt.Errorf("the problem has no canonical statement, rule or status")
+	}
+	found := false
+	for _, st := range field(m, "statements").Content {
+		if f := field(st, "id"); f != nil && f.Value == id {
+			found = true
+		}
+	}
+	if !found {
+		return nil, fmt.Errorf("the problem has no statement %s", id)
+	}
+	field(canonical, "statement").Value = id
+	field(canonical, "rule").Value = rule
+	field(status0, "statement").Value = status
+	var buf bytes.Buffer
+	buf.WriteString("---\n")
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(&doc); err != nil {
+		return nil, err
+	}
+	if err := enc.Close(); err != nil {
+		return nil, err
+	}
+	buf.WriteString("---\n")
+	buf.WriteString(strings.TrimSpace(text) + "\n")
+	return content.Format(buf.Bytes())
+}
+
 // Trace marks the statement id of an existing problem file as traced to the official statement official, and makes it the canonical statement with the rule. The text of id moves to the top of the body, and the other texts keep their markers.
 func Trace(file []byte, id, official, rule string) ([]byte, error) {
 	front, body, err := content.SplitFront(file)

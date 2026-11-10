@@ -67,10 +67,6 @@ func (t *Topics) Place(r seed.Row) (year int, letter, pos string, ok bool) {
 
 // place gives the appearance of a row as Add describes it. unsure is true when the title names a part and its number does not agree with the number column.
 func (t *Topics) place(r seed.Row) (code string, year int, letter, pos string, unsure, ok bool) {
-	pos = seed.Position(r.Number)
-	if pos == "" && !gradeNumberRE.MatchString(strings.TrimSpace(r.Number)) {
-		return
-	}
 	code = t.Aliases.Code(r.Labels)
 	if code == "" || code == "-" {
 		return
@@ -83,6 +79,17 @@ func (t *Topics) place(r seed.Row) (code string, year int, letter, pos string, u
 	title := r.Title
 	if title == "" {
 		title = r.Statement
+	}
+	if comp != nil && comp.EditionForm == "year-season" {
+		year, season, pos, ok := SeasonPosition(r.Number, title)
+		if !ok {
+			return "", 0, "", "", false, false
+		}
+		return code, year, "-" + season, pos, false, true
+	}
+	pos = seed.Position(r.Number)
+	if pos == "" && !gradeNumberRE.MatchString(strings.TrimSpace(r.Number)) {
+		return "", 0, "", "", false, false
 	}
 	// Agent decision: a title that names the longlist and the number of a problem, such as "IMO LongList 1959 1966 P24", gives the number of the problem in the longlist. The AoPS wiki puts such rows on some shortlist pages with that number, so a row of a shortlist with such a title gives no position. A title that also names the shortlist, such as "IMO ShortList 1988 P15 Iceland 1 P34 of ILL", is read as before.
 	if comp != nil && comp.TopicPositions && longlistRE.MatchString(title) && !shortlistRE.MatchString(title) && titleMarkRE.MatchString(title) {
@@ -148,7 +155,7 @@ func (t *Topics) Year(ref, code string) int {
 	return y
 }
 
-// Position gives the position of the topic of ref, such as aops-topic:1738331, when its competition and its year are code and year, and the letter of its paper, such as "a" for the AMC 10A, when the numbered source gives it. It gives "" when it does not know the position.
+// Position gives the position of the topic of ref, such as aops-topic:1738331, when its competition and its year are code and year, and the letter of its paper, such as "a" for the AMC 10A, when the numbered source gives it. For a competition with seasons, the letter is the season of the edition, such as "-fall" for tot/2024-fall. It gives "" when it does not know the position.
 func (t *Topics) Position(ref, code string, year int) (pos, letter string) {
 	topic, ok := strings.CutPrefix(ref, "aops-topic:")
 	if !ok {
@@ -160,7 +167,7 @@ func (t *Topics) Position(ref, code string, year int) (pos, letter string) {
 		return "", ""
 	}
 	letter, pos, ok = strings.Cut(rest, "/")
-	if !ok || (letter != "" && letter != "a" && letter != "b") {
+	if !ok || (letter != "" && letter != "a" && letter != "b" && !seasonLetterRE.MatchString(letter)) {
 		return "", ""
 	}
 	return pos, letter
@@ -495,6 +502,8 @@ var (
 	gradeTokenRE = regexp.MustCompile(`(?:^|[^0-9.])([0-9]{1,2})\.([0-9]{1,2})(?:[^0-9.]|$)`)
 	// gradeMarkRE finds the number after a mark of a problem number in a title, as titleMarkNumRE does, and also after "problem nr.", as in "Moldova NMO 2002 grade 7 problem nr.5".
 	gradeMarkRE = regexp.MustCompile(`(?i)(?:\bp|#|\bproblem(?:\s*nr)?|\bq|\bpb|/)\s*\.?\s*([0-9]{1,2})\b`)
+	// bracketRE finds a part of a title in brackets with no bracket inside, such as "(Grade 8 9)".
+	bracketRE = regexp.MustCompile(`\([^()]*\)`)
 	// gradePaperRE matches the name of a paper of one grade, such as "Grade 10".
 	gradePaperRE = regexp.MustCompile(`(?i)^grade ([0-9]{1,2})$`)
 )
@@ -519,7 +528,7 @@ func titleGrade(title string) int {
 	return g
 }
 
-// gradePosition reads a row of a competition that has one paper for each grade in the year, such as the Kosovo MO, where the wiki numbers the problems of each grade from 1. The name of such a paper is "Grade G". The grade comes from the title, such as "Kosovo MO 2019 Grade 10 P1", or from a number such as "10.3", in the number column or in the title, as in "2018 Belarusian NMO 10.3". The number of the problem comes from the number column, and a number of the title must agree with it. In a paper of several days, the number column can count from 1 in each day, as in the Moldova NMO 2002, where problem 5 of a grade has the number 1. It gives the position of the problem in the paper of its grade. graded is false when the layout of the year has no paper of a grade. Then the row is read by the other rules. The position is "" when the row does not name one grade and one problem of that grade, so that a row with no grade is never placed by its number alone.
+// gradePosition reads a row of a competition that has one paper for each grade in the year, such as the Kosovo MO, where the wiki numbers the problems of each grade from 1. The name of such a paper is "Grade G". The grade comes from the title, such as "Kosovo MO 2019 Grade 10 P1", or from a number such as "10.3", in the number column or in the title, as in "2018 Belarusian NMO 10.3". The number of the problem comes from the number column, and a number of the title must agree with it. In a paper of several days, the number column can count from 1 in each day, as in the Moldova NMO 2002, where problem 5 of a grade has the number 1, and a title that names the day, such as "Sharygin 2019 Finals Day 2 Grade 10 P4", counts its number in the day or in the paper. In a number such as "P9.8" the mark names the grade, so the problem is 8. It gives the position of the problem in the paper of its grade. graded is false when the layout of the year has no paper of a grade, or when the title names another paper of the layout, such as the correspondence round of the Sharygin Olympiad. In such a layout a grade in brackets does not name a paper. Then the row is read by the other rules. The position is "" when the row does not name one grade and one problem of that grade, so that a row with no grade is never placed by its number alone.
 func gradePosition(c *content.Competition, year int, number, title string) (pos string, graded bool) {
 	if c == nil || year == 0 {
 		return "", false
@@ -558,16 +567,53 @@ func gradePosition(c *content.Competition, year int, number, title string) (pos 
 	if !isTitle(title) {
 		return "", true
 	}
-	if tg := titleGrade(title); tg < 0 || (tg > 0 && !agree(&g, tg)) {
+	// other tells that the layout has a paper that is not a paper of a grade, such as the correspondence round of the Sharygin Olympiad.
+	other := len(grades) < len(layout)
+	if i := namedIndex(layout, title); other && i >= 0 && gradePaperRE.FindStringSubmatch(layout[i].Name) == nil {
+		// Agent decision: a title that names the other paper, such as "Sharygin Geometry Olympiad Correspondence round 2016 P 6 Grade 8", is read by the other rules, because a grade in such a title is the grade that the problem is meant for, not a paper.
+		return "", false
+	}
+	// t is the number of the problem that the title names, 0 when it names none.
+	t := 0
+	ms := gradeTokenRE.FindAllStringSubmatchIndex(title, -1)
+	switch {
+	case len(ms) > 1:
+		return "", true
+	case len(ms) == 1:
+		tg, _ := strconv.Atoi(title[ms[0][2]:ms[0][3]])
+		t, _ = strconv.Atoi(title[ms[0][4]:ms[0][5]])
+		if !agree(&g, tg) {
+			return "", true
+		}
+		// The mark of a number such as "P9.8" names the grade, not the problem, so the number is taken out before the marks and the grade words are read.
+		title = title[:ms[0][2]] + " " + title[ms[0][5]:]
+	}
+	// The day is also taken out of the grade words, so that "Day 2 Grade 10" does not read as grade 2.
+	words := dayRE.ReplaceAllString(title, " ")
+	if other {
+		// Agent decision: when the layout has another paper, a grade in brackets, as in "Sharygin 2023 P1 (Grade 8)", is the grade that a problem of that paper is meant for, so it does not name a paper.
+		for w := ""; w != words; {
+			w, words = words, bracketRE.ReplaceAllString(words, " ")
+		}
+	}
+	tg := titleGrade(words)
+	if tg < 0 || (tg > 0 && !agree(&g, tg)) {
 		return "", true
 	}
-	if ms := gradeTokenRE.FindAllStringSubmatch(title, -1); len(ms) > 1 {
-		return "", true
-	} else if len(ms) == 1 {
-		tg, _ := strconv.Atoi(ms[0][1])
-		tn, _ := strconv.Atoi(ms[0][2])
-		if !agree(&g, tg) || tn != n {
-			return "", true
+	if g == 0 && other && len(layout)-len(grades) == 1 && titleDay(title) == 0 {
+		// Agent decision: a title that names no grade, such as "Sharygin Geometry Olympiad 2012 P24", gives a problem of the other paper when its number is above the size of each paper of a grade, because only that paper has such a number. A smaller number gives no position, because it can be a problem of a grade.
+		most := 0
+		for _, l := range layout {
+			if gradePaperRE.MatchString(l.Name) {
+				most = max(most, len(l.Positions))
+			}
+		}
+		t2 := t
+		if marks := gradeMarkRE.FindAllStringSubmatch(title, -1); len(marks) == 1 {
+			t2, _ = strconv.Atoi(marks[0][1])
+		}
+		if n > most && (t2 == 0 || t2 > most) {
+			return "", false
 		}
 	}
 	i, ok := grades[g]
@@ -575,25 +621,41 @@ func gradePosition(c *content.Competition, year int, number, title string) (pos 
 		return "", true
 	}
 	ps := layout[i].Positions
-	t := n
-	if ms := gradeMarkRE.FindAllStringSubmatch(title, -1); len(ms) > 1 {
+	if marks := gradeMarkRE.FindAllStringSubmatch(title, -1); len(marks) > 1 {
 		return "", true
-	} else if len(ms) == 1 {
-		t, _ = strconv.Atoi(ms[0][1])
+	} else if len(marks) == 1 {
+		m, _ := strconv.Atoi(marks[0][1])
+		if t != 0 && m != t {
+			return "", true
+		}
+		t = m
+	}
+	days := layout[i].Days
+	per := len(ps)
+	if days > 1 && len(ps)%days == 0 {
+		per = len(ps) / days
+	}
+	// Agent decision: in a paper of several days, a title that names the day, such as "Sharygin 2019 Finals Day 2 Grade 10 P4", counts its number from 1 in the day or in the paper, as described at dayPosition, and the number column must give the same problem, counted in the paper or in the day.
+	if d := titleDay(title); d > 0 && days > 1 {
+		if t == 0 {
+			t = n
+		}
+		p := dayPosition(layout[i], d, t)
+		k := slices.Index(ps, p)
+		if p == "" || (n != k+1 && n != k+1-(d-1)*per) {
+			return "", true
+		}
+		return p, true
+	}
+	if t == 0 {
+		t = n
 	}
 	if t < 1 || t > len(ps) {
 		return "", true
 	}
 	// Agent decision: the number column counts in the paper, or from 1 in the day of the problem.
-	if t != n {
-		days := layout[i].Days
-		if days < 2 || len(ps)%days != 0 {
-			return "", true
-		}
-		per := len(ps) / days
-		if t-(t-1)/per*per != n {
-			return "", true
-		}
+	if t != n && (days < 2 || per == len(ps) || t-(t-1)/per*per != n) {
+		return "", true
 	}
 	return ps[t-1], true
 }
