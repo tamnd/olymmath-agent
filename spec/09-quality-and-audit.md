@@ -68,6 +68,7 @@ The badge on the site is derived: "official", "human, graded 7/7", "human, not g
 | C01 | warning | an edition in the register has positions without a problem |
 | C02 | warning | a competition in the register has editions without any problem |
 | C03 | info | coverage numbers changed by more than 1% since the last nightly |
+| C04 | warning | an appearance is at a position that the register says cannot exist: a gap year, a year out of `first_year` to `last_year`, an edition that is not a paper of the year, or a position that is not in the shape of the year. The positions of an edition file (`papers[].problems`) replace the shape, so an edition with an extra problem or an unused number lists its positions there; `overrides` in the register do the same for a year |
 | **X, legal** |||
 | X01 | error | each source in use has a licence zone and a ToS note in `registers/sources.yaml` |
 | X02 | error | no capture from a source with a `do-not-republish` flag is in a published export, and no text from a source with `ai-train=no` (AoPS, ProofWiki) is in the Hugging Face export |

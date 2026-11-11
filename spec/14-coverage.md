@@ -25,6 +25,8 @@
   editions: {default: {positions: "from booklet"}}
 ```
 
+The register also says which positions cannot exist: a gap year, a year out of the range of the competition, or a position that is not in the shape of its year. Audit rule C04 (9.3) warns on each appearance at such a position, so a record that a source put at the wrong competition or year shows up. When the position is real, the register or the edition file is wrong and gets the fix, with a source in a comment.
+
 The register starts with the ~210 competitions of 01b (157 table rows plus ~56 grouped countries), each with its first year and positions. Lower rounds of national olympiads are added as separate competitions when a source holds them. The register is the denominator of every closed-universe measure.
 
 **How we find missing competitions.** The register is not trusted to be complete. Each source adapter reports every competition label it sees (AoPS category names, NuminaMath and Omni-MATH source strings, MathNet `competition` values, problems.ru sources, imomath and imogeometry directories). A label that does not resolve through `competition-aliases.tsv` goes to the queue "unknown competition". The coverage report lists these labels with their row counts. The register is complete when this queue is empty.

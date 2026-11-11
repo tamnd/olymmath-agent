@@ -84,11 +84,7 @@ func Grid(c *content.Competition, thisYear int) ([]Row, Count) {
 		years[e.Year] = true
 	}
 	if c.FirstYear > 0 && c.HasShape() {
-		last := thisYear
-		if c.LastYear > 0 {
-			last = c.LastYear
-		}
-		for y := c.FirstYear; y <= last; y++ {
+		for y := c.FirstYear; y <= lastYear(c, thisYear); y++ {
 			years[y] = !slices.Contains(c.Gaps, y)
 		}
 	}
@@ -107,7 +103,7 @@ func Grid(c *content.Competition, thisYear int) ([]Row, Count) {
 	var total Count
 	for _, y := range ys {
 		for _, pp := range papers(c, y, editions[y]) {
-			r := row(y, pp.edition, c.Shape(y).Positions())
+			r := row(y, pp.edition, Expected(c, y, pp.edition))
 			r.Name = pp.id
 			rows = append(rows, r)
 			total.Add(r.Count)
@@ -116,14 +112,10 @@ func Grid(c *content.Competition, thisYear int) ([]Row, Count) {
 	return rows, total
 }
 
-func row(year int, e *content.Edition, usual []string) Row {
+func row(year int, e *content.Edition, expected []string) Row {
 	r := Row{Year: year, Edition: e}
-	expected := usual
 	at := map[string]*content.Problem{}
 	if e != nil {
-		if ps := e.Positions(); len(ps) > 0 {
-			expected = ps
-		}
 		for _, p := range e.Problems {
 			at[p.Position] = p
 		}
