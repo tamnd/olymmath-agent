@@ -22,7 +22,7 @@ import (
 )
 
 func init() {
-	register(command{"ocr", "read a scanned official paper with a vision model and make a problem for each position of the edition that has no problem (om ocr -source om-sem pl-om/1997 URL)", runOCR})
+	register(command{"ocr", "read an official paper with a vision model, or its text layer with -lanes native, and make a problem for each position of the edition that has no problem (om ocr -source om-sem pl-om/1997 URL)", runOCR})
 }
 
 // ocrOptions are the flags of om ocr.
@@ -47,7 +47,7 @@ func runOCR(env Env, args []string) int {
 	fs.StringVar(&o.pages, "pages", "", "the pages to read, such as 1-2,4. All the pages up to -limit when it is not given")
 	fs.IntVar(&o.limit, "limit", ocr.DefaultLimit, "the largest number of pages to read when -pages is not given")
 	fs.StringVar(&o.work, "work", filepath.Join(os.TempDir(), "om-ocr"), "the directory for the PDF and the page images. om ocr deletes them when it ends")
-	fs.StringVar(&o.lanes, "lanes", "codex,gemini,claude", "the model clients to ask, in order, or local for the vision servers of -local")
+	fs.StringVar(&o.lanes, "lanes", "codex,gemini,claude", "the model clients to ask, in order, or local for the vision servers of -local, or native for the text layer of a born-digital PDF, with its math put into TeX (no model)")
 	fs.StringVar(&o.local, "local", envOr("OLYMMATH_LOCAL", lane.DefaultLocal), "the targets of the local lane, as a comma-separated list of MODEL=URL. URL is a base URL such as http://127.0.0.1:8079/v1, or ssh://HOST/URL for a server on the loopback address of an ssh host. $OLYMMATH_LOCAL sets the default")
 	fs.BoolVar(&o.check, "check", false, "ask each target of -local for one token, print which targets answer, and read no page")
 	fs.StringVar(&o.dpi, "dpi", "200,300", "the resolutions of the page images. A page whose text has a flag is read again at the next one")
@@ -61,11 +61,16 @@ func runOCR(env Env, args []string) int {
 		return checkLocal(env, o.local)
 	}
 	if len(pos) < 1 || len(pos) > 2 {
-		fmt.Fprintln(env.Stderr, "usage: om ocr [-source SOURCE] [-paper PAPER] [-pages PAGES] [-file FILE | -images DIR] [-lanes LANES] [-local TARGETS] [-dry] EDITION [URL]\n       om ocr -check [-local TARGETS]\nEDITION is an edition such as pl-om/1997. URL is the address of the official paper. It is the official paper of the edition from the source when it is not given, or the address of the source for the images of a dataset.\nLANES is codex,gemini,claude by default. -lanes local reads with the vision servers of -local, which by default are "+lane.DefaultLocal+".")
+		fmt.Fprintln(env.Stderr, "usage: om ocr [-source SOURCE] [-paper PAPER] [-pages PAGES] [-file FILE | -images DIR] [-lanes LANES] [-local TARGETS] [-dry] EDITION [URL]\n       om ocr -check [-local TARGETS]\nEDITION is an edition such as pl-om/1997. URL is the address of the official paper. It is the official paper of the edition from the source when it is not given, or the address of the source for the images of a dataset.\nLANES is codex,gemini,claude by default. -lanes local reads with the vision servers of -local, which by default are "+lane.DefaultLocal+". -lanes native reads the text layer of the PDF and puts its math into TeX, with no model.")
 		return ExitUsage
 	}
 	if o.images != "" && (o.file != "" || o.pages != "") {
 		fmt.Fprintln(env.Stderr, "om ocr: -images reads image files, so it takes no -file and no -pages")
+		return ExitUsage
+	}
+	native := strings.TrimSpace(o.lanes) == ocr.NativeLane
+	if native && o.images != "" {
+		fmt.Fprintln(env.Stderr, "om ocr: -lanes native reads the text layer of a PDF, so it takes no -images")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(o.root)
@@ -101,6 +106,17 @@ func runOCR(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om ocr: -dpi: %v\n", err)
 		return ExitUsage
 	}
+	ctx := context.Background()
+	var read []ocr.Page
+	if native {
+		n := &ocr.Native{Version: ocr.PdftotextVersion(ctx), Limit: o.limit, Log: env.Stderr}
+		read, err = readPDF(ctx, env, o, *dir, *remote, src.ID, paper.URL, pages, n.Read)
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om ocr: %s: %v\n", e.Locator(), err)
+			return ExitFailure
+		}
+		return finishOCR(env, o, corpus, e, src, paper, read)
+	}
 	lanes, variants, err := ocrLanes(o)
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om ocr: %v\n", err)
@@ -111,9 +127,7 @@ func runOCR(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om ocr: %v\n", err)
 		return ExitFailure
 	}
-	ctx := context.Background()
 	chain := &lane.Chain{Lanes: lanes, State: filepath.Join(cache.Dir, "lanes.json")}
-	var read []ocr.Page
 	if o.images != "" {
 		files, ferr := imageFiles(o.images)
 		if ferr != nil {
@@ -124,7 +138,10 @@ func runOCR(env Env, args []string) int {
 		read, err = r.ReadImages(ctx, files)
 	} else {
 		r := &ocr.Reader{Asker: chain, Cache: cache, DPI: dpi, Limit: o.limit, Log: env.Stderr, Variants: variants}
-		read, err = readPDF(ctx, env, o, *dir, *remote, src.ID, paper.URL, r, pages)
+		read, err = readPDF(ctx, env, o, *dir, *remote, src.ID, paper.URL, pages, func(ctx context.Context, file string, pages []int) ([]ocr.Page, error) {
+			r.Work = filepath.Dir(file)
+			return r.Read(ctx, file, pages)
+		})
 	}
 	if errors.Is(err, lane.ErrExhausted) {
 		// The batch stops here. The pages that were read are in the cache, so the next run asks only for the others.
@@ -135,6 +152,11 @@ func runOCR(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om ocr: %s: %v\n", e.Locator(), err)
 		return ExitFailure
 	}
+	return finishOCR(env, o, corpus, e, src, paper, read)
+}
+
+// finishOCR cuts the pages into problems, prints them, and writes the new problems unless -dry.
+func finishOCR(env Env, o ocrOptions, corpus *content.Corpus, e *content.Edition, src *content.SourceRecord, paper content.OfficialPaper, read []ocr.Page) int {
 	markup, err := site.NewMarkup(nil)
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om ocr: %v\n", err)
@@ -297,7 +319,8 @@ func planScans(corpus *content.Corpus, e *content.Edition, paper content.Officia
 		pg := byPage[p.Page]
 		flags := slices.Clone(p.Flags)
 		for _, f := range pg.Flags {
-			if f == ocr.FlagRefusal && !slices.Contains(flags, f) {
+			// A refusal and a broken font are flags of the whole page, so each problem of the page has them.
+			if (f == ocr.FlagRefusal || f == ocr.FlagEncoding) && !slices.Contains(flags, f) {
 				flags = append(flags, f)
 			}
 		}
@@ -397,8 +420,8 @@ func parseInts(s string) ([]int, error) {
 	return out, nil
 }
 
-// readPDF gets the PDF, from the local file or the URL, and reads its pages with r. r gets the work directory.
-func readPDF(ctx context.Context, env Env, o ocrOptions, dir string, remote bool, source, url string, r *ocr.Reader, pages []int) ([]ocr.Page, error) {
+// readPDF gets the PDF, from the local file or the URL, writes it into a new work directory, and reads its pages with read.
+func readPDF(ctx context.Context, env Env, o ocrOptions, dir string, remote bool, source, url string, pages []int, read func(ctx context.Context, file string, pages []int) ([]ocr.Page, error)) ([]ocr.Page, error) {
 	pdf, err := ocrBytes(ctx, env, o, dir, remote, source, url)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", url, err)
@@ -415,8 +438,7 @@ func readPDF(ctx context.Context, env Env, o ocrOptions, dir string, remote bool
 	if err := os.WriteFile(file, pdf, 0o600); err != nil {
 		return nil, err
 	}
-	r.Work = work
-	return r.Read(ctx, file, pages)
+	return read(ctx, file, pages)
 }
 
 // imageExts are the extensions of the image files that -images reads.

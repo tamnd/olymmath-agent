@@ -157,7 +157,11 @@ Many national olympiads, all journals and the official IMO texts are PDF. The `o
 | TeX | the source TeX exists (Evan Chen, USA TST archive, some booklets) | use the TeX; skip OCR |
 | vision | scans | `olmOCR` or `MinerU`, then a vision-model pass that compares the LaTeX rendering with the page image |
 
-`om ocr` implements the vision lane. It renders each page to an image and asks one of two kinds of reader for Markdown with TeX math:
+`om ocr -lanes native` implements the native lane with no model. It reads the text layer of each page with `pdftotext`, cleans the layout (ligatures, soft hyphens, runs of spaces), and puts the math of the text layer into TeX by fixed rules (`ocr.TeX`): Unicode superscripts and subscripts, vulgar fractions, Greek letters, the math alphabets, roots and the math symbols become TeX between dollars, and prose stays as it is. Its extraction is `native/pdftotext@<version> (om-tex/1)`. A page is flagged, so its problems stay below the confidence threshold, when its fonts have no Unicode map (`encoding`: private use characters or U+FFFD) or when its words have two heights (`layout`: an exponent or an index that the text layer writes on the line, as `A−1` for $A^{-1}$). Such pages go to the vision lane.
+
+The TeX lane has no OCR: the adapter reads the source TeX and puts it into Markdown (`archive.Markdown`, used for the Putnam and USA TST archives).
+
+`om ocr` with the other lanes implements the vision lane. It renders each page to an image and asks one of two kinds of reader for Markdown with TeX math:
 
 | Reader | `-lanes` | Tool |
 |---|---|---|
