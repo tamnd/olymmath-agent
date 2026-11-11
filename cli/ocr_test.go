@@ -109,6 +109,57 @@ func TestScans(t *testing.T) {
 	}
 }
 
+// TestNativeScans checks the pages of the native lane: the text layer with its math put into TeX keeps its extraction, and a page with a broken font gives only links.
+func TestNativeScans(t *testing.T) {
+	root := copyContent(t)
+	reg := filepath.Join(root, "registers", "competitions.yaml")
+	b, err := os.ReadFile(reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b = []byte(strings.Replace(string(b), "  first_year: 1959\n", "  first_year: 1959\n  per_year: 6\n", 1))
+	if err := os.WriteFile(reg, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	corpus, f := content.Load(root)
+	if f.Errors() > 0 {
+		t.Fatalf("the test content has %d errors", f.Errors())
+	}
+	e, err := findEdition(corpus, "imo/2024")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paper, err := ocrPaper(e, ocrOptions{source: "imo-official"}, []string{"https://www.imo-official.org/problems/2024/eng.pdf"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pages := []ocr.Page{
+		{N: 1, Kind: ocr.NativeLane, Lane: "pdftotext", Version: "26.10.0", Model: ocr.TeXVersion, Text: ocr.TeX("Problem 3. Let n ≥ 1 be an integer. Prove that n² ≥ n.")},
+		{N: 2, Kind: ocr.NativeLane, Lane: "pdftotext", Version: "26.10.0", Text: "Problem 4. Find all reals such that the sum is two.", Flags: []string{ocr.FlagEncoding}},
+	}
+	markup, err := site.NewMarkup(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	news := planScans(corpus, e, paper, pages, false, true, markup)
+	if len(news) != 2 || news[0].at != "imo/2024/p3" || news[1].at != "imo/2024/p4" {
+		t.Fatalf("news = %+v", news)
+	}
+	if news[0].scan.Text != "Let $n \\ge 1$ be an integer. Prove that $n^2 \\ge n$." || news[0].scan.Extraction != "native/pdftotext@26.10.0 (om-tex/1)" {
+		t.Errorf("p3 = %+v", news[0])
+	}
+	if news[1].scan.Text != "" || !strings.Contains(news[1].why, ocr.FlagEncoding) {
+		t.Errorf("p4 = %+v", news[1])
+	}
+}
+
+func TestOCRNativeUsage(t *testing.T) {
+	code, _, errs := run("ocr", "-lanes", "native", "-images", t.TempDir(), "imo/2024")
+	if code != ExitUsage || !strings.Contains(errs, "no -images") {
+		t.Errorf("exit %d: %s", code, errs)
+	}
+}
+
 func TestImageScans(t *testing.T) {
 	root := copyContent(t)
 	reg := filepath.Join(root, "registers", "competitions.yaml")

@@ -285,6 +285,8 @@ func TestOlderThan(t *testing.T) {
 func TestReadBy(t *testing.T) {
 	for _, c := range []struct{ in, want string }{
 		{"native/pdftotext@26.10.0 (claude-opus-5-5)", "A model put the text layer of the paper into Markdown and TeX, with native/pdftotext@26.10.0 (claude-opus-5-5)."},
+		{"native/pdftotext@26.10.0 (om-tex/1)", "This text is the text layer of the paper, with its math put into TeX by fixed rules, with native/pdftotext@26.10.0 (om-tex/1)."},
+		{"native/pdftotext@26.10.0", "This text is the text layer of the paper, with its math put into TeX by fixed rules, with native/pdftotext@26.10.0."},
 		{"vision/codex@0.167.0 (gpt-5.5)", "A model read this text from the scan of the paper by OCR, with vision/codex@0.167.0 (gpt-5.5)."},
 	} {
 		if got := readBy(c.in); !strings.HasPrefix(got, c.want) || !strings.HasSuffix(got, "No person has checked it against the paper yet.") {

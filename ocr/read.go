@@ -41,6 +41,8 @@ type Reader struct {
 type Page struct {
 	N    int
 	Text string
+	// Kind is the lane of spec 05.7 that read the page: NativeLane, or "" for the vision lane.
+	Kind string
 	// Flags are the flags of the checks of the whole page.
 	Flags   []string
 	Lane    string
@@ -54,9 +56,13 @@ type Page struct {
 	File string
 }
 
-// Extraction gives the extraction of the page as spec 05.7 writes it: vision/<client>@<version>, and the model when the client tells it.
+// Extraction gives the extraction of the page as spec 05.7 writes it: vision/<client>@<version>, and the model when the client tells it. A page of the native lane gives native/pdftotext@<version>, and the rules of the TeX lane in brackets when they changed the text, as native/pdftotext@26.10.0 (om-tex/1).
 func (p Page) Extraction() string {
-	s := "vision/" + p.Lane
+	kind := p.Kind
+	if kind == "" {
+		kind = "vision"
+	}
+	s := kind + "/" + p.Lane
 	if p.Version != "" {
 		s += "@" + p.Version
 	}

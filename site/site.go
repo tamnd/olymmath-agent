@@ -340,8 +340,12 @@ func solutionOrigin(o string) string {
 	return "Solution"
 }
 
-// readBy gives the sentence of a problem page that tells how a text came out of the paper, from the extraction of its statement (spec 05.7). A text of the native lane came from the text layer of the PDF, and a model put it into Markdown and TeX. A text of the vision lane came from the page images by OCR.
+// readBy gives the sentence of a problem page that tells how a text came out of the paper, from the extraction of its statement (spec 05.7). A text of the native lane came from the text layer of the PDF, and a model or the rules of the TeX lane (om-tex) put it into Markdown and TeX. A text of the vision lane came from the page images by OCR.
 func readBy(extraction string) string {
+	if strings.HasPrefix(extraction, "native/") && (strings.Contains(extraction, "(om-tex/") || !strings.Contains(extraction, "(")) {
+		// The TeX lane of om ocr: fixed rules and no model put the math of the text layer into TeX.
+		return "This text is the text layer of the paper, with its math put into TeX by fixed rules, with " + extraction + ". No person has checked it against the paper yet."
+	}
 	if strings.HasPrefix(extraction, "native/") {
 		return "A model put the text layer of the paper into Markdown and TeX, with " + extraction + ". No person has checked it against the paper yet."
 	}
