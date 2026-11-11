@@ -45,12 +45,38 @@ func TestTitleUnits(t *testing.T) {
 		{"Vietnam TST 2019 P4", 0, 0},
 		{"Iran TST 2013 Day 1 P2 Day 2", -1, 0},
 		{"Tests 2 day in the morning", 0, 0},
+		{"Chinese TST 2009 3rd quiz P1", 0, 3},
+		{"China TST 2011   Quiz 2   D1   P1", 1, 2},
+		{"India TST 2017 D4 P1", 4, 0},
+		{"Romania ,4th TST 2014,P1", 0, 4},
+		{"Romania,2014,First TST,P2", 0, 1},
+		{"Iran TST 2012 Third exam 1st day P1", 1, 3},
+		{"China TST 2016 Test 3 Day 2 Q4", 2, 3},
+		{"2015 China TST 2 Day 2 Q1", 2, 2},
+		{"Romania TST 2015 Day 5 P3", 5, 0},
+		{"China TSTST 3 Day 1 P1", 1, 0},
+		{"Mathematical Duel 2D", 0, 0},
 	}
 	for _, tc := range cases {
 		if d, ts := titleUnits(tc.title); d != tc.day || ts != tc.test {
 			t.Errorf("titleUnits(%q) = %d, %d, want %d, %d", tc.title, d, ts, tc.day, tc.test)
 		}
 	}
+}
+
+// testDays gives a layout of tests named "Test 1", "Test 2" and so on, each of the given number of days with per problems a day.
+func testDays(days, per int, tests int) []content.Layout {
+	var ls []content.Layout
+	n := 0
+	for k := range tests {
+		l := content.Layout{Paper: "test" + strconv.Itoa(k+1), Name: "Test " + strconv.Itoa(k+1), Days: days}
+		for range days * per {
+			n++
+			l.Positions = append(l.Positions, "p"+strconv.Itoa(n))
+		}
+		ls = append(ls, l)
+	}
+	return ls
 }
 
 func TestUnitKind(t *testing.T) {
@@ -67,6 +93,8 @@ func TestUnitKind(t *testing.T) {
 		{[]content.Layout{{Name: "Day 2", Positions: []string{"p1"}}, {Name: "Day 1", Positions: []string{"p2"}}}, ""},
 		{[]content.Layout{{Name: "Day 1", Positions: []string{"p1"}}, {Name: "Test 2", Positions: []string{"p2"}}}, ""},
 		{[]content.Layout{{Name: "Day 1", Days: 2, Positions: []string{"p1", "p2"}}, {Name: "Day 2", Positions: []string{"p3"}}}, ""},
+		{testDays(2, 3, 3), "test"},
+		{[]content.Layout{{Name: "Test 1", Days: 2, Positions: []string{"p1", "p2", "p3"}}, {Name: "Test 2", Positions: []string{"p4"}}}, ""},
 	}
 	for i, tc := range cases {
 		c := &content.Competition{Layout: tc.layout}
@@ -86,6 +114,7 @@ func TestUnitPosition(t *testing.T) {
 	three := dayLayout("Day", 3, 3)
 	vmo := dayLayout("Day", 4, 3)
 	tests := dayLayout("Test", 3, 3)
+	iran := testDays(2, 3, 3)
 	cases := []struct {
 		layout []content.Layout
 		kind   string
@@ -132,7 +161,26 @@ func TestUnitPosition(t *testing.T) {
 		// Tests.
 		{tests, "test", "Romania TST 2019 Test 2 Problem 1", 1, "p4", nil, true, true},
 		{tests, "test", "TST 2 Problem 3", 6, "p6", nil, false, true},
-		{tests, "test", "Romania TST 2019 Test 2 Day 1 P1", 1, "", nil, false, false},
+		{tests, "test", "Romania TST 2019 Test 2 Day 1 P1", 1, "p4", nil, true, true},
+		{tests, "test", "Romania TST 2019 Test 2 Day 2 P1", 1, "", nil, false, false},
+		// Tests of one day: the day of the title is the test.
+		{tests, "test", "Romania TST 2019 Day 2 P3", 3, "p6", nil, true, true},
+		{tests, "test", "Romanian TST 2 2019 P1", 1, "p4", nil, true, true},
+		{tests, "test", "Romania,2019,First TST,P2", 2, "p2", nil, false, true},
+		{tests, "test", "Romania TST 2019 Day 3 P1", 1, "", nil, false, false},
+		// Tests of two days: the title names the test and the day in the test, and a number counts in the day, in the test or across the year.
+		{iran, "test", "Iran TST 2019 second exam day 1 problem 2", 2, "p8", nil, true, true},
+		{iran, "test", "Iran TST 2019 First exam 2nd day P4", 1, "p4", nil, true, true},
+		{iran, "test", "Iran TST 2019 Third exam 2nd day P4", 1, "p16", nil, true, true},
+		{iran, "test", "2019 China TST 2 Day 2 Q1", 4, "p10", nil, true, true},
+		{iran, "test", "Iran TST 2019:TST 2,Day 2,problem 1", 10, "p10", nil, false, true},
+		{iran, "test", "China TST 2019 Test 3 Day 2 Q6", 6, "p18", nil, true, true},
+		{iran, "test", "2019 China TST Test 3 P5", 5, "p17", nil, true, true},
+		{iran, "test", "2019 China TST Test 3 P2", 2, "", []string{"p14", "p17"}, false, true},
+		{iran, "test", "2019 China TST Day 1 Q2", 2, "", []string{"p2", "p8", "p14"}, false, true},
+		{iran, "test", "2019 China TST Day 3 Q2", 2, "", nil, false, false},
+		{iran, "test", "2019 China TST Test 4 P1", 1, "", nil, false, false},
+		{iran, "test", "Iran TST 2019 second exam day 1 problem 4", 4, "", nil, false, false},
 	}
 	for _, tc := range cases {
 		u := unitPosition(tc.layout, tc.kind, tc.title, 2019, tc.n)
