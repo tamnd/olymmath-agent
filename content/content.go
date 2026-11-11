@@ -199,11 +199,13 @@ type SourceRecord struct {
 	// DoNotRepublish means that the holder asked that no text of the source is published. Rule X02 checks it.
 	DoNotRepublish bool `yaml:"do_not_republish"`
 	// Reworded means that the source changed the wording of each problem on purpose, as Kalva did. Its texts come after all other texts for the canonical statement, and a low text match with the canonical statement is expected.
-	Reworded bool   `yaml:"reworded"`
-	Size     string `yaml:"size"`
-	Wave     int    `yaml:"wave"`
-	State    string `yaml:"state"`
-	Notes    string `yaml:"notes"`
+	Reworded bool `yaml:"reworded"`
+	// Derived means that the rows of the dataset are copies of other sources, sometimes changed or written by a model (spec 05.1). om matchrate -derived matches them in full against the records.
+	Derived bool   `yaml:"derived"`
+	Size    string `yaml:"size"`
+	Wave    int    `yaml:"wave"`
+	State   string `yaml:"state"`
+	Notes   string `yaml:"notes"`
 }
 
 // Edition is one year or one sitting of a competition.
