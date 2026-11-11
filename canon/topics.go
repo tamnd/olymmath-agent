@@ -549,10 +549,12 @@ func PaperPosition(c *content.Competition, year int, text string) (pos, rest str
 }
 
 var (
-	// sectionRE finds a problem of a shortlist with sections in a title, for example "G2", "Algebra 2" or "number theory problem 4".
-	sectionRE = regexp.MustCompile(`(?i)(?:^|[^a-z])(algebra|combinatorics|geometry|number theory|[acgn])\s*(?:problem\s*)?#?\s*([0-9]{1,2})\b`)
+	// sectionRE finds a problem of a shortlist with sections in a title, for example "G2", "Algebra 2" or "number theory problem 4". A "P" can come just before the letter, as in "ELMO Shortlist 2013: PG8".
+	sectionRE = regexp.MustCompile(`(?i)(?:^|[^a-z]|\bp)(algebra|combinatorics|geometry|number theory|[acgn])\s*(?:problem\s*)?#?\s*([0-9]{1,2})\b`)
 	// shortlistRE tells that a title names a shortlist.
 	shortlistRE = regexp.MustCompile(`(?i)short\s*list|\bisl\b`)
+	// slRE finds the short name "SL" of a shortlist, as in "ELMO SL 2018 G4". It is only read with a section, in TitlePosition, because "SL" alone can name other things.
+	slRE = regexp.MustCompile(`\bSL\b`)
 	// longlistRE tells that a title names a longlist.
 	longlistRE = regexp.MustCompile(`(?i)long\s*list|\bill\b`)
 	// numberRE matches a title that ends with the number of the problem, for example "Vietnam MO 1982 P5" or "Iberoamerican 2004 problem 6". The name before the number has one year and no other digit.
@@ -569,7 +571,7 @@ func TitlePosition(c *content.Competition, al *seed.Aliases, year int, pos, text
 	}
 	if c.TopicPositions {
 		ms := sectionRE.FindAllStringSubmatch(text, -1)
-		if len(ms) != 1 || !shortlistRE.MatchString(text) {
+		if len(ms) != 1 || (!shortlistRE.MatchString(text) && !slRE.MatchString(text)) {
 			return ""
 		}
 		n, _ := strconv.Atoi(ms[0][2])
