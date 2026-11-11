@@ -3,11 +3,13 @@ package cli
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/tamnd/olymmath-agent/canon"
 	"github.com/tamnd/olymmath-agent/match"
+	"github.com/tamnd/olymmath-agent/seed"
 )
 
 func TestWriteExplain(t *testing.T) {
@@ -89,6 +91,26 @@ func TestWikiAnswer(t *testing.T) {
 	} {
 		if got := wikiAnswer(in); got != want {
 			t.Errorf("wikiAnswer(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestWikiAnchors(t *testing.T) {
+	for _, c := range []struct {
+		row  seed.Row
+		code string
+		want []wikiAnchor
+	}{
+		{seed.Row{Source: "hf-aops-wiki", Title: "2022 AMC 10A #1 / 2022 AMC 12A #1"}, "amc10", []wikiAnchor{{"amc10", 2022, "a", 1}, {"amc12", 2022, "a", 1}}},
+		{seed.Row{Source: "hf-aops-wiki", Title: "2015 AMC 8 #3"}, "amc8", []wikiAnchor{{"amc8", 2015, "", 3}}},
+		{seed.Row{Source: "hf-aops-wiki", Title: "2015 AMC 8 Problem 3"}, "amc8", nil},
+		{seed.Row{Source: "hf-amc12-full", Labels: []string{"AMC 12 B"}, Year: 2006, Number: "14"}, "amc12", []wikiAnchor{{"amc12", 2006, "b", 14}}},
+		{seed.Row{Source: "hf-amc12-full", Labels: []string{"AMC 12 B"}, Number: "14"}, "amc12", nil},
+		{seed.Row{Source: "hf-mathnet", Labels: []string{"AMC 10 A"}, Year: 2021}, "amc10", nil},
+	} {
+		got := wikiAnchors(c.row, c.code, nil)
+		if !slices.Equal(got, c.want) {
+			t.Errorf("wikiAnchors(%q %q) = %v, want %v", c.row.Source, c.row.Title, got, c.want)
 		}
 	}
 }
