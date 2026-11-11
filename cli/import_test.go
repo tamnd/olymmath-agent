@@ -69,3 +69,26 @@ func TestWriteQueueOnce(t *testing.T) {
 		t.Errorf("the queue:\n%s", b)
 	}
 }
+
+func TestWikiAnswer(t *testing.T) {
+	for in, want := range map[string]string{
+		`\textbf{(B)}\40`:        "B",
+		`\textbf{(E)}\`:          "E",
+		"D":                      "D",
+		"(C)":                    "C",
+		"12":                     "12",
+		`12\sqrt{3}`:             `12\sqrt{3}`,
+		`\frac{85\pi}{8}`:        `\frac{85\pi}{8}`,
+		"=3xor=-2x":              "",
+		`\frac{md}{+r}`:          "",
+		`\frac{}{b}`:             "",
+		`\frac{b^2-2ac}{^2}`:     "",
+		"notfound":               "",
+		"y+3x-4=0":               "",
+		`=\frac{15}{2}\implies=`: "",
+	} {
+		if got := wikiAnswer(in); got != want {
+			t.Errorf("wikiAnswer(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
