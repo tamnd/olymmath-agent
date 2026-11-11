@@ -75,6 +75,19 @@ func TestPlanPatternMerge(t *testing.T) {
 	}
 }
 
+func TestPatternLonglist(t *testing.T) {
+	for _, c := range []struct{ a, b, want string }{
+		{"ill/1967/p29", "imo/1967/p4", "ill-imo"},
+		{"isl/1992/p5", "ill/1992/p13", "ill-isl"},
+		{"ill/1967/p29", "imo/1968/p4", ""},
+		{"ill/1967/p29", "ill/1967/p30", ""},
+	} {
+		if got := Pattern(c.a, c.b); got != c.want {
+			t.Errorf("Pattern(%s, %s) = %q, want %q", c.a, c.b, got, c.want)
+		}
+	}
+}
+
 func TestPlanSameEdition(t *testing.T) {
 	var cs []Choice
 	for _, at := range []string{"imo/1977/p2", "isl/1977/p3", "isl/1977/p10"} {

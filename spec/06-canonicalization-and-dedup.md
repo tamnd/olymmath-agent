@@ -90,6 +90,7 @@ Translations: a statement in another language is matched by E across languages a
 These patterns are handled by rules before the general matcher:
 
 - ISL → IMO: the shortlist and the contest share a problem. The ISL booklet says which shortlist problems became contest problems. The rule merges them by key.
+- ILL → ISL or IMO: the jury picks the shortlist and the paper from the longlist of the same year, so a longlist problem can be a shortlist or a contest problem too. The rule puts the ill record in the year group of the IMO and joins the pair with two strict signals, like ISL → IMO.
 - TST reuse: many TSTs use ISL problems before the shortlist is public. AoPS threads of TSTs often link the ISL thread. The rule uses the link.
 - AMC 10 / AMC 12 shared problems: the same problem appears as AMC 10A P20 and AMC 12A P15. The AoPS wiki marks the pair ("Duplicate" sections). The rule merges them.
 - Grade levels: All-Russian and other national olympiads repeat a problem across grades. The rule merges by text within one edition.

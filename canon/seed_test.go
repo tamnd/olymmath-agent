@@ -594,6 +594,10 @@ func TestGradePosition(t *testing.T) {
 		{2019, "10.3", "2019 Kosovo MO 11.3", "", true},
 		{2019, "10.3", "2019 Kosovo MO Grade 11", "", true},
 		{2019, "1", "Kosovo MO 2019 Grade 9 P1\n$x$", "", true},
+		// When every paper is a paper of a grade, a title that names a round can be a row of an earlier round, so it gives no position.
+		{2019, "2", "St. Petersburg MO 2019 round II grade 9 P2", "", true},
+		{2019, "2", "Kosovo MO 2019 2nd Round Grade 10 P2", "", true},
+		{2019, "2", "Kosovo MO 2019 Round 1 Grade 10 P2", "", true},
 		// In a paper of two days, the number column can count from 1 in each day.
 		{2002, "1", "Moldova NMO 2002 grade 7 problem nr.5", "p75", true},
 		{2002, "4", "Moldova NMO 2002 grade 11 problem nr.8", "p118", true},
