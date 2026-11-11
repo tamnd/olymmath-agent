@@ -67,8 +67,8 @@ var (
 	// cruxHeadRE is the heading of the problem section, and cruxSolRE is the heading of the solution section.
 	cruxHeadRE = regexp.MustCompile(`(?m)^\s*PROBLEMS\s*$`)
 	cruxSolRE  = regexp.MustCompile(`(?m)^\s*SOLUTIONS\s*$`)
-	// cruxNumRE is a problem number at the start of a line, for example "5171. Proposed by".
-	cruxNumRE = regexp.MustCompile(`(?m)^\s*(\d{3,4})\s*\*?\.\s`)
+	// cruxNumRE is a problem number at the start of a line, for example "5171. Proposed by". The asterisk of a problem with no solution can be the operator ∗, and a text layer can write it as a question mark, for example "4635∗ ." or "3890? .".
+	cruxNumRE = regexp.MustCompile(`(?m)^\s*(\d{3,4})\s*[*∗?]?\s*\.\s`)
 )
 
 // CruxIssues gives the issues of the Crux digital archive page, in the order of the page.

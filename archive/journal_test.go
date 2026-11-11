@@ -55,6 +55,16 @@ func TestCruxProblemsContents(t *testing.T) {
 	}
 }
 
+func TestCruxProblemsStar(t *testing.T) {
+	// The asterisk of a problem with no solution comes in several forms.
+	text := "Contents\n  Problems: 4631–4635\n\f" +
+		"   PROBLEMS\n4631. Proposed by A.\n4632 *. Proposed by B.\n\f4633∗ . Proposed by C.\n4634? . Proposed by D.\n4635*. Proposed by E.\n\f" +
+		"   SOLUTIONS\n4531. A solution.\n"
+	if got := positions(CruxProblems(text)); got != "p4631@2 p4632@2 p4633@3 p4634@3 p4635@3" {
+		t.Fatalf("marks %s", got)
+	}
+}
+
 func TestCruxProblemsSection(t *testing.T) {
 	// An old issue has no range in its contents, so the numbers come from the longest problem section.
 	text := "   PROBLEMS\n2001. Notes.\n\f" +
