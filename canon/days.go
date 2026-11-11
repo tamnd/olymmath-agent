@@ -12,7 +12,7 @@ import (
 // unitNameRE matches the name of a paper that is one day or one test of an edition, such as "Day 2" or "Test 1".
 var unitNameRE = regexp.MustCompile(`^(Day|Test) ([1-9])$`)
 
-// unitKind gives "day" when the layout of c in the year is a list of two papers or more named "Day 1", "Day 2" and so on, and "test" for "Test 1", "Test 2" and so on. It gives "" for any other layout. Only such a layout gives the number of problems of each day, so only then can a title that counts the problems in the day or across the days be read.
+// unitKind gives "day" when the layout of c in the year is a list of two papers or more named "Day 1", "Day 2" and so on, and "test" for "Test 1", "Test 2" and so on. It gives "" for any other layout. Only such a layout gives the number of problems of each day, so only then can a title that counts the problems in the day or across the days be read. A test can be written over several days with the same number of problems each day (Layout.Days), as the tests of the Iranian and Chinese team selection; a day cannot.
 func unitKind(c *content.Competition, year int) string {
 	// A year with no edition, such as 1980 for the IMO, has no layout. The AoPS wiki lists other contests under such a year.
 	if c == nil || slices.Contains(c.Gaps, year) {
@@ -25,7 +25,10 @@ func unitKind(c *content.Competition, year int) string {
 	kind := ""
 	for i, l := range layout {
 		m := unitNameRE.FindStringSubmatch(l.Name)
-		if m == nil || m[2] != strconv.Itoa(i+1) || len(l.Positions) == 0 || l.Days > 1 || (kind != "" && kind != m[1]) {
+		if m == nil || m[2] != strconv.Itoa(i+1) || len(l.Positions) == 0 || (kind != "" && kind != m[1]) {
+			return ""
+		}
+		if l.Days > 1 && (m[1] != "Test" || len(l.Positions)%l.Days != 0) {
 			return ""
 		}
 		kind = m[1]
@@ -34,10 +37,10 @@ func unitKind(c *content.Competition, year int) string {
 }
 
 var (
-	// unitRE finds a day in a title, such as "Day 2", "day2", "Day II", "2nd day", "second day", or a test, such as "Test 2", "TST 3", "TST3", "Exam 2", "2nd test" or "second exam". The name "TST" alone, as in "Vietnam TST 2019", names no test. Group 1 is the word of a number after the unit, group 2 the word before it, and group 3 the unit.
-	unitRE = regexp.MustCompile(`(?i)\b(?:(day|test|tst|exam)\s*([1-9]|iv|i{1,3})\b|([1-4])(?:st|nd|rd|th)\s+(day|test|exam)\b|(first|second|third|fourth)\s+(day|test|exam)\b)`)
+	// unitRE finds a day in a title, such as "Day 2", "day2", "D2", "Day II", "2nd day", "second day", or a test, such as "Test 2", "TST 3", "TST3", "Exam 2", "Quiz 2", "2nd test", "4th TST", "second exam" or "1st quiz". The name "TST" alone, as in "Vietnam TST 2019", names no test. Group 1 is the unit and group 2 the word of a number after it, groups 3 and 4 the number and the unit of an ordinal, groups 5 and 6 the word and the unit of a word ordinal, and group 7 the number of a day written as D2.
+	unitRE = regexp.MustCompile(`(?i)\b(?:(day|test|tst|exam|quiz)\s*([1-9]|iv|i{1,3})\b|([1-6])(?:st|nd|rd|th)\s+(day|test|tst|exam|quiz)\b|(first|second|third|fourth|fifth|sixth)\s+(day|test|tst|exam|quiz)\b|d([1-9])\b)`)
 	// unitWords gives the number of a word in a unit, such as "II" in "Day II" or "second" in "second day".
-	unitWords = map[string]int{"i": 1, "ii": 2, "iii": 3, "iv": 4, "first": 1, "second": 2, "third": 3, "fourth": 4}
+	unitWords = map[string]int{"i": 1, "ii": 2, "iii": 3, "iv": 4, "first": 1, "second": 2, "third": 3, "fourth": 4, "fifth": 5, "sixth": 6}
 )
 
 // titleUnits gives the days and the tests that a title names, such as 2 days and no test for "Vietnam TST 2019 Day 2 P1" or test 2 and day 1 for "Iran TST 2015 exam 2 day 1 problem 2". A value is 0 when the title names none, and -1 when it names two different ones.
@@ -56,6 +59,8 @@ func titleUnits(title string) (day, test int) {
 			unit, word = m[4], m[3]
 		case m[5] != "":
 			unit, word = m[6], m[5]
+		case m[7] != "":
+			unit, word = "day", m[7]
 		}
 		v, err := strconv.Atoi(word)
 		if err != nil {
@@ -85,9 +90,12 @@ type unitPlace struct {
 }
 
 // unitPosition reads the title and the number n of a row of a competition whose layout in the year is a list of days or tests of the kind unitKind gives. Agent decision: the source numbers each day from 1 in some years and the whole year in others, and the number of a title, such as "P4" in "Vietnam TST 1985 P4" or "P1" in "China Western MO 2019 Day 2 P1", also counts in the day or across the days. A position fits a number when the number is its index in its day or its index across the days. The row gets the one position of the day that the title names, or of any day when it names none, that fits both n and the number of the title. A title with no number gives no condition. When more than one position fits, the day is not known, and the row gets the list of these positions, as described at resolve. A title that names a unit of another kind, such as a test in a layout of days, gives no position.
+//
+// In a layout of tests, a test of several days (Layout.Days) is read the same way one level down: a title such as "Iran TST 2015 exam 2 day 1 problem 2" names the test and the day in the test, and a number also fits a position when it is its index in its day of the test, as "2015 China TST 2 Day 2 Q1" with the number 4 does. When no test of the year has more than one day, each test is one day, so a title that names only a day, as "Romania TST 2015 Day 3 P1", names the test of that number.
 func unitPosition(layout []content.Layout, kind, title string, year, n int) unitPlace {
 	title = strings.TrimSpace(title)
-	day, test := 0, 0
+	// unit is the day of a layout of days or the test of a layout of tests, and sub the day in the test.
+	unit, sub := 0, 0
 	t := 0
 	if isTitle(title) {
 		if shortlistRE.MatchString(title) || longlistRE.MatchString(title) || prelimRE.MatchString(title) {
@@ -98,11 +106,24 @@ func unitPosition(layout []content.Layout, kind, title string, year, n int) unit
 				return unitPlace{}
 			}
 		}
-		day, test = titleUnits(title)
+		day, test := titleUnits(title)
+		unit, sub = day, test
 		if kind == "test" {
-			day, test = test, day
+			unit, sub = test, day
+			if !slices.ContainsFunc(layout, func(l content.Layout) bool { return l.Days > 1 }) && sub != 0 {
+				// Each test is one day, so the day of the title is the test.
+				switch {
+				case unit == 0:
+					unit = sub
+				case sub != 1:
+					return unitPlace{}
+				}
+				sub = 0
+			}
+		} else if sub != 0 {
+			return unitPlace{}
 		}
-		if day < 0 || test != 0 {
+		if unit < 0 || sub < 0 {
 			return unitPlace{}
 		}
 		// A title can give the number twice, as "Indonesia National MO 2021 P4 (INAMO 2021/4)" does. Two different numbers, as in "INAMO 2020 Day 1 P3 or APMO 2019 P1", give no position.
@@ -125,13 +146,21 @@ func unitPosition(layout []content.Layout, kind, title string, year, n int) unit
 	running := ""
 	i := 0
 	for d, l := range layout {
+		per := len(l.Positions)
+		if l.Days > 1 {
+			per /= l.Days
+		}
 		for j, p := range l.Positions {
 			i++
 			nums := []int{i, j + 1}
+			if l.Days > 1 {
+				nums = append(nums, j%per+1)
+			}
 			if i == n {
 				running = p
 			}
-			if (day == 0 || day == d+1) && slices.Contains(nums, n) && (t == 0 || slices.Contains(nums, t)) && !slices.Contains(fit, p) {
+			inSub := sub == 0 || (l.Days > 1 && sub == j/per+1)
+			if (unit == 0 || unit == d+1) && inSub && slices.Contains(nums, n) && (t == 0 || slices.Contains(nums, t)) && !slices.Contains(fit, p) {
 				fit = append(fit, p)
 			}
 		}
