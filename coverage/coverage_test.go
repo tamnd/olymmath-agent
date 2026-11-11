@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -153,5 +154,81 @@ func TestBuildAlso(t *testing.T) {
 		if y.Year == 2023 && (len(y.Record) != 1 || y.Record[0] != "p3") {
 			t.Errorf("2023 %+v", y)
 		}
+	}
+}
+
+// amc is a competition with two papers from 2002 and a fall part in 2021, as the AMC 10.
+func amc() *content.Competition {
+	return &content.Competition{
+		Code: "amc10", Name: "AMC 10", FirstYear: 2000, LastYear: 2022, PerYear: 2,
+		EditionForm: "year-letter",
+		Papers: []content.Papers{
+			{From: 2002, Letters: []string{"a", "b"}},
+			{From: 2021, To: 2021, Part: "fall", Letters: []string{"a", "b"}},
+		},
+	}
+}
+
+func TestPaperOf(t *testing.T) {
+	c := amc()
+	cases := []struct {
+		year   int
+		labels []string
+		want   string
+		known  bool
+	}{
+		{2001, []string{"AMC 10"}, "2001", true},
+		{2010, []string{"AMC 10A"}, "2010a", true},
+		{2010, []string{"AMC 10 B"}, "2010b", true},
+		{2010, []string{"AMC 10"}, "", false},
+		{2021, []string{"AMC 10 B", "Fall"}, "2021-fall-b", true},
+		{2021, []string{"AMC 10A"}, "2021a", true},
+		{2010, []string{"AMC 10 A", "Fall"}, "", false},
+		{2001, []string{"AMC 10"}, "2001", true},
+		{2010, []string{"AMC 10C"}, "", false},
+	}
+	for _, tc := range cases {
+		got, known := paperOf(c, tc.year, tc.labels)
+		if got != tc.want || known != tc.known {
+			t.Errorf("paperOf(%d, %q) = %q, %v, want %q, %v", tc.year, tc.labels, got, known, tc.want, tc.known)
+		}
+	}
+	if got, known := paperOf(&content.Competition{Code: "imo"}, 2024, nil); got != "2024" || !known {
+		t.Errorf("one paper gave %q, %v", got, known)
+	}
+}
+
+func TestMeasurePapers(t *testing.T) {
+	c := amc()
+	cand := map[string]map[string]bool{
+		"2001":        {"p1": true},
+		"2010b":       {"p2": true},
+		"2021-fall-a": {"p1": true},
+	}
+	seen := map[string]int{"2001": 1, "2010b": 1, "2021-fall-a": 3}
+	out := measure(c, cand, seen, map[int]int{2010: 4}, 9, 2026)
+	// Two years with one paper, 21 years with the papers a and b, and the two fall papers of 2021: 2 + 42 + 2 papers of 2 positions.
+	if out.Expected != 92 || out.Candidate != 3 || out.NoCandidate != 89 {
+		t.Errorf("expected %d, candidate %d, none %d", out.Expected, out.Candidate, out.NoCandidate)
+	}
+	var eds []string
+	years := map[string]*Year{}
+	for _, y := range out.Years {
+		if y.Year == 2001 || y.Year == 2010 || y.Year == 2021 {
+			eds = append(eds, y.Edition)
+		}
+		years[strconv.Itoa(y.Year)+y.Edition] = y
+	}
+	if got := strings.Join(eds, " "); got != " 2010a 2010b 2021a 2021b 2021-fall-a 2021-fall-b" {
+		t.Errorf("editions %q", got)
+	}
+	if y := years["20102010a"]; y.Rows != 4 || len(y.Candidate) != 0 {
+		t.Errorf("2010a %+v", y)
+	}
+	if y := years["20102010b"]; y.Rows != 1 || len(y.Candidate) != 1 || y.Candidate[0] != "p2" {
+		t.Errorf("2010b %+v", y)
+	}
+	if y := years["20212021-fall-a"]; y.Rows != 3 || len(y.Candidate) != 1 {
+		t.Errorf("2021-fall-a %+v", y)
 	}
 }

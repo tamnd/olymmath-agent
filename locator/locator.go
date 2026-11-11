@@ -36,7 +36,7 @@ func (k Kind) String() string {
 
 var (
 	codeRE     = regexp.MustCompile(`^[a-z][a-z0-9]*(-[a-z0-9]+)*$`)
-	editionRE  = regexp.MustCompile(`^[0-9]{4}([a-z]|-[a-z0-9]+)?$`)
+	editionRE  = regexp.MustCompile(`^[0-9]{4}([a-z]|-[a-z0-9]+(-[a-z])?)?$`)
 	paperRE    = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 	positionRE = regexp.MustCompile(`^[a-z]{0,3}[0-9]{1,4}[a-z]?$`)
 )
@@ -80,7 +80,7 @@ func (l Locator) Path() string { return "problems/" + l.String() + ".md" }
 // ValidCode reports whether s is a valid competition code: lowercase letters, digits and single hyphens, with a letter first.
 func ValidCode(s string) bool { return codeRE.MatchString(s) }
 
-// ValidEdition reports whether s is a valid edition: a year, then an optional letter or a hyphen and a word, for example 2024, 2021a or 2021-spring.
+// ValidEdition reports whether s is a valid edition: a year, then an optional letter or a hyphen and a word, and after the word an optional hyphen and a letter, for example 2024, 2021a, 2021-spring or 2021-fall-a.
 func ValidEdition(s string) bool { return editionRE.MatchString(s) }
 
 // ValidPosition reports whether s is a valid position, for example p1, n1, b6 or 25.

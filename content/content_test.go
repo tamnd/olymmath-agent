@@ -123,6 +123,58 @@ func TestLoadFindings(t *testing.T) {
 	}
 }
 
+func TestLoadPaperEditions(t *testing.T) {
+	root := copyTree(t)
+	reg := filepath.Join(root, "registers", "competitions.yaml")
+	b, err := os.ReadFile(reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b = append(b, []byte(`
+- code: amc10
+  name: AMC 10
+  group: usa
+  level: high-school
+  first_year: 2000
+  edition_form: year-letter
+  papers:
+    - {from: 2002, letters: [a, b]}
+    - {from: 2021, to: 2021, part: fall, letters: [a, b]}
+  per_year: 25
+  sources: [imo-official]
+  description: A test competition.
+`)...)
+	if err := os.WriteFile(reg, b, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(root, "editions", "amc10")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"2001", "2021a", "2021-fall-b", "2022-fall-a", "2003c"} {
+		if err := os.WriteFile(filepath.Join(dir, id+".yaml"), []byte("year: "+id[:4]+"\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	c, fs := Load(root)
+	got := fs.Error()
+	for _, want := range []string{"2022-fall-a is not one of them", "2003c is not one of them"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("want a finding with %q, got:\n%v", want, got)
+		}
+	}
+	if len(fs) != 2 {
+		t.Errorf("findings:\n%v", got)
+	}
+	var ids []string
+	for _, e := range c.Competition("amc10").Editions {
+		ids = append(ids, e.ID)
+	}
+	if strings.Join(ids, " ") != "2021a 2021-fall-b 2001" {
+		t.Errorf("editions %q", ids)
+	}
+}
+
 func TestShape(t *testing.T) {
 	c := &Competition{
 		Layout:    []Layout{{Positions: []string{"a1", "c1"}}},
@@ -160,6 +212,30 @@ func TestLetters(t *testing.T) {
 	}
 }
 
+func TestEditionIDs(t *testing.T) {
+	c := &Competition{FirstYear: 2000, Gaps: []int{2010}, EditionForm: "year-letter", Papers: []Papers{
+		{From: 2002, Letters: []string{"a", "b"}},
+		{From: 2021, To: 2021, Part: "fall", Letters: []string{"a", "b"}},
+	}}
+	for _, tc := range []struct {
+		year int
+		want string
+	}{{1999, ""}, {2001, "2001"}, {2002, "2002a 2002b"}, {2010, ""}, {2021, "2021a 2021b 2021-fall-a 2021-fall-b"}, {2022, "2022a 2022b"}} {
+		if got := strings.Join(c.EditionIDs(tc.year), " "); got != tc.want {
+			t.Errorf("EditionIDs(%d) = %q, want %q", tc.year, got, tc.want)
+		}
+	}
+	if got := c.PartLetters(2022, "fall"); got != nil {
+		t.Errorf("PartLetters(2022, fall) = %q", got)
+	}
+	if got := strings.Join(c.Parts(2021), " "); got != "fall" {
+		t.Errorf("Parts(2021) = %q", got)
+	}
+	if got := strings.Join(c.Letters(2021), " "); got != "a b" {
+		t.Errorf("Letters(2021) = %q", got)
+	}
+}
+
 func TestShapeError(t *testing.T) {
 	ok := Layout{Positions: []string{"p1", "p2"}}
 	for _, tc := range []struct {
@@ -179,6 +255,9 @@ func TestShapeError(t *testing.T) {
 		{Competition{Papers: []Papers{{From: 2002, Letters: []string{"a", "b"}}}}, "year-letter"},
 		{Competition{EditionForm: "year-letter", Papers: []Papers{{From: 2002, Letters: []string{"A"}}}}, "not one small letter"},
 		{Competition{EditionForm: "year-letter", Papers: []Papers{{From: 2002}}}, "no letters"},
+		{Competition{EditionForm: "year-letter", Papers: []Papers{{From: 2002, Letters: []string{"a", "b"}}, {From: 2021, To: 2021, Part: "fall", Letters: []string{"a", "b"}}}}, ""},
+		{Competition{EditionForm: "year-letter", Papers: []Papers{{From: 2002, Letters: []string{"a", "b"}}, {From: 2021, To: 2021, Part: "Fall 2", Letters: []string{"a"}}}}, "not one word"},
+		{Competition{EditionForm: "year-letter", Papers: []Papers{{From: 2002, Letters: []string{"a", "b"}}, {From: 2021, To: 2021, Letters: []string{"c"}}}}, "papers 2 overlaps papers 1"},
 	} {
 		got := shapeError(&tc.c)
 		if (tc.want == "") != (got == "") || !strings.Contains(got, tc.want) {

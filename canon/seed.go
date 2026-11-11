@@ -50,6 +50,30 @@ func Letter(labels []string) string {
 	return ""
 }
 
+// Paper gives the part and the letter of the paper of a row of a competition with two papers each year, from the labels of the row. A label that names a season, such as "2021 AMC 10 B Fall" or "Fall 2021 AMC 10 B", gives the part of that season when the register lists papers of that part for the year, as the fall of 2021 of the AMC 10. A spring label gives the main part. The result ok is false when a label names a season that is not a part of the year, because the paper is not known. The letter is "" when no label names one.
+func Paper(c *content.Competition, year int, labels []string) (part, letter string, ok bool) {
+	plain := make([]string, len(labels))
+	for i, l := range labels {
+		if m := seasonRE.FindString(l); m != "" && part == "" {
+			part = strings.ToLower(m)
+		}
+		plain[i] = strings.TrimSpace(seasonLabelRE.ReplaceAllString(l, " "))
+	}
+	if part == "autumn" {
+		part = "fall"
+	}
+	if part == "spring" {
+		part = ""
+	}
+	if part != "" && (c == nil || c.PartLetters(year, part) == nil) {
+		return "", "", false
+	}
+	return part, Letter(plain), true
+}
+
+// seasonLabelRE matches a season word in a label, with the brackets around it, as in "2021 AMC 10A (Fall)".
+var seasonLabelRE = regexp.MustCompile(`(?i)\(?\b(?:fall|spring|autumn)\b\)?`)
+
 // Seeds makes candidates from seed rows. It accepts a row when the alias table resolves its labels to a competition of comps (all competitions when comps is empty), when its year and its position are valid for the competition, and when its text is a statement. The result maps each appearance to its candidates.
 type Seeds struct {
 	Corpus  *content.Corpus
@@ -234,10 +258,19 @@ func (s *Seeds) Add(r seed.Row) {
 			return
 		}
 	case "year-letter":
-		letter = Letter(r.Labels)
+		part, l, ok := Paper(comp, r.Year, r.Labels)
+		letter = l
 		// A row with no letter, such as a row of the AoPS collection "2009 AMC 10" that holds both papers, takes the letter that the AoPS wiki gives its topic. A row of a collection that names a season, such as "2021 AMC 10 Fall", does not, because that year had four papers.
 		if letter == "" && !seasonRE.MatchString(strings.Join(r.Labels, " ")) {
 			letter = topicLetter
+		}
+		// A paper of a part of the year, such as the fall papers of 2021, has the edition 2021-fall-a. A row whose season is not a part of the year has no paper.
+		if !ok {
+			s.skip(r, code, "no paper of the season")
+			return
+		}
+		if part != "" && letter != "" {
+			letter = "-" + part + "-" + letter
 		}
 		if letter != "" {
 			if s.lettered == nil {

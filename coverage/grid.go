@@ -40,9 +40,11 @@ type Cell struct {
 	Counted bool
 }
 
-// Row is one year of a competition in the year grid. Edition is nil when the content has no edition for the year.
+// Row is one edition of a competition in the year grid: a year, or one paper of a year when the register lists the papers of the year. Edition is nil when the content has no edition for it.
 type Row struct {
-	Year    int
+	Year int
+	// Name is the year, or the edition of the paper, such as 2021a or 2021-fall-a.
+	Name    string
 	Edition *content.Edition
 	Cells   []Cell
 	Count   Count
@@ -73,14 +75,12 @@ func (c Count) Percent(m int) string {
 	return strconv.Itoa(100*c.Reached[m]/c.Expected) + "%"
 }
 
-// Grid gives the year grid of a competition, the newest year first, and the total count. The years go from the first year of the register to thisYear, or to the last year, with no gap year, and include each edition of the content.
+// Grid gives the year grid of a competition, the newest year first, and the total count. A year has one row for each paper that the register lists. The years go from the first year of the register to thisYear, or to the last year, with no gap year, and include each edition of the content.
 func Grid(c *content.Competition, thisYear int) ([]Row, Count) {
-	editions := map[int]*content.Edition{}
+	editions := map[int][]*content.Edition{}
 	years := map[int]bool{}
 	for _, e := range c.Editions {
-		if _, ok := editions[e.Year]; !ok {
-			editions[e.Year] = e
-		}
+		editions[e.Year] = append(editions[e.Year], e)
 		years[e.Year] = true
 	}
 	if c.FirstYear > 0 && c.HasShape() {
@@ -106,9 +106,12 @@ func Grid(c *content.Competition, thisYear int) ([]Row, Count) {
 	var rows []Row
 	var total Count
 	for _, y := range ys {
-		r := row(y, editions[y], c.Shape(y).Positions())
-		rows = append(rows, r)
-		total.Add(r.Count)
+		for _, pp := range papers(c, y, editions[y]) {
+			r := row(y, pp.edition, c.Shape(y).Positions())
+			r.Name = pp.id
+			rows = append(rows, r)
+			total.Add(r.Count)
+		}
 	}
 	return rows, total
 }

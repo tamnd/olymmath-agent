@@ -65,24 +65,67 @@ type Era struct {
 	PerYear int      `yaml:"per_year"`
 }
 
-// Papers are the letters of the papers of each year from the year From to the year To. To is 0 when the papers did not change since From.
+// Papers are the letters of the papers of each year from the year From to the year To. To is 0 when the papers did not change since From. Part names a second set of papers in the year, such as fall for the AMC 10 of fall 2021, which came after the papers A and B of the spring. The edition of a paper of a part is the year, the part and the letter, as 2021-fall-a.
 type Papers struct {
 	From    int      `yaml:"from"`
 	To      int      `yaml:"to"`
+	Part    string   `yaml:"part"`
 	Letters []string `yaml:"letters"`
 }
 
+// held tells if the competition was held in the year.
+func (c *Competition) held(year int) bool {
+	return year >= c.FirstYear && (c.LastYear == 0 || year <= c.LastYear) && !slices.Contains(c.Gaps, year)
+}
+
 // Letters gives the letters of the papers of the year, in order. It gives one empty letter for a year with one paper, and nil for a year that the competition did not hold.
-func (c *Competition) Letters(year int) []string {
-	if year < c.FirstYear || (c.LastYear > 0 && year > c.LastYear) || slices.Contains(c.Gaps, year) {
+func (c *Competition) Letters(year int) []string { return c.PartLetters(year, "") }
+
+// PartLetters gives the letters of the papers of a part of the year, in order. The part "" is the main part, as for Letters. Another part gives nil when the year has no papers of that part.
+func (c *Competition) PartLetters(year int, part string) []string {
+	if !c.held(year) {
 		return nil
 	}
 	for _, p := range c.Papers {
-		if year >= p.From && (p.To == 0 || year <= p.To) {
+		if p.Part == part && year >= p.From && (p.To == 0 || year <= p.To) {
 			return p.Letters
 		}
 	}
+	if part != "" {
+		return nil
+	}
 	return []string{""}
+}
+
+// Parts gives the parts of the year after the main part, such as fall, in the order of the register.
+func (c *Competition) Parts(year int) []string {
+	var out []string
+	for _, p := range c.Papers {
+		if p.Part != "" && !slices.Contains(out, p.Part) && c.PartLetters(year, p.Part) != nil {
+			out = append(out, p.Part)
+		}
+	}
+	return out
+}
+
+// EditionID gives the edition part of the locator of a paper: 2024 with no part and no letter, 2021a with a letter, and 2021-fall-a with a part.
+func EditionID(year int, part, letter string) string {
+	id := strconv.Itoa(year)
+	if part != "" {
+		id += "-" + part + "-"
+	}
+	return id + letter
+}
+
+// EditionIDs gives the edition of each paper of the year, in order: the papers of the main part, then the papers of each other part. It gives nil for a year that the competition did not hold.
+func (c *Competition) EditionIDs(year int) []string {
+	var out []string
+	for _, part := range append([]string{""}, c.Parts(year)...) {
+		for _, l := range c.PartLetters(year, part) {
+			out = append(out, EditionID(year, part, l))
+		}
+	}
+	return out
 }
 
 // Shape is the format of one edition: its papers, or its number of problems.

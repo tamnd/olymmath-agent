@@ -1,6 +1,7 @@
 package canon
 
 import (
+	"fmt"
 	"maps"
 	"strconv"
 	"testing"
@@ -184,6 +185,58 @@ func TestTopicsLetter(t *testing.T) {
 	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO", "2014 IMO Spring"}, Year: 2014, Ref: "aops-topic:1", Statement: text})
 	if got := s.Candidates(); len(got["imo/2014b/p1"]) != 1 || len(got["imo/2014a/p1"]) != 0 || s.Skipped["no edition letter"] != 1 {
 		t.Errorf("candidates %v, skipped %v", got, s.Skipped)
+	}
+}
+
+func TestSeedsFallPapers(t *testing.T) {
+	corpus, fs := content.Load("../content/testdata/valid")
+	if fs.Errors() > 0 {
+		t.Fatal(fs)
+	}
+	al, err := seed.LoadAliases("../content/testdata/valid", corpus)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := corpus.Competition("imo")
+	c.EditionForm = "year-letter"
+	c.Layout = nil
+	c.Papers = []content.Papers{{From: 2014, Letters: []string{"a", "b"}}, {From: 2021, To: 2021, Part: "fall", Letters: []string{"a", "b"}}}
+	text := "What is the value of $1+2+3+4$, the sum of the first four positive integers?"
+	s := &Seeds{Corpus: corpus, Aliases: al}
+	// The papers of the fall of 2021 are editions of their own. A spring label gives the main papers. A fall label of a year with no fall papers gives no paper.
+	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO", "2021 IMO B Fall"}, Year: 2021, Number: "3", Statement: text})
+	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO", "Fall 2021 IMO A"}, Year: 2021, Number: "4", Statement: text + " Then add five."})
+	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO", "2021 IMO A (Spring)"}, Year: 2021, Number: "5", Statement: text + " Then add six."})
+	s.Add(seed.Row{Source: "imo-official", Labels: []string{"IMO", "Fall 2019 IMO A"}, Year: 2019, Number: "6", Statement: text + " Then add seven."})
+	got := s.Candidates()
+	for _, at := range []string{"imo/2021-fall-b/p3", "imo/2021-fall-a/p4", "imo/2021a/p5"} {
+		if len(got[at]) != 1 {
+			t.Errorf("no candidate at %s: %v", at, got)
+		}
+	}
+	if len(got) != 3 || s.Skipped["no paper of the season"] != 1 {
+		t.Errorf("candidates %v, skipped %v", got, s.Skipped)
+	}
+}
+
+func TestPaper(t *testing.T) {
+	c := &content.Competition{FirstYear: 2000, EditionForm: "year-letter", Papers: []content.Papers{{From: 2002, Letters: []string{"a", "b"}}, {From: 2021, To: 2021, Part: "fall", Letters: []string{"a", "b"}}}}
+	for _, tc := range []struct {
+		year   int
+		labels []string
+		want   string
+	}{
+		{2021, []string{"AMC 10 Fall", "2021 AMC 10 Fall"}, "fall  true"},
+		{2021, []string{"2021 AMC 10 B Fall"}, "fall b true"},
+		{2021, []string{"2021 AMC 10A (Fall)"}, "fall a true"},
+		{2021, []string{"AMC 10 Spring", "2021 AMC 10 Spring"}, "  true"},
+		{2021, []string{"AMC 10B"}, " b true"},
+		{2019, []string{"Fall 2019 AMC 10 B"}, "  false"},
+	} {
+		part, letter, ok := Paper(c, tc.year, tc.labels)
+		if got := fmt.Sprintf("%s %s %v", part, letter, ok); got != tc.want {
+			t.Errorf("Paper(%d, %q) = %q, want %q", tc.year, tc.labels, got, tc.want)
+		}
 	}
 }
 
