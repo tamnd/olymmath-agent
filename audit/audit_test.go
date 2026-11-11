@@ -169,6 +169,8 @@ func TestRules(t *testing.T) {
 		{"F03", map[string][][2]string{agentReview: {{"decision: clean", "decision: faithful"}}}},
 		{"F03", map[string][][2]string{agentReview: {{"note: \"Agent decision, not a person's review. ", "note: \""}}}},
 		{"T02", map[string][][2]string{"registers/tags.tsv": {{"X70GFNJBRT\tformal\n", ""}}}},
+		{"C04", map[string][][2]string{"registers/competitions.yaml": {{"  first_year: 1959\n", "  first_year: 1959\n  gaps: [2024]\n"}}}},
+		{"C04", map[string][][2]string{"editions/imo/2024.yaml": {{"problems: [p1, p2]", "problems: [p1]"}}}},
 		{"X01", map[string][][2]string{"registers/sources.yaml": {{"  terms: Copyright of the International Mathematical Olympiad. No licence is stated.\n", ""}}}},
 		{"X02", map[string][][2]string{"registers/sources.yaml": {{"  state: active", "  state: active\n  do_not_republish: true"}}}},
 	}

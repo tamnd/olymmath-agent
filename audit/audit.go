@@ -12,8 +12,10 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/tamnd/olymmath-agent/content"
+	"github.com/tamnd/olymmath-agent/coverage"
 	"github.com/tamnd/olymmath-agent/review"
 	"github.com/tamnd/olymmath-agent/site"
 )
@@ -30,9 +32,11 @@ type Rule struct {
 
 // Context is the input of the rules, and it collects their findings.
 type Context struct {
-	Root     string
-	Corpus   *content.Corpus
-	Markup   *site.Markup
+	Root   string
+	Corpus *content.Corpus
+	Markup *site.Markup
+	// ThisYear is the last year that rule C04 accepts for a competition that still runs.
+	ThisYear int
 	findings content.Findings
 	rule     *Rule
 	revs     map[string]*review.Review
@@ -73,6 +77,7 @@ var Rules = []*Rule{
 	{ID: "F01", Level: content.Error, Summary: "each formal statement is a complete record whose last check passed at the pinned toolchain", check: f01},
 	{ID: "F02", Level: content.Error, Summary: "each proof checks, uses no sorry, and uses only the allowed axioms", check: f02},
 	{ID: "F03", Level: content.Error, Summary: "each formal statement has a fidelity record, and the reviews back its status before the site shows it as faithful", check: f03},
+	{ID: "C04", Level: content.Warning, Summary: "each appearance is at a position that the register expects: not in a gap year, not out of the years of the register, in a paper of the year, and at a position of the shape or of the edition file", check: c04},
 	{ID: "X01", Level: content.Error, Summary: "each source in use has a licence zone and a terms note", check: x01},
 	{ID: "X02", Level: content.Error, Summary: "no text from a do-not-republish source is in the published tree", check: x02},
 }
@@ -100,7 +105,7 @@ func Run(root string, ids ...string) (*content.Corpus, content.Findings, error) 
 	if err != nil {
 		return nil, nil, err
 	}
-	c := &Context{Root: root, Corpus: corpus, Markup: m}
+	c := &Context{Root: root, Corpus: corpus, Markup: m, ThisYear: time.Now().Year()}
 	for _, f := range loaded {
 		if f.Rule == "" || want(f.Rule) {
 			c.findings = append(c.findings, f)
@@ -183,6 +188,30 @@ func t03(c *Context) {
 		}
 		if located[old] {
 			c.add("registers/redirects.tsv", "%s is a redirect and also an appearance of a problem", old)
+		}
+	}
+}
+
+func c04(c *Context) {
+	for _, p := range c.Corpus.All() {
+		for _, a := range p.Appearances {
+			l := a.Locator
+			comp := c.Corpus.Competition(l.Comp)
+			if comp == nil || l.Position == "" {
+				continue // T03 reports a competition that is not in the register.
+			}
+			if y := editionYear(l.Edition); comp.FirstYear > 0 && y > 0 && y < comp.FirstYear {
+				continue // T03 reports it.
+			}
+			var e *content.Edition
+			for _, x := range comp.Editions {
+				if x.ID == l.Edition {
+					e = x
+				}
+			}
+			if why := coverage.Unexpected(comp, e, l, c.ThisYear); why != "" {
+				c.add(p.Path, "the register does not expect %s: %s", a.At, why)
+			}
 		}
 	}
 }

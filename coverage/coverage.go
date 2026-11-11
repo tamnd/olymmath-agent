@@ -236,11 +236,7 @@ func measure(c *content.Competition, cand map[string]map[string]bool, seen map[s
 	// The years: from the first year to the last year, or to this year. With no first year, the years that the content or the seed rows give.
 	years := map[int]bool{}
 	if c.FirstYear > 0 {
-		last := thisYear
-		if c.LastYear > 0 {
-			last = c.LastYear
-		}
-		for y := c.FirstYear; y <= last; y++ {
+		for y := c.FirstYear; y <= lastYear(c, thisYear); y++ {
 			if !slices.Contains(c.Gaps, y) {
 				years[y] = true
 			}
@@ -271,20 +267,17 @@ func measure(c *content.Competition, cand map[string]map[string]bool, seen map[s
 			if i == 0 {
 				yr.Rows += paperless[y]
 			}
-			out.add(yr, c.Shape(y).Positions(), pp.edition, cand[pp.id])
+			out.add(yr, Expected(c, y, pp.edition), pp.edition, cand[pp.id])
 			out.Years = append(out.Years, yr)
 		}
 	}
 	return out
 }
 
-// add measures one edition: the positions that the shape expects, the problems of the edition e, which is nil when the content has none, and the positions with a seed candidate.
+// add measures one edition: the positions that the edition expects, the problems of the edition e, which is nil when the content has none, and the positions with a seed candidate.
 func (out *Comp) add(yr *Year, expected []string, e *content.Edition, cand map[string]bool) {
 	have := map[string]*content.Problem{}
 	if e != nil {
-		if ps := e.Positions(); len(ps) > 0 {
-			expected = ps
-		}
 		for _, p := range e.Problems {
 			have[p.Position] = p
 		}
