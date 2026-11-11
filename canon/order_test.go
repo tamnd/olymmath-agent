@@ -87,3 +87,72 @@ func TestOrder(t *testing.T) {
 		t.Errorf("placed %v", count)
 	}
 }
+
+func TestOrderAnchors(t *testing.T) {
+	o := &Order{
+		Sections: []string{"x"},
+		Papers: func(_ string, _ int, part string) ([]string, int) {
+			if part == "fall" {
+				return []string{"a", "b"}, 12
+			}
+			return []string{""}, 12
+		},
+	}
+	lex := []int{1, 10, 11, 12, 2, 3, 4, 5, 6, 7, 8, 9}
+	var rows []seed.Row
+	add := func(year int, part string, n int, anchor bool, letter string) {
+		text := orderText(year, n)
+		o.Ref("x", year, part, text)
+		if anchor {
+			o.Anchor("x", year, part, letter, n, text)
+		}
+		rows = append(rows, seed.Row{Statement: text})
+	}
+	// x 2005 misses problem 5. The anchors 1, 12 and 3 close two runs of the right length. Between 3 and 9 one row is missing, so those rows get no place, and the rows after 9 have no anchor after them.
+	for _, n := range lex {
+		if n != 5 {
+			add(2005, "", n, n == 1 || n == 12 || n == 3 || n == 9, "")
+		}
+	}
+	// x 2006 has one anchor only, so a number alone gives no place.
+	for _, n := range lex[:8] {
+		add(2006, "", n, n == 2, "")
+	}
+	// The fall of 2007 has the papers a and b, and it misses problem 4 of paper a. The anchors 7 of paper a and 10 of paper b close a run of the right length across the two papers.
+	for _, l := range []string{"a", "b"} {
+		for _, n := range lex {
+			if l == "a" && n == 4 {
+				continue
+			}
+			plus := map[string]int{"a": 0, "b": 100}[l]
+			text := orderText(2007, n+plus)
+			o.Ref("x", 2007, "fall", text)
+			if (l == "a" && n == 7) || (l == "b" && n == 10) {
+				o.Anchor("x", 2007, "fall", l, n, text)
+			}
+			rows = append(rows, seed.Row{Statement: text})
+		}
+	}
+	got := o.Place(rows)
+	var placed []string
+	for i := range rows {
+		p, ok := got[i]
+		if !ok {
+			continue
+		}
+		if !p.Anchored {
+			t.Errorf("row %d placed without anchors: %+v", i, p)
+		}
+		placed = append(placed, strconv.Itoa(p.Year)+p.Part+p.Letter+"/"+strconv.Itoa(p.Number))
+	}
+	want := "2005/1 2005/10 2005/11 2005/12 2005/2 2005/3 2007falla/7 2007falla/8 2007falla/9 2007fallb/1 2007fallb/10"
+	if s := strings.Join(placed, " "); s != want {
+		t.Errorf("placed %s\nwant   %s", s, want)
+	}
+	for i, p := range got {
+		plus := map[string]int{"b": 100}[p.Letter]
+		if rows[i].Statement != orderText(p.Year, p.Number+plus) {
+			t.Errorf("row %d placed at %+v", i, p)
+		}
+	}
+}

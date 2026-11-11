@@ -145,11 +145,12 @@ func runImport(env Env, args []string) int {
 	}
 	var ordered map[string]seed.Row
 	if *wikiOrder {
-		if ordered, err = wikiPlaces(*dir, sources, corpus, al); err != nil {
+		var anchored int
+		if ordered, anchored, err = wikiPlaces(*dir, sources, corpus, al); err != nil {
 			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
 			return ExitFailure
 		}
-		fmt.Fprintf(env.Stderr, "om import: %d rows got a position from the order of the AoPS wiki.\n", len(ordered))
+		fmt.Fprintf(env.Stderr, "om import: %d rows got a position from the order of the AoPS wiki, %d of them between two anchors.\n", len(ordered), anchored)
 	}
 	for _, src := range sources {
 		if err := seed.Read(*dir, src, func(r seed.Row) error {
@@ -448,14 +449,14 @@ const (
 
 var orderedSections = []string{"ahsme", "aime", "amc10", "amc12", "amc8"}
 
-// wikiPlaces reads the rows of the sources and gives the amc_aime rows that canon.Order places, with the label, the year and the number of their place, by canon.MatchRef. The other rows of the competitions of the wiki are the reference rows. A row of a paper of the fall, such as the AMC 10 of fall 2021, is a reference row of its own part of the year, and that part gets no position, because the register has no edition for it.
-func wikiPlaces(dir string, sources []string, corpus *content.Corpus, al *seed.Aliases) (map[string]seed.Row, error) {
+// wikiPlaces reads the rows of the sources and gives the amc_aime rows that canon.Order places, with the label, the year and the number of their place, by canon.MatchRef. The other rows of the competitions of the wiki are the reference rows, and the rows among them that have a number are anchors. A row of a paper of the fall, such as the AMC 10 of fall 2021, is a reference row of its own part of the year, and it gets the papers of that part in the register.
+func wikiPlaces(dir string, sources []string, corpus *content.Corpus, al *seed.Aliases) (out map[string]seed.Row, anchored int, err error) {
 	o := &canon.Order{
 		Sections: orderedSections,
 		Shared:   map[string]string{"amc12": "amc10"},
 		Papers: func(code string, year int, part string) ([]string, int) {
 			c := corpus.Competition(code)
-			if c == nil || part != "" {
+			if c == nil {
 				return nil, 0
 			}
 			ps := c.Shape(year).Positions()
@@ -464,8 +465,15 @@ func wikiPlaces(dir string, sources []string, corpus *content.Corpus, al *seed.A
 					return nil, 0
 				}
 			}
-			return c.Letters(year), len(ps)
+			return c.PartLetters(year, part), len(ps)
 		},
+	}
+	var topics *canon.Topics
+	if slices.Contains(sources, "hf-aops-wiki") && slices.Contains(sources, "hf-ai-mo-aops") {
+		topics = &canon.Topics{Aliases: al, Corpus: corpus}
+		if err := seed.Read(dir, "hf-aops-wiki", func(r seed.Row) error { topics.Add(r); return nil }); err != nil {
+			return nil, 0, fmt.Errorf("hf-aops-wiki: %w", err)
+		}
 	}
 	var rows []seed.Row
 	for _, src := range sources {
@@ -478,14 +486,18 @@ func wikiPlaces(dir string, sources []string, corpus *content.Corpus, al *seed.A
 			if fallRE.MatchString(strings.Join(r.Labels, " ")) {
 				part = "fall"
 			}
-			o.Ref(al.Code(r.Labels), r.Year, part, r.Statement)
+			code := al.Code(r.Labels)
+			o.Ref(code, r.Year, part, r.Statement)
+			for _, a := range wikiAnchors(r, code, topics) {
+				o.Anchor(a.code, a.year, part, a.letter, a.number, r.Statement)
+			}
 			return nil
 		})
 		if err != nil {
-			return nil, fmt.Errorf("%s: %w", src, err)
+			return nil, 0, fmt.Errorf("%s: %w", src, err)
 		}
 	}
-	out := map[string]seed.Row{}
+	out = map[string]seed.Row{}
 	for i, p := range o.Place(rows) {
 		r := rows[i]
 		// Some rows hold the table of contents of the wiki page and not the problem. Such a row keeps its slot in the order, but it gets no place.
@@ -496,12 +508,66 @@ func wikiPlaces(dir string, sources []string, corpus *content.Corpus, al *seed.A
 		if p.Letter != "" {
 			label += " " + strings.ToUpper(p.Letter)
 		}
-		r.Labels = append([]string{label}, r.Labels...)
+		labels := []string{label}
+		if p.Part != "" {
+			// The season goes in a label of its own, so that canon.Paper finds the paper of the part.
+			labels = append(labels, p.Part)
+		}
+		r.Labels = append(labels, r.Labels...)
 		r.Year, r.Number = p.Year, strconv.Itoa(p.Number)
 		r.Answer = wikiAnswer(r.Answer)
+		if p.Anchored {
+			anchored++
+			// Agent decision: an anchored row sits next to the numbered row that anchors it, which gives the choice letter. A value as the answer, such as 66, cannot match that letter, so the row keeps only a choice letter.
+			if !choiceLetterRE.MatchString(r.Answer) {
+				r.Answer = ""
+			}
+		}
 		out[canon.MatchRef(r)] = r
 	}
-	return out, nil
+	return out, anchored, nil
+}
+
+// wikiAnchor is the number of a reference row of the wiki order.
+type wikiAnchor struct {
+	code   string
+	year   int
+	letter string
+	number int
+}
+
+// wikiTitleRE reads one appearance of a title of the AoPS wiki, such as "2022 AMC 10A #1" in "2022 AMC 10A #1 / 2022 AMC 12A #1".
+var wikiTitleRE = regexp.MustCompile(`^\s*((?:19|20)[0-9]{2}) (AHSME|AJHSME|AMC 8|AMC 10|AMC 12)\s*([AB])?\s*#([0-9]{1,2})\s*$`)
+
+// wikiAnchors gives the numbers that a reference row gives itself: the number column of a row of a competition and a year, as in the AMC 12 dataset; each appearance in the title of a row of the AoPS wiki; and the position of the topic of a row of the AoPS dataset that the wiki numbers. A row of a paper with no letter in a year with two papers gives no number.
+func wikiAnchors(r seed.Row, code string, topics *canon.Topics) []wikiAnchor {
+	var out []wikiAnchor
+	if r.Source == "hf-aops-wiki" {
+		for _, t := range strings.Split(r.Title, "/") {
+			m := wikiTitleRE.FindStringSubmatch(t)
+			if m == nil {
+				continue
+			}
+			y, _ := strconv.Atoi(m[1])
+			n, _ := strconv.Atoi(m[4])
+			c := map[string]string{"AHSME": "ahsme", "AJHSME": "amc8", "AMC 8": "amc8", "AMC 10": "amc10", "AMC 12": "amc12"}[m[2]]
+			out = append(out, wikiAnchor{c, y, strings.ToLower(m[3]), n})
+		}
+		return out
+	}
+	if code == "" || code == "-" || r.Year == 0 {
+		return nil
+	}
+	pos := seed.Position(r.Number)
+	letter := canon.Letter(r.Labels)
+	if pos == "" && topics != nil && r.Source == "hf-ai-mo-aops" {
+		pos, letter = topics.Position(r.Ref, code, r.Year)
+	}
+	n, err := strconv.Atoi(strings.TrimPrefix(pos, "p"))
+	if pos == "" || err != nil {
+		return nil
+	}
+	return []wikiAnchor{{code, r.Year, letter, n}}
 }
 
 // wikiAnswer cleans the answer of an amc_aime row. These answers lost the spaces and often the letters of the variables, so that "a=3x or a=-2x" became "=3xor=-2x". The answer keeps the choice letter when it starts with one, and else it is kept only when it has no letter outside TeX commands and no sign of a lost letter, such as empty braces.
@@ -520,6 +586,7 @@ var (
 	choiceRE       = regexp.MustCompile(`^(?:\\textbf\{)?\(?([A-E])\)?(?:\}|$)`)
 	texCommandRE   = regexp.MustCompile(`\\[a-zA-Z]+`)
 	lostLetterRE   = regexp.MustCompile(`\{\}|\{[-+^_=]|\^\{\}|^[=+*/^_]|[-+*/^_=]$|\\\\`)
+	choiceLetterRE = regexp.MustCompile(`^[A-E]$`)
 	fallRE         = regexp.MustCompile(`(?i)\bfall\b`)
 	wikiContentsRE = regexp.MustCompile(`^\s*\[1 [^\]]*\]\(https://artofproblemsolving\.com#`)
 )
