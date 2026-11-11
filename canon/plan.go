@@ -65,7 +65,7 @@ var keyNames = map[match.Key]string{match.NoKey: "", match.WeakKey: "weak", matc
 // Primary is the order of the competitions for the primary appearance of a merged problem. The contest comes before its shortlist, and the shortlist comes before the selection tests that used its problems. A competition that is not in the list goes after the listed ones.
 var Primary = []string{"imo", "isl", "usamo", "usajmo", "amc12", "amc10", "amc8"}
 
-// Pattern tells if two appearances are a known duplicate pattern of spec 06.5: a shortlist problem that became a contest problem (isl and imo, or a code X-sl and X), an AMC 10 problem that is also an AMC 12 problem, or a USAJMO problem that is also a USAMO problem. Such a pair has a strong key.
+// Pattern tells if two appearances are a known duplicate pattern of spec 06.5: a shortlist problem that became a contest problem (isl and imo, or a code X-sl and X), a longlist problem that the jury put on the shortlist or on the paper of the same year (ill and isl, or ill and imo), an AMC 10 problem that is also an AMC 12 problem, or a USAJMO problem that is also a USAMO problem. Such a pair has a strong key.
 func Pattern(a, b string) string {
 	la, ea := locator.Parse(a)
 	lb, eb := locator.Parse(b)
@@ -77,6 +77,8 @@ func Pattern(a, b string) string {
 	switch {
 	case pair[0] == "imo" && pair[1] == "isl" && editionYear(la.Edition) == editionYear(lb.Edition):
 		return "isl-imo"
+	case pair[0] == "ill" && (pair[1] == "isl" || pair[1] == "imo") && editionYear(la.Edition) == editionYear(lb.Edition):
+		return "ill-" + pair[1]
 	case pair[1] == pair[0]+"-sl" && editionYear(la.Edition) == editionYear(lb.Edition):
 		return pair[0] + "-sl"
 	case pair[0] == "amc10" && pair[1] == "amc12" && la.Edition == lb.Edition:

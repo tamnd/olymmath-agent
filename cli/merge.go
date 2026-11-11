@@ -135,8 +135,11 @@ func patternMerges(ps []*content.Problem, ex *eIndex) (strict, weak []mergePlan)
 			continue
 		}
 		k := year(p)
-		if strings.HasPrefix(k, "isl/") {
-			k = "imo/" + strings.TrimPrefix(k, "isl/")
+		// The shortlist and the longlist of a year go in the group of the IMO of that year.
+		for _, list := range []string{"isl/", "ill/"} {
+			if rest, ok := strings.CutPrefix(k, list); ok {
+				k = "imo/" + rest
+			}
 		}
 		byEdition[k] = append(byEdition[k], p)
 	}

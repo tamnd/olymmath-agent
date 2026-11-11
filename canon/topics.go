@@ -608,6 +608,8 @@ var (
 	gradeMarkRE = regexp.MustCompile(`(?i)(?:\bp|#|\bproblem(?:\s*nr)?|\bq|\bpb|/)\s*\.?\s*([0-9]{1,2})\b`)
 	// firstRoundRE finds a title that names the first round, such as "Sharygin Geometry Olympiad 2016 First Round P1 grade8". In a layout with papers of the grades and one other paper, the first round is the other paper.
 	firstRoundRE = regexp.MustCompile(`(?i)\b(?:first|1st)\s+round\b`)
+	// roundRE finds a title that names a numbered round, such as "St. Petersburg MO 2009 round II grade 9 P2", "Olympiad 2009 2nd Round Grade 10" or "Round 3".
+	roundRE = regexp.MustCompile(`(?i)\b(?:(?:first|second|third|fourth|1st|2nd|3rd|4th|[1-4])\s+round|round\s+(?:[1-4]|i{1,3}|iv))\b`)
 	// bracketRE finds a part of a title in brackets with no bracket inside, such as "(Grade 8 9)".
 	bracketRE = regexp.MustCompile(`\([^()]*\)`)
 	// gradePaperRE matches the name of a paper of one grade, such as "Grade 10".
@@ -678,6 +680,10 @@ func gradePosition(c *content.Competition, year int, number, title string) (pos 
 	if i := namedIndex(layout, title); other && ((i >= 0 && gradePaperRE.FindStringSubmatch(layout[i].Name) == nil) || firstRoundRE.MatchString(title)) {
 		// Agent decision: a title that names the other paper, such as "Sharygin Geometry Olympiad Correspondence round 2016 P 6 Grade 8" or "Sharygin Geometry Olympiad 2016 First Round P1 grade8", is read by the other rules, because a grade in such a title is the grade that the problem is meant for, not a paper.
 		return "", false
+	}
+	if !other && roundRE.MatchString(title) {
+		// Agent decision: when every paper of the layout is a paper of a grade, a title that names a round, such as "St. Petersburg MO 2009 round II grade 9 P2", can be a row of an earlier round that numbers its problems from 1 in each grade too, so it gives no position.
+		return "", true
 	}
 	// t is the number of the problem that the title names, 0 when it names none.
 	t := 0
