@@ -498,12 +498,28 @@ func wikiPlaces(dir string, sources []string, corpus *content.Corpus, al *seed.A
 		}
 		r.Labels = append([]string{label}, r.Labels...)
 		r.Year, r.Number = p.Year, strconv.Itoa(p.Number)
+		r.Answer = wikiAnswer(r.Answer)
 		out[canon.MatchRef(r)] = r
 	}
 	return out, nil
 }
 
+// wikiAnswer cleans the answer of an amc_aime row. These answers lost the spaces and often the letters of the variables, so that "a=3x or a=-2x" became "=3xor=-2x". The answer keeps the choice letter when it starts with one, and else it is kept only when it has no letter outside TeX commands and no sign of a lost letter, such as empty braces.
+func wikiAnswer(a string) string {
+	a = strings.TrimSpace(a)
+	if m := choiceRE.FindStringSubmatch(a); m != nil {
+		return m[1]
+	}
+	if a == "" || lostLetterRE.MatchString(a) || strings.ContainsAny(texCommandRE.ReplaceAllString(a, ""), "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+		return ""
+	}
+	return a
+}
+
 var (
+	choiceRE       = regexp.MustCompile(`^(?:\\textbf\{)?\(?([A-E])\)?(?:\}|$)`)
+	texCommandRE   = regexp.MustCompile(`\\[a-zA-Z]+`)
+	lostLetterRE   = regexp.MustCompile(`\{\}|\{[-+^_=]|\^\{\}|^[=+*/^_]|[-+*/^_=]$|\\\\`)
 	fallRE         = regexp.MustCompile(`(?i)\bfall\b`)
 	wikiContentsRE = regexp.MustCompile(`^\s*\[1 [^\]]*\]\(https://artofproblemsolving\.com#`)
 )
