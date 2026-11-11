@@ -79,6 +79,7 @@ func (t *Topics) Claimed(at, ref string) bool {
 	if t == nil {
 		return false
 	}
+	t.resolve()
 	topic := strings.TrimPrefix(ref, "aops-topic:")
 	for o := range t.topics[at] {
 		if o != topic {
@@ -93,6 +94,7 @@ func (t *Topics) Elsewhere(at, ref string) bool {
 	if t == nil {
 		return false
 	}
+	t.resolve()
 	topic, ok := strings.CutPrefix(ref, "aops-topic:")
 	if !ok {
 		return false
