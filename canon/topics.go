@@ -22,6 +22,9 @@ type Topics struct {
 	at     map[string]string
 	// topics[at] is the set of topics that claim the appearance.
 	topics map[string]map[string]bool
+	// units holds the years of competitions with days or tests, by the start of their appearances, such as "vn-tst/2019/". resolved tells that resolve has run.
+	units    map[string]*unitYear
+	resolved bool
 }
 
 // Add reads one row of a numbered source. When the text of the row starts with a line that names the paper and the problem, the position comes from that line and the layout of the competition, because the source numbers some papers again from 1. A row with no year, no number or no topic link gives nothing, except a row whose text is a title that gives the year, as described at TitleAt. When the text is a title that names the problem, such as "Vietnam MO 1982 P5", the position comes from the title, as described at TitlePosition. When two rows give one topic two different appearances, the topic gets no appearance. When two topics claim one appearance, neither gets it, because the source numbers some papers again from 1 on each day, as the AoPS wiki does for some years of the IMO.
@@ -30,50 +33,109 @@ func (t *Topics) Add(r seed.Row) {
 	if m == nil {
 		return
 	}
-	code, year, letter, pos, unsure, ok := t.place(r)
+	pl, ok := t.place(r)
 	if !ok {
 		return
 	}
-	at := code + "/" + strconv.Itoa(year) + letter + "/" + pos
+	t.resolved = false
+	prefix := pl.code + "/" + strconv.Itoa(pl.year) + pl.letter + "/"
+	if pl.number > 0 {
+		if t.units == nil {
+			t.units = map[string]*unitYear{}
+		}
+		y := t.units[prefix]
+		if y == nil {
+			y = &unitYear{prefix: prefix, numbers: map[int]map[string]bool{}, fixed: map[string]map[string]bool{}}
+			t.units[prefix] = y
+		}
+		if y.numbers[pl.number] == nil {
+			y.numbers[pl.number] = map[string]bool{}
+		}
+		y.numbers[pl.number][m[1]] = true
+		if pl.fixed && !pl.unsure {
+			if y.fixed[pl.pos] == nil {
+				y.fixed[pl.pos] = map[string]bool{}
+			}
+			y.fixed[pl.pos][m[1]] = true
+		}
+		if pl.unit != nil {
+			y.perDay = y.perDay || pl.unit.perDay
+			if pl.unit.open != nil {
+				y.open = append(y.open, unitRow{topic: m[1], open: pl.unit.open, running: pl.unit.running})
+				return
+			}
+		}
+	}
+	t.claim(prefix+pl.pos, m[1], pl.unsure)
+}
+
+// claim records that the topic claims the appearance at. When the topic claims another appearance too, or when unsure is true, the topic gets no appearance.
+func (t *Topics) claim(at, topic string, unsure bool) {
 	if t.at == nil {
 		t.at, t.topics = map[string]string{}, map[string]map[string]bool{}
 	}
 	if t.topics[at] == nil {
 		t.topics[at] = map[string]bool{}
 	}
-	t.topics[at][m[1]] = true
-	if old, ok := t.at[m[1]]; unsure || (ok && old != at) {
+	t.topics[at][topic] = true
+	if old, ok := t.at[topic]; unsure || (ok && old != at) {
 		at = ""
 	}
-	t.at[m[1]] = at
+	t.at[topic] = at
 }
 
 // Place gives the year, the letter of the paper and the position of a row of a numbered source, from its number and its title, by the rules of Add. The import uses it for the rows of the AoPS wiki themselves, so that a row gets the appearance that its topic gets. The result ok is false when the row has no position, when its title names another number than the number column, or when another topic claims the same appearance, as in a year where the wiki numbers each day from 1. A topic can have appearances in two competitions, such as the IMO and the IMO Shortlist.
 func (t *Topics) Place(r seed.Row) (year int, letter, pos string, ok bool) {
-	code, year, letter, pos, unsure, ok := t.place(r)
-	if !ok || unsure {
+	pl, ok := t.place(r)
+	if !ok || pl.unsure {
 		return 0, "", "", false
 	}
 	m := topicRE.FindStringSubmatch(r.Ref)
 	if m == nil {
 		return 0, "", "", false
 	}
-	at := code + "/" + strconv.Itoa(year) + letter + "/" + pos
+	prefix := pl.code + "/" + strconv.Itoa(pl.year) + pl.letter + "/"
+	if pl.unit != nil && pl.unit.open != nil {
+		// The day of the row is not known from its title, so the row takes the position that resolve gives its topic.
+		t.resolve()
+		y := t.units[prefix]
+		if y == nil || !slices.Contains(pl.unit.open, y.at[m[1]]) {
+			return 0, "", "", false
+		}
+		pl.pos = y.at[m[1]]
+	}
+	at := prefix + pl.pos
 	if len(t.topics[at]) != 1 || !t.topics[at][m[1]] {
 		return 0, "", "", false
 	}
-	return year, letter, pos, true
+	return pl.year, pl.letter, pl.pos, true
 }
 
-// place gives the appearance of a row as Add describes it. unsure is true when the title names a part and its number does not agree with the number column.
-func (t *Topics) place(r seed.Row) (code string, year int, letter, pos string, unsure, ok bool) {
-	code = t.Aliases.Code(r.Labels)
-	if code == "" || code == "-" {
-		return
+// placement is the appearance that place gives a row.
+type placement struct {
+	code   string
+	year   int
+	letter string
+	pos    string
+	// unsure is true when the title names a part and its number does not agree with the number column.
+	unsure bool
+	// fixed tells that the title or the first line of the text gives the position, not the number alone.
+	fixed bool
+	// unit is set for a row of a year with days or tests when unitPosition reads it.
+	unit *unitPlace
+	// number is the number of a row of a year with days or tests, and 0 for other rows.
+	number int
+}
+
+// place gives the appearance of a row as Add describes it. The result ok is false when the row gives none.
+func (t *Topics) place(r seed.Row) (pl placement, ok bool) {
+	pl.code = t.Aliases.Code(r.Labels)
+	if pl.code == "" || pl.code == "-" {
+		return placement{}, false
 	}
 	var comp *content.Competition
 	if t.Corpus != nil {
-		comp = t.Corpus.Competition(code)
+		comp = t.Corpus.Competition(pl.code)
 	}
 	// The title is the source line of the post when the row has one, or else the text of the row, which is only a title in some rows.
 	title := r.Title
@@ -83,21 +145,21 @@ func (t *Topics) place(r seed.Row) (code string, year int, letter, pos string, u
 	if comp != nil && comp.EditionForm == "year-season" {
 		year, season, pos, ok := SeasonPosition(r.Number, title)
 		if !ok {
-			return "", 0, "", "", false, false
+			return placement{}, false
 		}
-		return code, year, "-" + season, pos, false, true
+		return placement{code: pl.code, year: year, letter: "-" + season, pos: pos}, true
 	}
-	pos = seed.Position(r.Number)
+	pos := seed.Position(r.Number)
 	if pos == "" && !gradeNumberRE.MatchString(strings.TrimSpace(r.Number)) {
-		return "", 0, "", "", false, false
+		return placement{}, false
 	}
 	// Agent decision: a title that names the longlist and the number of a problem, such as "IMO LongList 1959 1966 P24", gives the number of the problem in the longlist. The AoPS wiki puts such rows on some shortlist pages with that number, so a row of a shortlist with such a title gives no position. A title that also names the shortlist, such as "IMO ShortList 1988 P15 Iceland 1 P34 of ILL", is read as before.
 	if comp != nil && comp.TopicPositions && longlistRE.MatchString(title) && !shortlistRE.MatchString(title) && titleMarkRE.MatchString(title) {
-		return
+		return placement{}, false
 	}
-	year = r.Year
+	year := r.Year
 	if comp != nil && comp.EditionForm == "year-letter" {
-		letter = Letter(r.Labels)
+		pl.letter = Letter(r.Labels)
 	}
 	// Agent decision: in a year with one paper for each grade, the wiki numbers the problems of each grade from 1, so a row gets a position only from its grade, as described at gradePosition.
 	y := year
@@ -105,14 +167,32 @@ func (t *Topics) place(r seed.Row) (code string, year int, letter, pos string, u
 		y, _ = strconv.Atoi(ys[0])
 	}
 	if p, graded := gradePosition(comp, y, r.Number, title); graded {
-		return code, y, letter, p, false, p != ""
+		pl.year, pl.pos = y, p
+		return pl, p != ""
 	}
 	if pos == "" {
-		return
+		return placement{}, false
 	}
-	if year == 0 {
+	n, _ := strconv.Atoi(strings.TrimPrefix(pos, "p"))
+	// In a year whose layout is a list of days or tests, the title and the number give the position together, as described at unitPosition. A title that no position of the layout agrees with, such as "EGMO 2017 P4" with the number 3, or one that names another year or another competition, is read as in any other year.
+	var u unitPlace
+	kind := ""
+	if year != 0 && strings.HasPrefix(pos, "p") && n > 0 {
+		if kind = unitKind(comp, year); kind != "" {
+			pl.number = n
+			title := strings.TrimSpace(title)
+			if isTitle(title) {
+				u = unitPosition(comp.Shape(year).Layout, kind, title, year, n)
+			} else if _, _, found := PaperPosition(comp, year, title); !found && !unitRE.MatchString(title) && !titleMarkRE.MatchString(title) {
+				// A text that is not a title gives the day only by a first line such as "Day 2 P1". A text with no such line and no day or problem mark does not tell the day. A longer text that names one, such as "IMO ShortList 1973 Socialists Republic Of Czechoslovakia 2 IMO 1973 Day 1 P1", is read as in any other year.
+				u = unitPosition(comp.Shape(year).Layout, kind, "", year, n)
+			}
+		}
+	}
+	switch {
+	case year == 0:
 		y, p, l, found := TitleAt(comp, title, pos)
-		if !found && letter == "" {
+		if !found && pl.letter == "" {
 			// The number of the title can differ from the number column. TitlePosition then reads the title.
 			if ys := titleYearRE.FindAllString(title, -1); len(ys) == 1 {
 				y, _ = strconv.Atoi(ys[0])
@@ -121,24 +201,36 @@ func (t *Topics) place(r seed.Row) (code string, year int, letter, pos string, u
 			}
 		}
 		if !found {
-			return
+			return placement{}, false
 		}
-		year, pos, letter = y, p, l
-	} else if p, _, found := PaperPosition(comp, year, title); found {
-		pos = p
-	} else if p, found := namedPaper(comp, year, title, pos); found {
-		pos = p
-	} else if p := TitlePosition(comp, t.Aliases, year, pos, title); p != "" {
-		pos = p
-	} else if n := titleNumber(title); n != "" && strings.HasPrefix(pos, "p") && n != pos {
-		// The title names a part, such as "China TST 1986 problem 5", so TitlePosition does not read it. Its number does not agree with the number of the row, so the topic gets no appearance. It still claims the appearance of its number, because the true position is not known.
-		unsure = true
+		year, pos, pl.letter = y, p, l
+	case u.ok:
+		pl.unit, pos, pl.fixed = &u, u.pos, u.pos != ""
+	default:
+		if p, _, found := PaperPosition(comp, year, title); found {
+			pos, pl.fixed = p, true
+		} else if p, found := namedPaper(comp, year, title, pos); found {
+			pos, pl.fixed = p, true
+		} else if p := TitlePosition(comp, t.Aliases, year, pos, title); p != "" {
+			pos, pl.fixed = p, true
+		} else if tn := titleNumber(title); tn != "" && strings.HasPrefix(pos, "p") && tn != pos {
+			// The title names a part, such as "China TST 1986 problem 5", so TitlePosition does not read it. Its number does not agree with the number of the row, so the topic gets no appearance. It still claims the appearance of its number, because the true position is not known.
+			pl.unsure = true
+		}
+		if kind != "" && !pl.fixed && !pl.unsure {
+			// Only the number gives the position, and the number does not tell the day, so the row is read as a row with no day.
+			if u := unitPosition(comp.Shape(year).Layout, kind, "", year, n); u.ok {
+				pl.unit, pos, pl.fixed = &u, u.pos, u.pos != ""
+			}
+		}
 	}
-	return code, year, letter, pos, unsure, pos != ""
+	pl.year, pl.pos = year, pos
+	return pl, pos != "" || (pl.unit != nil && pl.unit.open != nil)
 }
 
 // Year gives the year of the topic of ref when the numbered source gives the topic one position of competition code. It gives 0 when it does not know the year.
 func (t *Topics) Year(ref, code string) int {
+	t.resolve()
 	topic, ok := strings.CutPrefix(ref, "aops-topic:")
 	if !ok {
 		return 0
@@ -157,6 +249,7 @@ func (t *Topics) Year(ref, code string) int {
 
 // Position gives the position of the topic of ref, such as aops-topic:1738331, when its competition and its year are code and year, and the letter of its paper, such as "a" for the AMC 10A, when the numbered source gives it. For a competition with seasons, the letter is the season of the edition, such as "-fall" for tot/2024-fall. It gives "" when it does not know the position.
 func (t *Topics) Position(ref, code string, year int) (pos, letter string) {
+	t.resolve()
 	topic, ok := strings.CutPrefix(ref, "aops-topic:")
 	if !ok {
 		return "", ""
