@@ -4,6 +4,7 @@
 package content
 
 import (
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -34,6 +35,8 @@ type Competition struct {
 	PerYear int      `yaml:"per_year"`
 	// Eras give the format of a range of years, when the format changed over the years.
 	Eras []Era `yaml:"eras"`
+	// Papers give the letters of the papers of a year, for a competition with edition_form year-letter, such as a and b for the AMC 10 from 2002. A year that no entry covers has one paper with no letter.
+	Papers []Papers `yaml:"papers"`
 	// Overrides give the positions of one year, when the format of that year is not the format of its era.
 	Overrides         map[int][]string `yaml:"overrides"`
 	OfficialSolutions *bool            `yaml:"official_solutions"`
@@ -60,6 +63,26 @@ type Era struct {
 	To      int      `yaml:"to"`
 	Layout  []Layout `yaml:"layout"`
 	PerYear int      `yaml:"per_year"`
+}
+
+// Papers are the letters of the papers of each year from the year From to the year To. To is 0 when the papers did not change since From.
+type Papers struct {
+	From    int      `yaml:"from"`
+	To      int      `yaml:"to"`
+	Letters []string `yaml:"letters"`
+}
+
+// Letters gives the letters of the papers of the year, in order. It gives one empty letter for a year with one paper, and nil for a year that the competition did not hold.
+func (c *Competition) Letters(year int) []string {
+	if year < c.FirstYear || (c.LastYear > 0 && year > c.LastYear) || slices.Contains(c.Gaps, year) {
+		return nil
+	}
+	for _, p := range c.Papers {
+		if year >= p.From && (p.To == 0 || year <= p.To) {
+			return p.Letters
+		}
+	}
+	return []string{""}
 }
 
 // Shape is the format of one edition: its papers, or its number of problems.

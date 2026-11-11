@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strconv"
@@ -36,6 +37,7 @@ func runImport(env Env, args []string) int {
 	comps := fs.String("comp", "", "a comma-separated list of competition codes; the default is all competitions")
 	dry := fs.Bool("dry", false, "print the plan and write no file")
 	anchor := fs.Bool("anchor", false, "give a position to each row with no number from the official papers of its edition in the raw store, or, when the edition has no official paper in the store, from the texts of zone Z3")
+	wikiOrder := fs.Bool("wiki-order", false, "give a position to each amc_aime row of NuminaMath 1.5 from the order of the AoPS wiki pages, in the runs of one year that hold every problem of the year; the year comes from the rows of the other sources with the same text")
 	dir2, remote := storeFlags(fs)
 	doubts := fs.Bool("doubts", false, "print each doubt with its source and the source of the canonical candidate, to show why a competition is skipped")
 	promote := fs.Bool("promote", false, "make a candidate of class H1 or H2 the canonical statement of an existing problem when it ranks above the canonical statement and its text agrees with it")
@@ -141,8 +143,22 @@ func runImport(env Env, args []string) int {
 			return ExitFailure
 		}
 	}
+	var ordered map[string]seed.Row
+	if *wikiOrder {
+		if ordered, err = wikiPlaces(*dir, sources, corpus, al); err != nil {
+			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
+			return ExitFailure
+		}
+		fmt.Fprintf(env.Stderr, "om import: %d rows got a position from the order of the AoPS wiki.\n", len(ordered))
+	}
 	for _, src := range sources {
-		if err := seed.Read(*dir, src, func(r seed.Row) error { s.Add(r); return nil }); err != nil {
+		if err := seed.Read(*dir, src, func(r seed.Row) error {
+			if o, ok := ordered[canon.MatchRef(r)]; ok {
+				r = o
+			}
+			s.Add(r)
+			return nil
+		}); err != nil {
 			fmt.Fprintf(env.Stderr, "om import: %s: %v\n", src, err)
 			return ExitFailure
 		}
@@ -423,6 +439,74 @@ func zoneKeys(dir string, sources []string, corpus *content.Corpus, al *seed.Ali
 	}
 	return keys, nil
 }
+
+// The amc_aime rows of NuminaMath 1.5 keep the order of the AoPS wiki pages: the AHSME, the AIME, the AMC 10, the AMC 12 and the AMC 8 (with the AJHSME), each by year, by paper and by page title.
+const (
+	orderedSource = "hf-numinamath-1-5"
+	orderedLabel  = "numina:amc_aime"
+)
+
+var orderedSections = []string{"ahsme", "aime", "amc10", "amc12", "amc8"}
+
+// wikiPlaces reads the rows of the sources and gives the amc_aime rows that canon.Order places, with the label, the year and the number of their place, by canon.MatchRef. The other rows of the competitions of the wiki are the reference rows. A row of a paper of the fall, such as the AMC 10 of fall 2021, is a reference row of its own part of the year, and that part gets no position, because the register has no edition for it.
+func wikiPlaces(dir string, sources []string, corpus *content.Corpus, al *seed.Aliases) (map[string]seed.Row, error) {
+	o := &canon.Order{
+		Sections: orderedSections,
+		Shared:   map[string]string{"amc12": "amc10"},
+		Papers: func(code string, year int, part string) ([]string, int) {
+			c := corpus.Competition(code)
+			if c == nil || part != "" {
+				return nil, 0
+			}
+			ps := c.Shape(year).Positions()
+			for i, p := range ps {
+				if p != "p"+strconv.Itoa(i+1) {
+					return nil, 0
+				}
+			}
+			return c.Letters(year), len(ps)
+		},
+	}
+	var rows []seed.Row
+	for _, src := range sources {
+		err := seed.Read(dir, src, func(r seed.Row) error {
+			if r.Source == orderedSource && slices.Contains(r.Labels, orderedLabel) {
+				rows = append(rows, r)
+				return nil
+			}
+			part := ""
+			if fallRE.MatchString(strings.Join(r.Labels, " ")) {
+				part = "fall"
+			}
+			o.Ref(al.Code(r.Labels), r.Year, part, r.Statement)
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", src, err)
+		}
+	}
+	out := map[string]seed.Row{}
+	for i, p := range o.Place(rows) {
+		r := rows[i]
+		// Some rows hold the table of contents of the wiki page and not the problem. Such a row keeps its slot in the order, but it gets no place.
+		if wikiContentsRE.MatchString(r.Statement) {
+			continue
+		}
+		label := p.Code
+		if p.Letter != "" {
+			label += " " + strings.ToUpper(p.Letter)
+		}
+		r.Labels = append([]string{label}, r.Labels...)
+		r.Year, r.Number = p.Year, strconv.Itoa(p.Number)
+		out[canon.MatchRef(r)] = r
+	}
+	return out, nil
+}
+
+var (
+	fallRE         = regexp.MustCompile(`(?i)\bfall\b`)
+	wikiContentsRE = regexp.MustCompile(`^\s*\[1 [^\]]*\]\(https://artofproblemsolving\.com#`)
+)
 
 // original gives the original language of a competition, or "" when the register does not say.
 func original(c *content.Competition) string {

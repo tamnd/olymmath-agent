@@ -144,6 +144,22 @@ func TestShape(t *testing.T) {
 	}
 }
 
+func TestLetters(t *testing.T) {
+	c := &Competition{FirstYear: 2000, Gaps: []int{2010}, EditionForm: "year-letter", Papers: []Papers{{From: 2002, To: 2020, Letters: []string{"a", "b"}}}}
+	for _, tc := range []struct {
+		year int
+		want string
+	}{{1999, "<nil>"}, {2001, ""}, {2002, "a b"}, {2010, "<nil>"}, {2020, "a b"}, {2021, ""}} {
+		got := "<nil>"
+		if ls := c.Letters(tc.year); ls != nil {
+			got = strings.Join(ls, " ")
+		}
+		if got != tc.want {
+			t.Errorf("Letters(%d) = %q, want %q", tc.year, got, tc.want)
+		}
+	}
+}
+
 func TestShapeError(t *testing.T) {
 	ok := Layout{Positions: []string{"p1", "p2"}}
 	for _, tc := range []struct {
@@ -159,6 +175,10 @@ func TestShapeError(t *testing.T) {
 		{Competition{Eras: []Era{{From: 1990, To: 2000, PerYear: 4}, {From: 2000, PerYear: 5}}}, "overlaps"},
 		{Competition{Eras: []Era{{From: 1990, PerYear: 4}, {From: 1980, To: 1985, PerYear: 5}, {From: 1995, PerYear: 5}}}, "era 3 overlaps era 1"},
 		{Competition{Overrides: map[int][]string{1990: {}}}, "no positions"},
+		{Competition{EditionForm: "year-letter", Papers: []Papers{{From: 2002, Letters: []string{"a", "b"}}}}, ""},
+		{Competition{Papers: []Papers{{From: 2002, Letters: []string{"a", "b"}}}}, "year-letter"},
+		{Competition{EditionForm: "year-letter", Papers: []Papers{{From: 2002, Letters: []string{"A"}}}}, "not one small letter"},
+		{Competition{EditionForm: "year-letter", Papers: []Papers{{From: 2002}}}, "no letters"},
 	} {
 		got := shapeError(&tc.c)
 		if (tc.want == "") != (got == "") || !strings.Contains(got, tc.want) {

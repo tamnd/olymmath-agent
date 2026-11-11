@@ -230,6 +230,21 @@ func TestProfiles(t *testing.T) {
 	if row.Labels[0] != `3rd Memorial "A"` {
 		t.Errorf("label %q", row.Labels[0])
 	}
+	for _, tc := range []struct {
+		path, label string
+		year        int
+	}{
+		{"Contest Collections/National and Regional Contests/USA Contests/MAA AMC/AMC 12/AHSME/1998 AMC 12/AHSME/21815.json", "AHSME", 1998},
+		{"Contest Collections/National and Regional Contests/USA Contests/MAA AMC/AMC 12/AHSME/2007 AMC 12/AHSME/1.json", "AMC 12", 2007},
+		{"Contest Collections/National and Regional Contests/USA Contests/MAA AMC/AMC 12/AHSME/2021 AMC 12/AHSME Fall/1.json", "AMC 12 Fall", 2021},
+		{"Contest Collections/National and Regional Contests/USA Contests/MAA AMC/AMC 12/AHSME/2003 AMC 12-AHSME/1.json", "AMC 12", 2003},
+		{"Contest Collections/National and Regional Contests/USA Contests/MAA AMC/AMC 8/1990 AMC 8/1.json", "AMC 8", 1990},
+	} {
+		row, _ = Profiles["hf-ai-mo-aops"].Map(Record{"metadata.path": {tc.path}, "problem": {"x"}})
+		if row.Labels[0] != tc.label || row.Year != tc.year || row.ID != "21815" && tc.year == 1998 {
+			t.Errorf("%s: %+v", tc.path, row)
+		}
+	}
 	if p := Generic([]string{"problem_statement", "reasoning", "label"}); len(p.Columns) != 2 {
 		t.Errorf("generic columns %v", p.Columns)
 	}
