@@ -495,6 +495,23 @@ func shapeError(c *Competition) string {
 			}
 		}
 	}
+	for i, p := range c.Papers {
+		switch {
+		case p.From <= 0:
+			return fmt.Sprintf("papers %d has no from year", i+1)
+		case p.To != 0 && p.To < p.From:
+			return fmt.Sprintf("papers %d ends before it starts", i+1)
+		case len(p.Letters) == 0:
+			return fmt.Sprintf("papers %d has no letters", i+1)
+		case c.EditionForm != "year-letter":
+			return "papers need the edition form year-letter"
+		}
+		for _, l := range p.Letters {
+			if len(l) != 1 || l[0] < 'a' || l[0] > 'z' {
+				return fmt.Sprintf("papers %d: the letter %q is not one small letter", i+1, l)
+			}
+		}
+	}
 	for y, ps := range c.Overrides {
 		if y <= 0 {
 			return fmt.Sprintf("the override year %d is not valid", y)

@@ -53,6 +53,8 @@ func Year(s string) int {
 	return y
 }
 
+var ahsmeRE = regexp.MustCompile(`^AMC 12\s*[/-]\s*AHSME((?:\s+(?:Fall|Spring))?)$`)
+
 var leadYearRE = regexp.MustCompile(`^\s*(19|20)[0-9]{2}(\s*[-/]\s*[0-9]{2,4})?\s+`)
 
 // noYear removes a year at the start of a label: "2023 Germany TST" gives "Germany TST".
@@ -182,12 +184,24 @@ var Profiles = map[string]Profile{
 				contest = parts[len(parts)-2]
 				topic = strings.TrimSuffix(parts[len(parts)-1], ".json")
 			}
+			// A collection name can hold a slash, as "1998 AMC 12/AHSME" does. The path then splits the name in two, and the part before the slash holds the year.
+			if len(parts) >= 3 && Year(contest) == 0 && leadYearRE.MatchString(parts[len(parts)-3]) {
+				contest = parts[len(parts)-3] + "/" + contest
+			}
 			ref := ""
 			if topic != "" {
 				ref = "aops-topic:" + topic
 			}
+			name := noYear(contest)
+			// The collection "AMC 12/AHSME" holds the AHSME up to 1999 and the AMC 12 from 2000, with the season of the two papers of 2021.
+			if m := ahsmeRE.FindStringSubmatch(name); m != nil {
+				name = "AMC 12" + m[1]
+				if Year(contest) < 2000 {
+					name = "AHSME"
+				}
+			}
 			return Row{
-				ID: topic, Labels: labels(noYear(contest), contest), Year: Year(contest), Lang: "en",
+				ID: topic, Labels: labels(name, contest), Year: Year(contest), Lang: "en",
 				Statement: r.Get("problem"), Solutions: count(r, "solution"), Ref: ref,
 			}, r.Get("problem") != "" && strings.HasPrefix(path, "Contest Collections")
 		},
