@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -152,6 +153,14 @@ func (l *loader) editions() {
 				l.add(rel, "", "the name of the file must be the year %d, or the year and a letter or a word", e.Year)
 				continue
 			}
+			if ids := c.EditionIDs(e.Year); len(c.Papers) > 0 && !slices.Contains(ids, e.ID) {
+				if len(ids) == 0 {
+					l.add(rel, "", "the register lists no papers for %d", e.Year)
+				} else {
+					l.add(rel, "", "the register lists the papers %s for %d, and %s is not one of them", strings.Join(ids, ", "), e.Year, e.ID)
+				}
+				continue
+			}
 			for i := range e.Papers {
 				if e.Papers[i].ID == "" {
 					e.Papers[i].ID = strconv.Itoa(i + 1)
@@ -218,6 +227,9 @@ func (l *loader) problems() {
 }
 
 var markerRE = regexp.MustCompile(`(?m)^<!--\s*(S[0-9]+)\b[^>]*-->[ \t]*$`)
+
+// partRE matches the name of a part of the papers of a year, such as fall.
+var partRE = regexp.MustCompile(`^[a-z]+$`)
 
 // SplitStatements cuts the body into the texts of the statements. The text before the first marker belongs to the canonical statement.
 func SplitStatements(body, canonical string) map[string]string {
@@ -505,6 +517,13 @@ func shapeError(c *Competition) string {
 			return fmt.Sprintf("papers %d has no letters", i+1)
 		case c.EditionForm != "year-letter":
 			return "papers need the edition form year-letter"
+		case p.Part != "" && !partRE.MatchString(p.Part):
+			return fmt.Sprintf("papers %d: the part %q is not one word of small letters", i+1, p.Part)
+		}
+		for j, o := range c.Papers[:i] {
+			if o.Part == p.Part && (o.To == 0 || p.From <= o.To) && (p.To == 0 || o.From <= p.To) {
+				return fmt.Sprintf("papers %d overlaps papers %d", i+1, j+1)
+			}
 		}
 		for _, l := range p.Letters {
 			if len(l) != 1 || l[0] < 'a' || l[0] > 'z' {

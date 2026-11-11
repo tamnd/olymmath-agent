@@ -13,6 +13,8 @@ func TestParse(t *testing.T) {
 		{"imo/2024", Edition, "imo/2024"},
 		{"usamo/2021a", Edition, "usamo/2021a"},
 		{"kmo/2021-spring", Edition, "kmo/2021-spring"},
+		{"amc10/2021-fall-a", Edition, "amc10/2021-fall-a"},
+		{"amc10/2021-fall-a/p25", Appearance, "amc10/2021-fall-a/p25"},
 		{"imo/2024/p1", Appearance, "imo/2024/p1"},
 		{"/isl/2024/n1/", Appearance, "isl/2024/n1"},
 		{"amc12/2021/a/p25", Appearance, "amc12/2021/a/p25"},
@@ -29,7 +31,7 @@ func TestParse(t *testing.T) {
 			t.Errorf("Parse(%q) = %s %q, want %s %q", c.in, l.Kind(), l, c.kind, c.out)
 		}
 	}
-	for _, in := range []string{"", "IMO", "imo/24", "imo/2024/P1", "imo/2024/p1/x/y", "imo--x", "1imo", "imo/2024/day one/p1"} {
+	for _, in := range []string{"", "IMO", "imo/24", "imo/2024/P1", "imo/2024/p1/x/y", "imo--x", "1imo", "imo/2024/day one/p1", "amc10/2021-fall-ab", "amc10/2021-fall-a-b"} {
 		if _, err := Parse(in); err == nil {
 			t.Errorf("Parse(%q) gave no error", in)
 		}

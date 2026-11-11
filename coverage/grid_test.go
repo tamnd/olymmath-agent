@@ -1,6 +1,7 @@
 package coverage
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/tamnd/olymmath-agent/content"
@@ -43,5 +44,21 @@ func TestGrid(t *testing.T) {
 	_, et := Grid(eras, 2025)
 	if et.Expected != 2+2+3+1 {
 		t.Errorf("eras %+v", et)
+	}
+}
+
+func TestGridPapers(t *testing.T) {
+	c := amc()
+	c.FirstYear, c.LastYear = 2020, 2021
+	rows, total := Grid(c, 2026)
+	var names []string
+	for _, r := range rows {
+		names = append(names, r.Name)
+	}
+	if got := strings.Join(names, " "); got != "2021a 2021b 2021-fall-a 2021-fall-b 2020a 2020b" {
+		t.Errorf("rows %q", got)
+	}
+	if total.Expected != 12 {
+		t.Errorf("expected %d", total.Expected)
 	}
 }

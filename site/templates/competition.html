@@ -26,8 +26,8 @@
   {{$c := .}}
   {{range .Rows}}
     <tr>
-      {{$e := .Edition}}{{$y := .Year}}
-      <th scope="row">{{if $e}}<a href="{{link (printf "%s/" $e.Locator)}}">{{.Year}}</a>{{else}}{{.Year}}{{end}}</th>
+      {{$e := .Edition}}{{$y := .Name}}
+      <th scope="row">{{if $e}}<a href="{{link (printf "%s/" $e.Locator)}}">{{.Name}}</a>{{else}}{{.Name}}{{end}}</th>
       <td>{{with $e}}{{.Place}}{{if .Country}}, {{.Country}}{{end}}{{end}}</td>
       <td><ol class="cells">{{range .Cells}}<li>{{if .Problem}}<a class="cell cell-{{lower .Class}}{{if .Human}} cell-sol{{end}}{{if not .Counted}} cell-extra{{end}}" href="{{link (printf "%s/%s" $e.Locator .Position)}}" title="{{$c.Short}} {{$y}} {{poslabel .Position}}">{{poscell .Position}}</a>{{else}}<span class="cell cell-missing" title="{{$c.Short}} {{$y}} {{poslabel .Position}}: no problem yet">{{poscell .Position}}</span>{{end}}</li>{{end}}</ol></td>
     </tr>

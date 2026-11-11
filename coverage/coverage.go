@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/tamnd/olymmath-agent/canon"
 	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/seed"
 )
@@ -46,14 +47,16 @@ type Comp struct {
 	Years []*Year `json:"years,omitempty"`
 }
 
-// Year lists the positions of one edition by state.
+// Year lists the positions of one edition by state. A competition with two papers in a year, such as the AMC 10 with the papers A and B, has one Year for each paper.
 type Year struct {
 	Year int `json:"year"`
+	// Edition is the edition of the paper, such as 2021a or 2021-fall-a, when the register lists the papers of the year. It is empty when the year has one edition with the year as its name.
+	Edition string `json:"edition,omitempty"`
 	// Record are the positions with a problem record. Candidate are the positions with no record and with a seed candidate. Missing are the expected positions with neither.
 	Record    []string `json:"record,omitempty"`
 	Candidate []string `json:"candidate,omitempty"`
 	Missing   []string `json:"missing,omitempty"`
-	// Rows counts the seed rows of this year, with or without a position.
+	// Rows counts the seed rows of this edition, with or without a position. A row that does not name its paper counts in the first paper of the year.
 	Rows int `json:"rows"`
 }
 
@@ -76,9 +79,10 @@ type Label struct {
 // Build makes the report. rows walks every seed row.
 func Build(corpus *content.Corpus, al *seed.Aliases, thisYear int, rows func(fn func(seed.Row) error) error) (*Report, error) {
 	rep := &Report{ThisYear: thisYear, Aliases: al.Len()}
-	// cand[code][year][pos] is true for a position with a seed candidate. seen[code][year] counts the rows of the year.
-	cand := map[string]map[int]map[string]bool{}
-	seen := map[string]map[int]int{}
+	// cand[code][edition][pos] is true for a position with a seed candidate. seen[code][edition] counts the rows of the edition. The edition is the year, or the edition of the paper when the register lists the papers of the year. paperless[code][year] counts the rows of a year with papers that do not name their paper.
+	cand := map[string]map[string]map[string]bool{}
+	seen := map[string]map[string]int{}
+	paperless := map[string]map[int]int{}
 	compRows := map[string]int{}
 	srcs := map[string]*Source{}
 	unknown := map[[2]string]int{}
@@ -107,29 +111,41 @@ func Build(corpus *content.Corpus, al *seed.Aliases, thisYear int, rows func(fn 
 		if r.Year == 0 {
 			return nil
 		}
-		if seen[code] == nil {
-			seen[code] = map[int]int{}
+		ed, known := paperOf(corpus.Competition(code), r.Year, r.Labels)
+		if !known {
+			if paperless[code] == nil {
+				paperless[code] = map[int]int{}
+			}
+			paperless[code][r.Year]++
+		} else {
+			if seen[code] == nil {
+				seen[code] = map[string]int{}
+			}
+			seen[code][ed]++
 		}
-		seen[code][r.Year]++
 		pos := seed.Position(r.Number)
 		if pos == "" {
 			return nil
 		}
 		s.Positioned++
+		// A row that does not name its paper in a year with two papers is not a candidate of either paper.
+		if !known {
+			return nil
+		}
 		if cand[code] == nil {
-			cand[code] = map[int]map[string]bool{}
+			cand[code] = map[string]map[string]bool{}
 		}
-		if cand[code][r.Year] == nil {
-			cand[code][r.Year] = map[string]bool{}
+		if cand[code][ed] == nil {
+			cand[code][ed] = map[string]bool{}
 		}
-		cand[code][r.Year][pos] = true
+		cand[code][ed][pos] = true
 		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 	for _, c := range corpus.Competitions {
-		rep.Competitions = append(rep.Competitions, measure(c, cand[c.Code], seen[c.Code], compRows[c.Code], thisYear))
+		rep.Competitions = append(rep.Competitions, measure(c, cand[c.Code], seen[c.Code], paperless[c.Code], compRows[c.Code], thisYear))
 	}
 	for _, c := range rep.Competitions {
 		t := &rep.Totals
@@ -154,15 +170,68 @@ func Build(corpus *content.Corpus, al *seed.Aliases, thisYear int, rows func(fn 
 	return rep, nil
 }
 
-func measure(c *content.Competition, cand map[int]map[string]bool, seen map[int]int, rows, thisYear int) *Comp {
+// paperOf gives the edition of a row of the year: the year, or the edition of the paper that the labels of the row name when the register lists the papers of the year. The result known is false when the year has more than one paper and the labels do not name one, or name a season that has no papers in the year.
+func paperOf(c *content.Competition, year int, labels []string) (edition string, known bool) {
+	if c == nil || len(c.Papers) == 0 {
+		return strconv.Itoa(year), true
+	}
+	part, letter, ok := canon.Paper(c, year, labels)
+	if !ok {
+		return "", false
+	}
+	letters := c.PartLetters(year, part)
+	switch {
+	case len(letters) == 1 && letters[0] == "":
+		return content.EditionID(year, part, ""), true
+	case slices.Contains(letters, letter):
+		return content.EditionID(year, part, letter), true
+	case len(letters) == 0 && part == "":
+		// A year that the register does not list, such as a year before the first year, has one paper.
+		return strconv.Itoa(year), true
+	}
+	return "", false
+}
+
+// paper is one edition of a year: the year, or one paper of the year when the register lists its papers.
+type paper struct {
+	id      string
+	edition *content.Edition
+}
+
+// papers gives the editions of a year. A competition whose register lists papers has one edition for each paper of the year and each edition of the content in the year. Another competition has one edition for the year, which is the first edition of the content in the year when there is one.
+func papers(c *content.Competition, year int, editions []*content.Edition) []paper {
+	if len(c.Papers) == 0 {
+		p := paper{id: strconv.Itoa(year)}
+		if len(editions) > 0 {
+			p.edition = editions[0]
+		}
+		return []paper{p}
+	}
+	var out []paper
+	for _, id := range c.EditionIDs(year) {
+		out = append(out, paper{id: id})
+	}
+	if len(out) == 0 && len(editions) == 0 {
+		out = append(out, paper{id: strconv.Itoa(year)})
+	}
+	for _, e := range editions {
+		i := slices.IndexFunc(out, func(p paper) bool { return p.id == e.ID })
+		if i < 0 {
+			out = append(out, paper{id: e.ID})
+			i = len(out) - 1
+		}
+		out[i].edition = e
+	}
+	return out
+}
+
+func measure(c *content.Competition, cand map[string]map[string]bool, seen map[string]int, paperless map[int]int, rows, thisYear int) *Comp {
 	out := &Comp{Code: c.Code, Name: c.Name, Group: c.Group}
 	out.Rows = rows
 	out.Shape = c.HasShape()
-	editions := map[int]*content.Edition{}
+	editions := map[int][]*content.Edition{}
 	for _, e := range c.Editions {
-		if _, ok := editions[e.Year]; !ok {
-			editions[e.Year] = e
-		}
+		editions[e.Year] = append(editions[e.Year], e)
 	}
 	// The years: from the first year to the last year, or to this year. With no first year, the years that the content or the seed rows give.
 	years := map[int]bool{}
@@ -180,7 +249,12 @@ func measure(c *content.Competition, cand map[int]map[string]bool, seen map[int]
 	for y := range editions {
 		years[y] = true
 	}
-	for y := range seen {
+	for ed := range seen {
+		if y, err := strconv.Atoi(ed[:4]); err == nil {
+			years[y] = true
+		}
+	}
+	for y := range paperless {
 		years[y] = true
 	}
 	ys := make([]int, 0, len(years))
@@ -189,77 +263,89 @@ func measure(c *content.Competition, cand map[int]map[string]bool, seen map[int]
 	}
 	slices.Sort(ys)
 	for _, y := range ys {
-		yr := &Year{Year: y, Rows: seen[y]}
-		expected := c.Shape(y).Positions()
-		have := map[string]*content.Problem{}
-		if e := editions[y]; e != nil {
-			if ps := e.Positions(); len(ps) > 0 {
-				expected = ps
+		for i, pp := range papers(c, y, editions[y]) {
+			yr := &Year{Year: y, Rows: seen[pp.id]}
+			if pp.id != strconv.Itoa(y) {
+				yr.Edition = pp.id
 			}
-			for _, p := range e.Problems {
-				have[p.Position] = p
+			if i == 0 {
+				yr.Rows += paperless[y]
 			}
-			// A problem whose primary appearance is in another edition also fills its position here, as a shortlist problem that was chosen for the contest does.
-			for _, p := range e.Also {
-				for _, a := range p.Appearances {
-					if a.Locator.Comp == c.Code && a.Locator.Edition == e.ID && have[a.Locator.Position] == nil {
-						have[a.Locator.Position] = p
-					}
-				}
-			}
+			out.add(yr, c.Shape(y).Positions(), pp.edition, cand[pp.id])
+			out.Years = append(out.Years, yr)
 		}
-		set := map[string]bool{}
-		for _, p := range expected {
-			set[p] = true
-		}
-		// A position with a record or a candidate that the shape does not have still shows, so nothing found is hidden.
-		var extra []string
-		for p := range have {
-			if !set[p] {
-				extra = append(extra, p)
-			}
-		}
-		for p := range cand[y] {
-			if !set[p] && have[p] == nil {
-				extra = append(extra, p)
-			}
-		}
-		slices.SortFunc(extra, comparePos)
-		for _, p := range append(slices.Clone(expected), extra...) {
-			counted := set[p]
-			if counted {
-				out.Expected++
-			}
-			if pr := have[p]; pr != nil {
-				yr.Record = append(yr.Record, p)
-				if counted {
-					out.C0++
-					if s := pr.CanonicalStatement(); s != nil {
-						if c := pr.Class(s); c == "H1" || c == "H2" {
-							out.C1++
-						}
-						if pr.Class(s) == "H1" {
-							out.C2++
-						}
-					}
-				}
-				continue
-			}
-			if cand[y][p] {
-				yr.Candidate = append(yr.Candidate, p)
-				if counted {
-					out.Candidate++
-				}
-				continue
-			}
-			if counted {
-				yr.Missing = append(yr.Missing, p)
-				out.NoCandidate++
-			}
-		}
-		out.Years = append(out.Years, yr)
 	}
 	return out
+}
+
+// add measures one edition: the positions that the shape expects, the problems of the edition e, which is nil when the content has none, and the positions with a seed candidate.
+func (out *Comp) add(yr *Year, expected []string, e *content.Edition, cand map[string]bool) {
+	have := map[string]*content.Problem{}
+	if e != nil {
+		if ps := e.Positions(); len(ps) > 0 {
+			expected = ps
+		}
+		for _, p := range e.Problems {
+			have[p.Position] = p
+		}
+		// A problem whose primary appearance is in another edition also fills its position here, as a shortlist problem that was chosen for the contest does.
+		for _, p := range e.Also {
+			for _, a := range p.Appearances {
+				if a.Locator.Comp == e.Competition.Code && a.Locator.Edition == e.ID && have[a.Locator.Position] == nil {
+					have[a.Locator.Position] = p
+				}
+			}
+		}
+	}
+	set := map[string]bool{}
+	for _, p := range expected {
+		set[p] = true
+	}
+	// A position with a record or a candidate that the shape does not have still shows, so nothing found is hidden.
+	var extra []string
+	for p := range have {
+		if !set[p] {
+			extra = append(extra, p)
+		}
+	}
+	for p := range cand {
+		if !set[p] && have[p] == nil {
+			extra = append(extra, p)
+		}
+	}
+	slices.SortFunc(extra, comparePos)
+	for _, p := range append(slices.Clone(expected), extra...) {
+		counted := set[p]
+		if counted {
+			out.Expected++
+		}
+		if pr := have[p]; pr != nil {
+			yr.Record = append(yr.Record, p)
+			if counted {
+				out.C0++
+				if s := pr.CanonicalStatement(); s != nil {
+					if c := pr.Class(s); c == "H1" || c == "H2" {
+						out.C1++
+					}
+					if pr.Class(s) == "H1" {
+						out.C2++
+					}
+				}
+			}
+			continue
+		}
+		if cand[p] {
+			yr.Candidate = append(yr.Candidate, p)
+			if counted {
+				out.Candidate++
+			}
+			continue
+		}
+		if counted {
+			yr.Missing = append(yr.Missing, p)
+			out.NoCandidate++
+		}
+	}
 }
 
 // comparePos orders positions by letter and then by number: p2 before p10.
