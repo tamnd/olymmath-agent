@@ -388,6 +388,15 @@ om fetch -content olymmath pmo-ph
 
 The home page of pmo.ph links the papers of the last olympiad, and pmo.ph/downloads links the papers of the earlier ones. A link belongs to the olympiad of the last heading before it, as "25th PMO". The Nth olympiad ends in the year 1998+N, so the 25th olympiad is the edition of 2023. The command keeps only the written phase of the national stage. The 10th olympiad has one file for the area and the national stage, and the 11th has one file for all the stages. The problems of the written phase are numbered from 1 across its days, so the paper has no id. The papers of the qualifying stage, the area stage and the oral phase are left out. The site has no page of terms. Its robots.txt allows all paths except /wp-admin/ for other agents, and its content signal says search=yes, ai-train=no, use=reference.
 
+The Stanford Math Tournament works the same way, with the source `stanford-smt`:
+
+```sh
+om papers -content olymmath stanford-smt
+om fetch -content olymmath stanford-smt
+```
+
+The site has one archive page for each year, such as stanfordmathtournament.org/past-tests/SMT/2024, for 2011 to 2014 and 2018 to 2025. SMT was not held at Stanford in 2015 to 2017. A page links the problems and the solutions of each round, as /pdfs/smt2024/algebra-problems.pdf. Each round numbers its problems from 1, so the paper of a round is the name of its file: algebra, calculus, discrete, geometry, general, team and guts, and advanced (2011 to 2014), combo and nt (2021). The solutions and the tiebreakers are left out. The power round is left out, because it is one long problem with many numbered parts, and so is the integration bee of 2025. The links of the power round of 2018 and the guts round of 2020 give a web page and not a PDF. The site has no page of terms and the papers give no licence. Its robots.txt allows all paths.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Journals

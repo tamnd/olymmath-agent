@@ -735,3 +735,23 @@ func TestPMOPapers(t *testing.T) {
 		t.Errorf("PMOPapers = %+v", got)
 	}
 }
+
+func TestSMTPapers(t *testing.T) {
+	page := `<a href="/pdfs/smt2024/algebra-problems.pdf">Problems</a> <a href="/pdfs/smt2024/algebra-solutions.pdf">Solutions</a>
+<a href="/pdfs/smt2024/algebra-tiebreaker-problems.pdf">Tiebreaker</a> <a href="/pdfs/smt2024/power-problems.pdf">Power</a>
+<a href="/pdfs/smt2024/guts-problems.pdf">Problems</a> <a href="/pdfs/smt2025/integrationbee-problems.pdf">Bee</a>
+<a href="/pdfs/smt2020/guts-problems.pdf">Problems</a> <a href="/pdfs/smt2011/advanced-problems.pdf">Problems</a>
+<a href="/pdfs/smt2011/advanced-problems.pdf">Problems</a>`
+	got := SMTPapers(page)
+	want := []National{
+		{Competition: "smt", Year: 2011, Paper: "advanced", URL: "https://www.stanfordmathtournament.org/pdfs/smt2011/advanced-problems.pdf"},
+		{Competition: "smt", Year: 2024, Paper: "algebra", URL: "https://www.stanfordmathtournament.org/pdfs/smt2024/algebra-problems.pdf"},
+		{Competition: "smt", Year: 2024, Paper: "guts", URL: "https://www.stanfordmathtournament.org/pdfs/smt2024/guts-problems.pdf"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("SMTPapers = %+v", got)
+	}
+	if l := SMTListings(); len(l) != len(SMTYears) || l[0] != "https://www.stanfordmathtournament.org/past-tests/SMT/2011" {
+		t.Errorf("SMTListings = %v", l)
+	}
+}
