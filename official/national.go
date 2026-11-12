@@ -953,3 +953,41 @@ func DMFAPapers(page string) []National {
 	slices.SortFunc(out, func(a, b National) int { return a.Year - b.Year })
 	return out
 }
+
+// PMOListings are the pages of the Philippine Mathematical Olympiad (PMO) that link its papers. The home page links the papers of the last olympiad, and the downloads page links the papers of the earlier ones.
+var PMOListings = []string{"https://pmo.ph/", "https://pmo.ph/downloads/"}
+
+// pmoRE matches the heading of one olympiad, as "25th PMO" or "28th Philippine Mathematical Olympiad", or a link to a file with its label, as <a href="https://pmo.ph/wp-content/uploads/2023/08/PMO-25-National-Stage.pdf" class="elementor-icon" tabindex="-1" aria-label="National Stage">.
+var pmoRE = regexp.MustCompile(`\b([1-9][0-9])(?:st|nd|rd|th) (?:PMO|Philippine Mathematical Olympiad)\b|<a href="(https://pmo\.ph/wp-content/uploads/[^"]+\.pdf)"[^>]*aria-label="([^"]*)"`)
+
+// PMOPapers gives the papers of the national stage of the Philippine Mathematical Olympiad (ph-pmo) on the listing pages. A link belongs to the olympiad of the last heading before it. The Nth olympiad ends in the year 1998+N, so the 25th olympiad is the edition of 2023. The label of a link names its stage. The written phase of the national stage has the label "National Stage" or "National Stage – Written Phase". The 10th olympiad has one file for the area and the national stage, and the 11th has one file for all the stages. The papers of the qualifying stage, the area stage and the oral phase are left out. The problems of the written phase are numbered from 1 across its days, so the file holds all the positions of the edition and has no paper id.
+func PMOPapers(page string) []National {
+	var out []National
+	seen := map[int]bool{}
+	n := 0
+	for _, m := range pmoRE.FindAllStringSubmatch(page, -1) {
+		if m[1] != "" {
+			n, _ = strconv.Atoi(m[1])
+			continue
+		}
+		if n == 0 || !pmoWritten(html.UnescapeString(m[3])) {
+			continue
+		}
+		y := 1998 + n
+		if seen[y] {
+			continue
+		}
+		seen[y] = true
+		out = append(out, National{Competition: "ph-pmo", Year: y, URL: m[2]})
+	}
+	slices.SortFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}
+
+// pmoWritten reports whether the label of a link names a file with the written phase of the national stage.
+func pmoWritten(label string) bool {
+	if strings.Contains(label, "Oral") {
+		return false
+	}
+	return strings.HasPrefix(label, "National Stage") || label == "Area + National Stage" || label == "All Questions"
+}

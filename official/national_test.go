@@ -709,3 +709,29 @@ func TestDMFAPapers(t *testing.T) {
 		t.Errorf("DMFAPapers = %+v", got)
 	}
 }
+
+func TestPMOPapers(t *testing.T) {
+	page := `<h2>29th Philippine Mathematical Olympiad</h2><p>Questions from the 28th PMO</p>
+<a href="https://pmo.ph/wp-content/uploads/2026/09/PMO-28_QS_Questions-and-Answers.pdf" class="elementor-icon" tabindex="-1" aria-label="Qualifying Stage">
+<a href="https://pmo.ph/wp-content/uploads/2026/09/PMO-28_NS.pdf" class="elementor-icon" tabindex="-1" aria-label="National Stage">
+<a href="https://pmo.ph/wp-content/uploads/2026/09/PMO-28_NS.pdf" >
+<h3>22nd PMO</h3>
+<a href="https://pmo.ph/wp-content/uploads/2021/01/PMO-22-National-Finals-Written-Round.pdf" class="elementor-icon" tabindex="-1" aria-label="National Stage &#8211; Written Phase">
+<a href="https://pmo.ph/wp-content/uploads/2021/01/PMO22-National-Orals-Judges.pdf" class="elementor-icon" tabindex="-1" aria-label="National Stage &#8211; Oral Phase">
+<h3>16th PMO</h3>
+<a href="https://pmo.ph/wp-content/uploads/2014/08/16th-PMO-Natl-Oral-Stage-Beamer-with-Ans.pdf" class="elementor-icon" tabindex="-1" aria-label="National Stage &#8211; Oral Phase">
+<h3>11th PMO</h3>
+<a href="https://pmo.ph/wp-content/uploads/2020/12/11th-PMO-Questions.pdf" class="elementor-icon" tabindex="-1" aria-label="All Questions">
+<h3>10th PMO</h3>
+<a href="https://pmo.ph/wp-content/uploads/2021/01/10th-PMO-Area-National-Stage-Questions-with-Answers.pdf" class="elementor-icon" tabindex="-1" aria-label="Area + National Stage">`
+	got := PMOPapers(page)
+	want := []National{
+		{Competition: "ph-pmo", Year: 2008, URL: "https://pmo.ph/wp-content/uploads/2021/01/10th-PMO-Area-National-Stage-Questions-with-Answers.pdf"},
+		{Competition: "ph-pmo", Year: 2009, URL: "https://pmo.ph/wp-content/uploads/2020/12/11th-PMO-Questions.pdf"},
+		{Competition: "ph-pmo", Year: 2020, URL: "https://pmo.ph/wp-content/uploads/2021/01/PMO-22-National-Finals-Written-Round.pdf"},
+		{Competition: "ph-pmo", Year: 2026, URL: "https://pmo.ph/wp-content/uploads/2026/09/PMO-28_NS.pdf"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("PMOPapers = %+v", got)
+	}
+}
