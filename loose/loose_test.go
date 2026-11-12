@@ -1,10 +1,12 @@
 package loose
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/tamnd/olymmath-agent/match"
+	"github.com/tamnd/olymmath-agent/similar"
 )
 
 func TestClean(t *testing.T) {
@@ -183,6 +185,16 @@ func TestDecideSibling(t *testing.T) {
 		if ds[1].Kind != c.want {
 			t.Errorf("%s: %v (%+v), want %v", c.name, ds[1].Kind, ds[1].Signals, c.want)
 		}
+	}
+}
+
+func TestSimText(t *testing.T) {
+	stem := "What number is one third of the way from $\\frac14$ to $\\frac34$?"
+	math := stem + " $\\textbf{(A)}\\ \\frac{1}{3} \\textbf{(B)}\\ \\frac{5}{12} \\textbf{(C)}\\ \\frac{1}{2}$"
+	plain := stem + "\n\n\\textbf{(A)}\\ \\frac {1}{3} \\textbf{(B)}\\ \\frac {5}{12} \\textbf{(C)}\\ \\frac {1}{2}"
+	a, b := similar.Words(simText(matchText(math))), similar.Words(simText(matchText(plain)))
+	if !slices.Equal(a, b) {
+		t.Errorf("the choices count for E:\n%v\n%v", a, b)
 	}
 }
 
