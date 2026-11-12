@@ -92,3 +92,47 @@ func TestPRSameYear(t *testing.T) {
 		t.Error("prSameYear")
 	}
 }
+
+func TestFillTexts(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "texts.jsonl")
+	data := `{"at":"ru-moscow/2013/p81","figure":true,"text":" Угол $\\angle A$. "}
+
+{"at":"ru-moscow/2013/d111","figure":false,"text":"Скан.","url":"https://example.org/2den.pdf","page":1}
+{"at":"ru-moscow/2014/d111","text":"Другой год.","url":"https://example.org/x.pdf","page":1}
+`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	texts, err := readFillTexts(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := texts["ru-moscow/2013/p81"]; got.Text != `Угол $\angle A$.` || !got.Figure {
+		t.Errorf("p81: %+v", got)
+	}
+	probs := []official.RuProblem{
+		{Edition: "2013", Position: "p81", Text: "layer", Flags: []string{"layout"}, Page: 1},
+		{Edition: "2013", Position: "p82", Text: "kept", Page: 1},
+	}
+	probs = withFillTexts(probs, texts, "ru-moscow", "2013", "claude-opus-5-5")
+	if len(probs) != 3 {
+		t.Fatalf("got %d problems", len(probs))
+	}
+	if p := probs[0]; p.Text != `Угол $\angle A$.` || len(p.Flags) != 0 || p.Model != "claude-opus-5-5" || !p.Figure {
+		t.Errorf("p81: %+v", p)
+	}
+	if p := probs[1]; p.Text != "kept" || p.Model != "" {
+		t.Errorf("p82: %+v", p)
+	}
+	if p := probs[2]; p.Position != "d111" || p.URL != "https://example.org/2den.pdf" || p.Page != 1 || p.Model != "claude-opus-5-5" {
+		t.Errorf("d111: %+v", p)
+	}
+	for _, bad := range []string{`{"at":"x"}`, `{"at":"x","text":"a"}` + "\n" + `{"at":"x","text":"b"}`, `{`} {
+		if err := os.WriteFile(path, []byte(bad), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := readFillTexts(path); err == nil {
+			t.Errorf("no error for %q", bad)
+		}
+	}
+}

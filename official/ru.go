@@ -22,6 +22,8 @@ type RuProblem struct {
 	Figure bool
 	// Flags are the warnings of the native lane for the page of a PDF, as layout.
 	Flags []string
+	// Model is the model that read the text from the image of the page, when the text layer was not good enough, or "" for the text of this package.
+	Model string
 }
 
 // At gives the locator of the problem in the competition comp.
@@ -511,10 +513,14 @@ func RuDecode(b []byte) (string, error) {
 // RuVersion names the rules of RuHTML and RuTeX. It goes into the extraction field of a text that they read.
 const RuVersion = "om-rutex/1"
 
-// RuExtraction gives the extraction field of an official text: native/html for a web page and native/pdftotext for a page of a PDF, with the rules of this package in brackets.
+// RuExtraction gives the extraction field of an official text: native/html for a web page and native/pdftotext for a page of a PDF, with the rules of this package in brackets, or the model that read the text from the image of the page.
 func RuExtraction(p RuProblem) string {
-	if p.Page > 0 {
-		return "native/pdftotext (" + RuVersion + ")"
+	rules := RuVersion
+	if p.Model != "" {
+		rules = p.Model
 	}
-	return "native/html (" + RuVersion + ")"
+	if p.Page > 0 {
+		return "native/pdftotext (" + rules + ")"
+	}
+	return "native/html (" + rules + ")"
 }
