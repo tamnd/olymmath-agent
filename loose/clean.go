@@ -17,24 +17,25 @@ const MaxText = 4000
 
 // Reasons why a row is dropped.
 const (
-	TooShort  = "too short"
-	TooLong   = "too long"
-	NotStated = "not a statement"
-	Solution  = "solution only"
-	Contents  = "table of contents"
-	Stub      = "stub"
-	Request   = "request"
-	Context   = "refers to another problem"
-	Figure    = "needs a figure"
-	Glued     = "several problems"
-	BrokenTeX = "broken TeX"
-	NoLang    = "unknown language"
-	WebLink   = "links to a page"
-	Template  = "a template"
-	Lost      = "formulas lost"
-	Science   = "physics or chemistry"
-	Economics = "economics or finance"
-	Shortlist = "a shortlist or longlist row"
+	TooShort    = "too short"
+	TooLong     = "too long"
+	NotStated   = "not a statement"
+	Solution    = "solution only"
+	Contents    = "table of contents"
+	Stub        = "stub"
+	Request     = "request"
+	Context     = "refers to another problem"
+	Figure      = "needs a figure"
+	Glued       = "several problems"
+	BrokenTeX   = "broken TeX"
+	NoLang      = "unknown language"
+	WebLink     = "links to a page"
+	Template    = "a template"
+	Lost        = "formulas lost"
+	Science     = "physics or chemistry"
+	Economics   = "economics or finance"
+	Informatics = "a task of informatics"
+	Shortlist   = "a shortlist or longlist row"
 )
 
 var (
@@ -63,11 +64,13 @@ var (
 	// stepWordRE is a word of the steps of a solution. A text with two or more of them is a solution, not a problem: "Then its discriminant is ..., therefore ...". A problem may use one, as "Prove that then ...", but in the fourth batch nearly every text with two of them was a solution.
 	stepWordRE = regexp.MustCompile(`(?i)\b(?:we find|we will show|we prove|let(?:'s| us) (?:show|prove|find|consider|denote|check|note|estimate|compute|calculate)|indeed|hence|therefore|thus|it follows|consequently|which means|this means|as required|q\.e\.d|substituting|it remains to|from (?:here|this|where)|then its|so the answer|the answer is)\b`)
 	// economicsRE is a term of economics or of personal finance, out of scope as the other sciences: some olympiad sets mix the problems of an economics or a financial literacy olympiad with those of mathematics.
-	economicsRE = regexp.MustCompile(`(?i)perfectly competitive|demand function|supply function|monetary units|microeconomics|macroeconomics|\beconomics\b|taxpayer|tax resident|tax deduction|income tax|securities|financial instrument|\bScore: [0-9]`)
+	economicsRE = regexp.MustCompile(`(?i)perfectly competitive|demand function|supply function|monetary units|microeconomics|macroeconomics|\beconomics\b|taxpayer|tax resident|tax deduction|income tax|securities|financial instrument|\bScore: [0-9]|\b(?:mortgage|inflation|interest-free loan|loan agreement|nominal value|cadastral|tax (?:rate|period|return|base)s?|(?:transport|land|property) tax|pension (?:fund|savings|programs?)|(?:funded|insurance) part of (?:her|his|the) pension|insurance premium|brokerage (?:account|firm)|stock market|mutual fund|labou?r market|alternative costs?|opportunity costs?|full score|financial (?:institution|organi[sz]ation|literacy|situation)|credit card|real return|exchange rate of|maximi[sz]ing (?:his|its|their) profit|budget revenues?|zero-coupon|ordinary shares|preferred shares|investment options?|deposit rates?|loyalty program|bonus program|producers? surplus|consumer surplus)\b`)
 	// promptRE is a request to translate that a dataset left at the end of the text.
 	promptRE = regexp.MustCompile(`(?is)\s*Translate the text above into English, please keep.*$`)
 	// scienceRE is a term of physics or chemistry. Problems of physics and of the other sciences are out of scope (spec 02); some olympiad sets mix them with the problems of mathematics. A puzzle that only names physics, as a club of physics, does not match.
-	scienceRE = regexp.MustCompile(`(?i)\((?:physics|chemistry)\)|\b(?:refractive|refraction|coefficient of friction|friction(?:al)? force|voltage|resistors?|resistivity|internal resistance|capacitors?|capacitance|piston|heat capacity|specific heat|latent heat|buoyan\w*|kinetic energy|potential energy|pendulum|wavelength|joules?|ohms?|electronegativity|hybridi[sz]ed|hybridization|moles? of|molar mass|(?:sulfuric|sulphuric|nitric|hydrochloric|hydroiodic|orthophosphoric|phosphoric|acetic) acid|isotopes?|acceleration due to gravity|air resistance|thermostat|spring constant|stiffness(?:es)? of the springs?|amperes?|ammeter|voltmeter|galvanic|emf|electromotive|ideal gas|(?:converging|diverging|collecting|thin) lens|focal length|optical (?:power|axis|center|centre)|electric (?:field|current|charge|circuit)|electrical circuit|current source|precipitat\w*|aqueous|alkanes?|alkynes?|alkenes?|gravitational forces?|elastic collision)\b`)
+	scienceRE = regexp.MustCompile(`(?i)\((?:physics|chemistry)\)|\b(?:refractive|refraction|coefficient of friction|friction(?:al)? force|voltage|resistors?|resistivity|internal resistance|capacitors?|capacitance|piston|heat capacity|specific heat|latent heat|buoyan\w*|kinetic energy|potential energy|pendulum|wavelength|joules?|ohms?|electronegativity|hybridi[sz]ed|hybridization|moles? of|molar mass|(?:sulfuric|sulphuric|nitric|hydrochloric|hydroiodic|orthophosphoric|phosphoric|acetic) acid|isotopes?|acceleration due to gravity|air resistance|thermostat|spring constant|stiffness(?:es)? of the springs?|amperes?|ammeter|voltmeter|galvanic|emf|electromotive|ideal gas|(?:converging|diverging|collecting|thin) lens|focal length|optical (?:power|axis|center|centre)|electric (?:field|current|charge|circuit)|electrical circuit|current source|precipitat\w*|aqueous|alkanes?|alkynes?|alkenes?|gravitational forces?|elastic collision|heat engines?|heaters?|density of (?:the |a |its )?(?:water|wood|ice|kerosene|aluminum|aluminium|copper|iron|steel|oil|material|body|liquid|mercury|glass|air|saltwater|milk)|densit(?:y|ies) (?:is|are) defined|spring scales?|on a spring|of the spring|DC power|power source|boiling point|monatomic|diatomic|thermally insulated|resistance force|calorimeter|eudiometer|jet engine|sound signal|(?:plane|ideal|flat) mirror|refrigerat(?:ing|ion) machines?|hot air balloon|charged (?:with|to)|carbon dioxide|chemical (?:reaction|experiment)s?|fully submerged|completely submerged in (?:water|kerosene|a liquid|liquid)|floats in (?:a |the )?(?:water|lake|liquid|glass|vessel))\b|kg\s*/\s*m\b`)
+	// informaticsRE marks a task of an olympiad of informatics or of an applied contest: a heading such as "Text of the task." or "Problem statement.", a request to write a program, or terms of programming. Some olympiad sets mix such tasks with the problems of mathematics.
+	informaticsRE = regexp.MustCompile(`\b(?:Text of the task|Task text|Task [Dd]escription|Problem text|Problem statement)\s*[.:]|(?i)\bwrite a program (?:that|which) (?:finds|outputs|prints|reads)\b|\((?:informatics|computer science)\)|\b(?:data analyst|input data|output data|time limit|memory limit|system administration|information security)\b`)
 	// shortlistRE is the mark of a problem of the IMO shortlist or longlist in a compendium: the country that proposed it, as "(GBR 2)" or "A2 (GBR)" at the start, or a note that the problem was set at the IMO, as "${ }^{\mathrm{IMO} 5}$". The row does not give the year, and the content has the shortlists, the longlists and the IMO by position, so such a row is left to them.
 	shortlistRE = regexp.MustCompile(`^\s*(?:[IVX]{1,3}\s+[0-9]{1,2}\s+)?(?:[ACGNS][0-9]{1,2}\s+)?\([A-Z]{3}(?:\s+[0-9]{1,2})?\)|\^\{\s*\\(?:mathrm|text)\s*\{\s*IMO`)
 	// personRE is a line of a poster about himself. With no formula, no question and no task it marks a forum post that is news and not a problem.
@@ -153,6 +156,8 @@ func Clean(raw string) (string, string) {
 		return "", Science
 	case economicsRE.MatchString(text):
 		return "", Economics
+	case informaticsRE.MatchString(text):
+		return "", Informatics
 	case stepWords(text) >= 2:
 		return "", Solution
 	case figureRE.MatchString(text):
