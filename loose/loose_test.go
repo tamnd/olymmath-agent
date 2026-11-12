@@ -30,6 +30,7 @@ func TestClean(t *testing.T) {
 		{"a number in the text", "2-colorings of a $3\\times 3$ board are counted up to rotation. How many are there in total?", "2-colorings of a $3\\times 3$ board are counted up to rotation. How many are there in total?", ""},
 		{"solution", "Solution. Since $a+b=c$ we get the claim, and the proof is done by induction on $n$.", "", Solution},
 		{"glued", "Problem 1. Prove that $n^2+n$ is even for every integer $n$.\nProblem 2. Find all real $x$ with $x^2=2x$.", "", Glued},
+		{"bold marks in a line", "Compute the remainder when $(10!)^{20}$ is divided by $2024$ .**p14.** A right square pyramid with height $12$ is inscribed in a sphere $S$.", "", Glued},
 		{"next number", "3. Prove that $n^2+n$ is even for every integer $n$ and every prime.\n4. Find all real $x$ with $x^2=2x$.", "", Glued},
 		{"stub", "Prove the lemma.", "", TooShort},
 		{"stub long", "Prove Lemma 2 from the paper of Erdos and Szekeres on convex polygons.", "", Stub},
