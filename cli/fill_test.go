@@ -65,6 +65,22 @@ func TestFillOne(t *testing.T) {
 	if err := fillOne(root, p, "ru-moscow/2003/p83", comp, src, o, 0.9); err == nil {
 		t.Error("a second fill gave no error")
 	}
+	// A text from a book keeps the name and the extraction of the book.
+	if err := os.WriteFile(full, []byte(linkOnly), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	o.Name, o.Extraction, o.Page = "A book of the olympiad", "vision/claude@2.1.322 (claude-opus-5-5)", 30
+	if err := fillOne(root, p, "ru-moscow/2003/p83", comp, src, o, 0.9); err != nil {
+		t.Fatal(err)
+	}
+	if b, err = os.ReadFile(full); err != nil { // #nosec G304 -- a test file.
+		t.Fatal(err)
+	}
+	for _, want := range []string{"name: A book of the olympiad", "page: 30", "extraction: vision/claude@2.1.322 (claude-opus-5-5)"} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("the book record has no %q:\n%s", want, b)
+		}
+	}
 }
 
 func TestWriteFillReview(t *testing.T) {
@@ -97,7 +113,7 @@ func TestFillTexts(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "texts.jsonl")
 	data := `{"at":"ru-moscow/2013/p81","figure":true,"text":" Угол $\\angle A$. "}
 
-{"at":"ru-moscow/2013/d111","figure":false,"text":"Скан.","url":"https://example.org/2den.pdf","page":1}
+{"at":"ru-moscow/2013/d111","figure":false,"text":"Скан.","url":"https://example.org/2den.pdf","page":1,"extraction":"vision/claude@2.1.322 (claude-opus-5-5)","name":"A book"}
 {"at":"ru-moscow/2014/d111","text":"Другой год.","url":"https://example.org/x.pdf","page":1}
 `
 	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
@@ -126,6 +142,12 @@ func TestFillTexts(t *testing.T) {
 	}
 	if p := probs[2]; p.Position != "d111" || p.URL != "https://example.org/2den.pdf" || p.Page != 1 || p.Model != "claude-opus-5-5" {
 		t.Errorf("d111: %+v", p)
+	}
+	if p := probs[2]; official.RuExtraction(p) != "vision/claude@2.1.322 (claude-opus-5-5)" || p.Name != "A book" {
+		t.Errorf("d111 extraction %q, name %q", official.RuExtraction(p), p.Name)
+	}
+	if e := official.RuExtraction(probs[0]); e != "native/pdftotext (claude-opus-5-5)" {
+		t.Errorf("p81 extraction %q", e)
 	}
 	for _, bad := range []string{`{"at":"x"}`, `{"at":"x","text":"a"}` + "\n" + `{"at":"x","text":"b"}`, `{`} {
 		if err := os.WriteFile(path, []byte(bad), 0o600); err != nil {
