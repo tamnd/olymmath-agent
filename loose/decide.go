@@ -50,6 +50,10 @@ type Signals struct {
 	A       match.Answer
 	// Exact is true when the two texts have the same normalized tokens.
 	Exact bool
+	// W, M and O are the Jaccard indexes of the words, of the formulas and of the order of the formulas of the rule of the words (words.go), Words the fewer words of the two texts, and Numbers is true when the two texts have the same numbers.
+	W, M, O float64
+	Words   int
+	Numbers bool
 }
 
 // Decision is what the import does with a row.
@@ -97,7 +101,12 @@ func (s Signals) Same() bool {
 		return true
 	}
 	// A pair with other words needs a strong keyword match and enough of all three signals. A pair of two short texts has few tokens to share, so it needs nearly the same words.
-	return s.E >= Near && s.F >= KeyStrong && s.E+s.F+s.T >= KeySum && ((s.Tokens >= keymatch.MinTokens && s.Shared >= keymatch.MinShared) || s.E >= KeyShort)
+	return s.E >= Near && s.F >= KeyStrong && s.E+s.F+s.T >= KeySum && ((s.Tokens >= keymatch.MinTokens && s.Shared >= keymatch.MinShared) || s.E >= KeyShort) || s.byWords()
+}
+
+// byWords tells if the rule of the words says that the two texts are one problem: nearly the same words and formulas, the same numbers, and for a short text formulas in nearly the same order.
+func (s Signals) byWords() bool {
+	return s.W >= WordSame && s.M >= FormulaSame && s.Words >= MinWords && s.Numbers && (s.Words >= ShortWords || s.O >= OrderSame)
 }
 
 // Doubt gives the reason why a pair that is not the same needs a review, or "" when the two texts are two problems.
@@ -141,11 +150,15 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 	// stems are the texts with no answer choices, or "" for a text with none.
 	stems := make([]string, len(all))
 	stemFeats := make([]keymatch.Features, len(all))
+	shapes := make([]shape, len(all))
+	words := make([]string, len(all))
 	parallel(len(all), func(i int) {
 		forms[i] = matchText(all[i].Text)
 		keys[i] = exactKey(forms[i])
 		texts[i] = simText(forms[i])
 		feats[i] = keymatch.Extract(forms[i])
+		shapes[i] = shapeOf(forms[i])
+		words[i] = shapes[i].text
 		if st := stem(forms[i]); st != forms[i] {
 			stems[i] = st
 			stemFeats[i] = keymatch.Extract(st)
@@ -177,6 +190,7 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 		return out
 	}
 	near, peerE := similar.FindFromAlso(texts, n, max(o.Neighbors, 1), Near, peers)
+	nearW := similar.FindFrom(words, n, max(o.Neighbors, 1), WordNear)
 	shingles := make([][]uint64, len(all))
 	sh := func(i int) []uint64 {
 		if shingles[i] == nil {
@@ -201,6 +215,8 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 	signals := func(i, j int, e float64) Signals {
 		s := Signals{E: e, T: match.Jaccard(sh(i), sh(j)), A: match.Answers(all[i].Answer, all[j].Answer), Exact: keys[i] == keys[j]}
 		s.F, s.Shared, s.Tokens = km.Score(feats[i], feats[j])
+		s.W, s.M, s.O = bagJaccard(shapes[i].words, shapes[j].words), bagJaccard(shapes[i].formulas, shapes[j].formulas), bagJaccard(shapes[i].order, shapes[j].order)
+		s.Words, s.Numbers = min(shapes[i].n, shapes[j].n), shapes[i].numbers == shapes[j].numbers
 		if stems[i] != "" && stems[j] != "" && !s.Exact {
 			// Two multiple choice problems of one contest often have the same choices, so the texts without them must agree too.
 			t := match.Jaccard(match.Shingles(stems[i]), match.Shingles(stems[j]))
@@ -239,6 +255,12 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 				cands = append(cands, cand{m.Doc, m.Score})
 			}
 		}
+		// A text with other formulas has a low E, so the rule of the words finds its candidates by the words alone. Its E is not known; 0 is below each bar of E.
+		for _, m := range nearW[i] {
+			if owner[m.Doc] != none && (m.Doc < n || m.Doc < i) && !slices.ContainsFunc(cands, func(c cand) bool { return c.doc == m.Doc }) {
+				cands = append(cands, cand{m.Doc, 0})
+			}
+		}
 		var best *Decision
 		doubt := Decision{Kind: New}
 		for _, c := range cands {
@@ -252,6 +274,9 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 			}
 			if s.Same() {
 				d := Decision{Kind: Link, Target: owner[c.doc], Signals: s}
+				if !(Signals{E: s.E, T: s.T, F: s.F, Shared: s.Shared, Tokens: s.Tokens, A: s.A, Exact: s.Exact}).Same() {
+					d.Reason = fmt.Sprintf("words %.2f, formulas %.2f", s.W, s.M)
+				}
 				if d.Target < 0 {
 					d.Kind, d.Target = Join, -1-d.Target
 				}
