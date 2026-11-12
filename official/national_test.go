@@ -851,6 +851,12 @@ func TestBMTPapers(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Errorf("BMTPapers = %+v", got)
 	}
+	two := page + "\n" + `<link rel="canonical" href="https://berkeley.mt/archives/bmt-2018/" />
+<tr><td>Team</td><td class="text-center"><a href="TESP18.pdf">PDF</a></td></tr>`
+	want = append(want, National{Competition: "bmt", Year: 2018, Paper: "team", URL: "https://berkeley.mt/archives/bmt-2018/TESP18.pdf"})
+	if got := BMTPapers(two); !slices.Equal(got, want) {
+		t.Errorf("BMTPapers of two joined pages = %+v", got)
+	}
 	if BMTPapers("<p>no canonical link</p>") != nil {
 		t.Error("BMTPapers of a page with no canonical link is not nil")
 	}
