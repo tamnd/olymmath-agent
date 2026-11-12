@@ -136,3 +136,49 @@ func TestFillTexts(t *testing.T) {
 		}
 	}
 }
+
+func TestTotHolds(t *testing.T) {
+	for _, c := range []struct {
+		name, edition string
+		want          bool
+	}{
+		{"30 турнир (2008/2009 год)", "2008-fall", true},
+		{"30 турнир (2008/2009 год)", "2009-spring", true},
+		{"30 турнир (2008/2009 год)", "2009-fall", false},
+		{"30 турнир (2008/2009 год)", "2008-spring", false},
+		{"30 турнир (2008/2009 год)", "2008", false},
+	} {
+		if got := totHolds(c.name, c.edition); got != c.want {
+			t.Errorf("totHolds(%q, %q) = %v, want %v", c.name, c.edition, got, c.want)
+		}
+	}
+}
+
+func TestTotTour(t *testing.T) {
+	for _, c := range []struct {
+		edition, prefix string
+		n               int
+	}{
+		{"2008-fall", "os", 30},
+		{"2009-spring", "vs", 30},
+		{"2026-spring", "vs", 47},
+	} {
+		n, prefix, ok := totTour(c.edition)
+		if !ok || n != c.n || prefix != c.prefix {
+			t.Errorf("totTour(%q) = %d %q %v, want %d %q", c.edition, n, prefix, ok, c.n, c.prefix)
+		}
+	}
+	for _, name := range []string{"os-36-baz-avt.pdf", "os32os-avt.pdf", "os31sl.pdf", "vs-35-sl-avt.pdf"} {
+		if !totPDFFile.MatchString(name) {
+			t.Errorf("%s is not a paper PDF", name)
+		}
+	}
+	for _, name := range []string{"vs-30-ustn-avt.pdf", "os-43-sol.pdf", "sol_os30baz.pdf"} {
+		if totPDFFile.MatchString(name) {
+			t.Errorf("%s is a paper PDF", name)
+		}
+	}
+	if !totTeXFile.MatchString("os30os.tex") || totTeXFile.MatchString("sol_os30baz.tex") {
+		t.Error("totTeXFile")
+	}
+}

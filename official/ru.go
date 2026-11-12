@@ -1,6 +1,7 @@
 package official
 
 import (
+	"cmp"
 	"html"
 	"regexp"
 	"strings"
@@ -18,7 +19,7 @@ type RuProblem struct {
 	// URL is the page or the PDF that gives the text, and Page is the page of a PDF, from 1, or 0 for a web page.
 	URL  string
 	Page int
-	// Tool is the tool that read the text layer of a PDF, as pdftohtml. It is empty for pdftotext.
+	// Tool is the tool that read the text, as pdftohtml for a PDF or tex for a TeX file. It is empty for pdftotext or for a web page.
 	Tool string
 	// Figure is true when the problem has a picture that the text does not hold.
 	Figure bool
@@ -515,18 +516,15 @@ func RuDecode(b []byte) (string, error) {
 // RuVersion names the rules of RuHTML and RuTeX. It goes into the extraction field of a text that they read.
 const RuVersion = "om-rutex/1"
 
-// RuExtraction gives the extraction field of an official text: native/html for a web page and native/pdftotext, or the tool in Tool, for a page of a PDF, with the rules of this package in brackets, or the model that read the text from the image of the page.
+// RuExtraction gives the extraction field of an official text: the tool in Tool, or native/html for a web page and native/pdftotext for a page of a PDF, with the rules of this package in brackets, or the model that read the text from the image of the page.
 func RuExtraction(p RuProblem) string {
 	rules := RuVersion
 	if p.Model != "" {
 		rules = p.Model
 	}
+	tool := "html"
 	if p.Page > 0 {
-		tool := p.Tool
-		if tool == "" {
-			tool = "pdftotext"
-		}
-		return "native/" + tool + " (" + rules + ")"
+		tool = "pdftotext"
 	}
-	return "native/html (" + rules + ")"
+	return "native/" + cmp.Or(p.Tool, tool) + " (" + rules + ")"
 }
