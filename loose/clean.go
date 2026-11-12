@@ -83,11 +83,8 @@ func Clean(raw string) (string, string) {
 	text := normalize.Statement(plain, "")
 	// cut tells if an answer or a solution was cut from the end of the text.
 	cut := len(normalize.CutTail(plain)) < len(strings.TrimSpace(plain))
-	switch {
-	case solutionRE.MatchString(text), stepRE.MatchString(text):
+	if solutionRE.MatchString(text) {
 		return "", Solution
-	case shortlistRE.MatchString(text):
-		return "", Shortlist
 	}
 	if m := headingRE.FindStringIndex(text); m != nil && !strings.ContainsAny(text[:m[1]], "?") {
 		text = strings.TrimSpace(text[m[1]:])
@@ -99,6 +96,13 @@ func Clean(raw string) (string, string) {
 	} else if m := tightLeadRE.FindStringSubmatchIndex(text); m != nil {
 		lead, _ = strconv.Atoi(text[m[2]:m[3]])
 		text = strings.TrimSpace(text[m[3]+1:])
+	}
+	// A step of a solution and the mark of the compendium often follow a problem number, as in "5. Since ..." or "27. (BLR) Ten points ...", so they are read after the number is cut.
+	switch {
+	case stepRE.MatchString(text):
+		return "", Solution
+	case shortlistRE.MatchString(text):
+		return "", Shortlist
 	}
 	if m := answerRE.FindStringIndex(text); m != nil {
 		if m[0] < canon.MinText {

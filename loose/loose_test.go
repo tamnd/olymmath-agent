@@ -35,6 +35,8 @@ func TestClean(t *testing.T) {
 		{"answer under a heading", "# 3. Answer: $\\frac{2}{5}$ or $\\frac{11}{40}$ for the two cases of the problem.", "", Solution},
 		{"a step of a solution", "Since the right side of the equation $(x+y)^{2}=49(3 x+5 y)$ is divisible by 49, then $x+y=7 k$.", "", Solution},
 		{"by the condition", "By the condition, $a_{k}=\\frac{120-a_{k}}{k+1}$ for all $k=1,2, \\ldots, n-1$, so we find $n$.", "", Solution},
+		{"a step after a number", "5. Since the expressions on the left and right are even functions, it is sufficient to consider the case $x \\geqslant 0$.", "", Solution},
+		{"shortlist after a number", "8. A2 (GBR) Let $a, b, c$ be positive integers satisfying the conditions $b>2 a$ and $c>2 b$. Show that there exists a real number $t$.", "", Shortlist},
 		{"template", "Given a regular param1. In how many ways can three of its vertices be chosen so that they form a scalene triangle?", "", Template},
 		{"lost formula", "Prove that if the equation\n\nhas three real roots, then\n\nIs the converse statement true?", "", Lost},
 		{"translator note", "Solve in integers the equation\n\nNote: The equation is not provided in the original text, so it is not included.", "", Lost},
