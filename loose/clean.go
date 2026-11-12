@@ -39,8 +39,8 @@ var (
 	leadRE = regexp.MustCompile(`(?i)^\s*(?:\*\*|__)?\s*(?:(?:problem|task|question|exercise|задача)\s*-?\s*|[pq]\s*\.?\s*)?([1-9][0-9]?)((?:\.[0-9]{1,2})*)\s*(?:\.\)|[.:)])\s*(?:\*\*|__)?(?:\s|$)`)
 	// tightLeadRE is a problem number glued to the text, as "3-There is" or "1.Let".
 	tightLeadRE = regexp.MustCompile(`^\s*([1-9][0-9]?)[-.]\p{Lu}\p{Ll}`)
-	// markRE is a problem mark inside a text, at the start of a line: "Problem 2", "Task 3", "p2." or "**3.**". A row with such a mark after its start holds more than one problem.
-	markRE = regexp.MustCompile(`(?im)(?:^|\n)\s*(?:\*\*|__)?\s*(?:(?:problem|task|задача)\s*[0-9]{1,2}\b|p[0-9]{1,2}\s*[.:)])|\*\*\s*[0-9]{1,2}\s*[.:)]\s*\*\*`)
+	// markRE is a problem mark inside a text: "Problem 2", "Task 3" or "p2." at the start of a line, or a bold "**3.**" or "**p14.**" anywhere. A row with such a mark after its start holds more than one problem. A post of a whole test often runs its problems on one line, as "... divided by $2024$ .**p14.** A right square pyramid ...".
+	markRE = regexp.MustCompile(`(?im)(?:^|\n)\s*(?:\*\*|__)?\s*(?:(?:problem|task|задача)\s*[0-9]{1,2}\b|p[0-9]{1,2}\s*[.:)])|\*\*\s*p?[0-9]{1,2}\s*[.:)]\s*\*\*`)
 	// numLineRE is a line that starts with a number and a point, such as "4. Find".
 	numLineRE = regexp.MustCompile(`(?m)^\s*([1-9][0-9]?)\.\s`)
 	// answerRE is the start of an answer or a solution that a dataset joined to the statement, on a line of its own.
