@@ -691,3 +691,21 @@ func TestSSMRPapers(t *testing.T) {
 		t.Errorf("SSMRPapers = %+v", got)
 	}
 }
+
+func TestDMFAPapers(t *testing.T) {
+	page := `<a href="\Tekmovanja\GetPDF.ashx?src=MaSSA_Drzavno_2010.pdf">2010</a>
+<a href="\Tekmovanja\GetPDF.ashx?src=MaSSA_Drzavno_2001.pdf">2001</a>
+<a href="\Tekmovanja\GetPDF.ashx?src=MaSSA_Drzavno_2001.pdf">2001</a>
+<a href="\Tekmovanja\GetPDF.ashx?src=MaSSA_Odbirno_2017.pdf">2017</a>
+<a href="\Tekmovanja\GetPDF.ashx?src=MaSSA_Podrocno_2001.pdf">2001</a>
+<a href="/Tekmovanja/GetPDF.ashx?src=MaSSA_Drzavno_2025.pdf">2025</a>`
+	got := DMFAPapers(page)
+	want := []National{
+		{Competition: "si-mo", Year: 2001, URL: "https://www.dmfa.si/Tekmovanja/GetPDF.ashx?src=MaSSA_Drzavno_2001.pdf"},
+		{Competition: "si-mo", Year: 2010, URL: "https://www.dmfa.si/Tekmovanja/GetPDF.ashx?src=MaSSA_Drzavno_2010.pdf"},
+		{Competition: "si-mo", Year: 2025, URL: "https://www.dmfa.si/Tekmovanja/GetPDF.ashx?src=MaSSA_Drzavno_2025.pdf"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("DMFAPapers = %+v", got)
+	}
+}

@@ -931,3 +931,25 @@ func SSMRPapers(page string) []National {
 	})
 	return out
 }
+
+// DMFAListing is the page of the Society of Mathematicians, Physicists and Astronomers of Slovenia (DMFA) that lists the papers of the high school competition in mathematics, category A.
+const DMFAListing = "https://www.dmfa.si/Tekmovanja/MaSSA/ArhivNalog.aspx"
+
+// dmfaRE matches a link to the file of the national round of one year, as \Tekmovanja\GetPDF.ashx?src=MaSSA_Drzavno_2010.pdf. The page writes the path with backslashes. The files of the selection round (Odbirno), the regional round (Podrocno) and the school round (Solsko) have other names.
+var dmfaRE = regexp.MustCompile(`href="[\\/]Tekmovanja[\\/]GetPDF\.ashx\?src=(MaSSA_Drzavno_((?:19|20)[0-9]{2})\.pdf)"`)
+
+// DMFAPapers gives the papers of the national round of the Slovenian high school competition (si-mo) on the listing page of the DMFA. One file holds the papers of the four grades and their solutions, so the file holds all the positions of the edition and has no paper id.
+func DMFAPapers(page string) []National {
+	var out []National
+	seen := map[int]bool{}
+	for _, m := range dmfaRE.FindAllStringSubmatch(page, -1) {
+		y, _ := strconv.Atoi(m[2])
+		if seen[y] {
+			continue
+		}
+		seen[y] = true
+		out = append(out, National{Competition: "si-mo", Year: y, URL: "https://www.dmfa.si/Tekmovanja/GetPDF.ashx?src=" + m[1]})
+	}
+	slices.SortFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}
