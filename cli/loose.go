@@ -121,14 +121,14 @@ func runImportLoose(env Env, args []string) int {
 		}
 		for _, s := range p.Statements {
 			if s.Text != "" {
-				docs = append(docs, loose.Doc{Text: s.Text, Answer: p.Answer, Editions: eds, Named: named, ID: p.Tag, Derived: len(p.Appearances) == 0 && s.Origin == "D"})
+				docs = append(docs, loose.Doc{Text: s.Text, Answer: p.Answer, Editions: eds, Named: named, ID: p.Tag, Derived: len(p.Appearances) == 0 && s.Origin == "D", Capture: s.Capture})
 				owners = append(owners, p)
 			}
 		}
 	}
 	rows := make([]loose.Doc, len(r.rows))
 	for i, x := range r.rows {
-		rows[i] = loose.Doc{Text: x.cand.Text, Answer: x.cand.Answer}
+		rows[i] = loose.Doc{Text: x.cand.Text, Answer: x.cand.Answer, Capture: x.cand.Capture}
 		for _, u := range x.unplaced {
 			if strings.Contains(u.At, "/") {
 				rows[i].Editions = append(rows[i].Editions, u.At)
