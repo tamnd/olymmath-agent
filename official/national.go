@@ -878,3 +878,56 @@ func OKTVPapers(page string) []National {
 	slices.SortStableFunc(out, func(a, b National) int { return cmp.Or(a.Year-b.Year, strings.Compare(a.Paper, b.Paper)) })
 	return out
 }
+
+// SSMRListings are the pages of the Romanian Mathematical Society (SSMR) that list the papers of the national round of the Romanian National Mathematical Olympiad. The page of 2015 on ssmr.ro has no national papers, so the list holds the page of the 2015 olympiad site. The list holds only the years that the register of ro-nmo has.
+var SSMRListings = []string{
+	"https://ssmr.ro/onm2013",
+	"https://ssmr.ro/onm2014",
+	"https://onm2015.ssmr.ro/subiecte",
+	"https://ssmr.ro/onm2016",
+	"https://ssmr.ro/onm2017",
+	"https://ssmr.ro/onm2019",
+	"https://ssmr.ro/onm2021",
+}
+
+var (
+	// ssmrLinkRE matches a link to a file of one olympiad on ssmr.ro or on the 2015 olympiad site. The directory onmYYYY gives the year.
+	ssmrLinkRE = regexp.MustCompile(`href="https?://((?:onm2015\.)?ssmr\.ro)/files/onm((?:19|20)[0-9]{2})/([^"?#]+\.pdf)"`)
+	// ssmrFileRE matches the path of the paper of one grade of the national round: faza_nationala/subiecte/subiecte_7.pdf (2013, 2014), subiecte/07_2015_solutii.pdf (2015, the solutions, which state the problems), subiecte/ONM_2016_Clasa_VII.pdf (2016 to 2019) or etapa_3/subiecte/Subiecte_cl_7.pdf (2021). The Hungarian versions (_HU), the papers of the county round and the papers of the selection tests (juniori, seniori) have other paths.
+	ssmrFileRE = regexp.MustCompile(`^(?:faza_nationala/subiecte/subiecte_([0-9]{1,2})|subiecte/([0-9]{2})_(?:19|20)[0-9]{2}_solutii|subiecte/ONM_(?:19|20)[0-9]{2}_Clasa_([IVX]+)|etapa_3/subiecte/Subiecte_cl_([0-9]{1,2}))\.pdf$`)
+)
+
+// ssmrRoman gives the grade of a Roman numeral in the name of a paper.
+var ssmrRoman = map[string]int{"VII": 7, "VIII": 8, "IX": 9, "X": 10, "XI": 11, "XII": 12}
+
+// SSMRPapers gives the papers of the national round of the Romanian National Mathematical Olympiad (ro-nmo) on the listing pages of the SSMR. Each grade from 7 to 12 has its own paper, and each paper numbers its problems from 1. So the paper of grade G is gradeG. The papers of grades 5 and 6 are not in the register, so they are left out.
+func SSMRPapers(page string) []National {
+	var out []National
+	seen := map[string]bool{}
+	for _, m := range ssmrLinkRE.FindAllStringSubmatch(page, -1) {
+		f := ssmrFileRE.FindStringSubmatch(m[3])
+		if f == nil {
+			continue
+		}
+		g, _ := strconv.Atoi(f[1] + f[2] + f[4])
+		if f[3] != "" {
+			g = ssmrRoman[f[3]]
+		}
+		if g < 7 || g > 12 {
+			continue
+		}
+		paper := "grade" + strconv.Itoa(g)
+		key := m[2] + "/" + paper
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		y, _ := strconv.Atoi(m[2])
+		out = append(out, National{Competition: "ro-nmo", Year: y, Paper: paper, URL: "https://" + m[1] + "/files/onm" + m[2] + "/" + m[3]})
+	}
+	// grade7 comes before grade10, so a shorter id comes first.
+	slices.SortFunc(out, func(a, b National) int {
+		return cmp.Or(a.Year-b.Year, len(a.Paper)-len(b.Paper), strings.Compare(a.Paper, b.Paper))
+	})
+	return out
+}

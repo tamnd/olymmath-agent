@@ -345,6 +345,16 @@ om ocr -content olymmath -lanes native -source oktatas-oktv -paper cat2-final hu
 
 The Oktatási Hivatal has one page for each category of the OKTV in mathematics, tartalomjegyzek/matematika_I, matematika_II and matematika_III. Each page links the papers of the school years 2004/2005 to 2020/2021, with a marking guide for each paper. The edition is the second year of the school year, so 2018/2019 is the edition 2019. The paper of category C and round R is catC-roundR, and the final round is catC-final. Category III has no second round. The pages link no final of 2019/2020 and 2020/2021 in categories I and II. The file names vary: mat2_flap1f_oktv_1819.pdf, mat2_flap_d_oktv1112.pdf, oktv0910_mat2_d_flut.pdf, matematika3_fela.pdf and mat2_2foktv0405_fl.pdf. The marking guides (javut, mego, ut) are left out. The finals of 2005/2006 to 2009/2010 are in one file with their solutions. The page of category II links the round 1 paper of category I for 2004/2005, and the page of category I links round 1 twice for 2011/2012 and has no round 2, so these papers are not recorded. The site blocks the default user agent of curl and answers only from some networks. The robots.txt allows all paths.
 
+The Romanian National Mathematical Olympiad works the same way, with the source `ssmr-onm`:
+
+```
+om papers -content olymmath ssmr-onm
+om fetch -content olymmath ssmr-onm
+om ocr -content olymmath -lanes native -source ssmr-onm -lang ro -paper grade7 ro-nmo/2016
+```
+
+The Romanian Mathematical Society (SSMR) has a page for each olympiad, such as ssmr.ro/onm2016. The page links the paper of each grade of the national round. The file names vary: faza_nationala/subiecte/subiecte_7.pdf (2013, 2014), ONM_2016_Clasa_VII.pdf (2016 to 2019) and etapa_3/subiecte/Subiecte_cl_7.pdf (2021). The page of 2015 on ssmr.ro links only the earlier rounds, so the command reads onm2015.ssmr.ro/subiecte. That page links only the solutions of each grade, such as 07_2015_solutii.pdf, and they state each problem first. Each grade numbers its problems from 1, so the paper of grade G is gradeG. Only grades 7 to 12 are recorded. The Hungarian versions (_HU), the solutions of the other years, the county round and the selection tests (juniori, seniori) are left out. The listing holds only the years that the register of ro-nmo has. The copyright note of the SSMR (ssmr.ro/node/463) says that the SSMR holds the rights to the problems of its contests, and that commercial use needs its written consent. The robots.txt asks for a crawl delay of 10 seconds and does not disallow /files/.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Journals
