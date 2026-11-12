@@ -991,3 +991,37 @@ func pmoWritten(label string) bool {
 	}
 	return strings.HasPrefix(label, "National Stage") || label == "Area + National Stage" || label == "All Questions"
 }
+
+// SMTYears are the years of the Stanford Math Tournament (SMT) that the archive of the tournament has. The tournament was not held at Stanford in 2015 to 2017.
+var SMTYears = []int{2011, 2012, 2013, 2014, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025}
+
+// SMTListings gives the archive pages of the Stanford Math Tournament, one page for each year of SMTYears, as https://www.stanfordmathtournament.org/past-tests/SMT/2024.
+func SMTListings() []string {
+	var out []string
+	for _, y := range SMTYears {
+		out = append(out, "https://www.stanfordmathtournament.org/past-tests/SMT/"+strconv.Itoa(y))
+	}
+	return out
+}
+
+// smtRE matches the link to the problems of one round of the SMT, as href="/pdfs/smt2024/algebra-problems.pdf". The files of the solutions (algebra-solutions.pdf) and of the tiebreakers (algebra-tiebreaker-problems.pdf) do not match.
+var smtRE = regexp.MustCompile(`href="(?:https://www\.stanfordmathtournament\.org)?(/pdfs/smt((?:19|20)[0-9]{2})/([a-z]+)-problems\.pdf)"`)
+
+// smtLeftOut are the rounds of the SMT that are not recorded. The power round is one long problem with many numbered parts, and the integration bee is a list of integrals. The links of the power round of 2018 and the guts round of 2020 give a web page and not a PDF (checked on 2026-11-13).
+var smtLeftOut = map[string]bool{"power": true, "integrationbee": true, "integrationbeequalification": true, "2018/power": true, "2020/guts": true}
+
+// SMTPapers gives the papers of the rounds of the Stanford Math Tournament (smt) on its archive pages. Each round numbers its problems from 1, so the paper of a round is the name of its file, such as algebra, general, team or guts.
+func SMTPapers(page string) []National {
+	var out []National
+	seen := map[string]bool{}
+	for _, m := range smtRE.FindAllStringSubmatch(page, -1) {
+		y, _ := strconv.Atoi(m[2])
+		if smtLeftOut[m[3]] || smtLeftOut[m[2]+"/"+m[3]] || seen[m[1]] {
+			continue
+		}
+		seen[m[1]] = true
+		out = append(out, National{Competition: "smt", Year: y, Paper: m[3], URL: "https://www.stanfordmathtournament.org" + m[1]})
+	}
+	slices.SortStableFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}
