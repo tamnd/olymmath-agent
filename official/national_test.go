@@ -755,3 +755,28 @@ func TestSMTPapers(t *testing.T) {
 		t.Errorf("SMTListings = %v", l)
 	}
 }
+
+func TestPOFMPapers(t *testing.T) {
+	page := `<h4>2025-2026 :</h4>
+<ul>
+<li><a href="https://maths-olympiques.fr/wp-content/uploads/2026/10/Sujet-Test-1-2025-2026.pdf">Test de Novembre</a>. <a href="https://maths-olympiques.fr/wp-content/uploads/2026/10/Corrige-Test-1-2025-2026.pdf">Corrigé</a>.</li>
+</ul>
+<h4>2022-2023 :</h4>
+<li><a href="https://maths-olympiques.fr/wp-content/uploads/2023/01/Énoncé-Web-Test-2.pdf">Test de Janvier</a>. <a href="https://maths-olympiques.fr/wp-content/uploads/2023/01/Corrigé-Web-Test-2.pdf">Corrigé</a>.</li>
+<h4>2020-2021 :</h4>
+<li><a href="https://maths-olympiques.fr/wp-content/uploads/2021/12/Enoncé-Test-3-2020.pdf">Tests de Février</a>.</li>
+<li><a href="https://maths-olympiques.fr/wp-content/uploads/2021/12/Sujet-test-5-2021.pdf">Test de Mai</a>.</li>
+<h4>2019-2020 :</h4>
+<li><a href="https://maths-olympiques.fr/wp-content/uploads/2019/12/sujet-test-novembre.pdf">Test de Novembre</a>.</li>
+<li><a href="https://maths-olympiques.fr/wp-content/uploads/2020/11/Enonce-Test-Fevrier-2020.pdf">Tests de Février</a>.</li>`
+	got := POFMPapers(page)
+	want := []National{
+		{Competition: "fr-tst", Year: 2021, Paper: "test3", URL: "https://maths-olympiques.fr/wp-content/uploads/2021/12/Enoncé-Test-3-2020.pdf"},
+		{Competition: "fr-tst", Year: 2021, Paper: "test5", URL: "https://maths-olympiques.fr/wp-content/uploads/2021/12/Sujet-test-5-2021.pdf"},
+		{Competition: "fr-tst", Year: 2023, Paper: "test2", URL: "https://maths-olympiques.fr/wp-content/uploads/2023/01/Énoncé-Web-Test-2.pdf"},
+		{Competition: "fr-tst", Year: 2026, Paper: "test1", URL: "https://maths-olympiques.fr/wp-content/uploads/2026/10/Sujet-Test-1-2025-2026.pdf"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("POFMPapers = %+v", got)
+	}
+}

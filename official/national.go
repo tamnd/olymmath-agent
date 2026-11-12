@@ -1025,3 +1025,51 @@ func SMTPapers(page string) []National {
 	slices.SortStableFunc(out, func(a, b National) int { return a.Year - b.Year })
 	return out
 }
+
+// POFMListing is the page of the French olympiad preparation (POFM) that lists the past tests of each school year.
+const POFMListing = "https://maths-olympiques.fr/?page_id=479"
+
+// pofmRE matches a heading of a school year, as "2024-2025 :", or a link to a PDF.
+var pofmRE = regexp.MustCompile(`<h[1-6][^>]*>\s*(20[0-9]{2})-(20[0-9]{2})\s*:?\s*</h[1-6]>|<a href="([^"]+\.pdf)"`)
+
+// pofmTestRE matches the file name of a numbered test, as Sujet-Test-3-2024-2025.pdf or Énoncé-Web-Test-1.pdf.
+var pofmTestRE = regexp.MustCompile(`[Tt]est-([1-5])(?:-[0-9]{4}){0,2}\.pdf$`)
+
+// POFMPapers reads the papers of the POFM tests (fr-tst) from the page of past tests. A link belongs to the school year of the last heading before it, and the edition is the second year of the school year. Only the school years from 2020-2021 are kept, because their five files are numbered Test 1 to Test 5. Test N is the paper testN. The solutions (Corrigé) are left out.
+func POFMPapers(page string) []National {
+	var out []National
+	seen := map[string]bool{}
+	year := 0
+	for _, m := range pofmRE.FindAllStringSubmatch(page, -1) {
+		if m[1] != "" {
+			year, _ = strconv.Atoi(m[2])
+			continue
+		}
+		if year < 2021 {
+			continue
+		}
+		u := html.UnescapeString(m[3])
+		name := u[strings.LastIndex(u, "/")+1:]
+		if strings.HasPrefix(strings.ToLower(name), "corrig") {
+			continue
+		}
+		t := pofmTestRE.FindStringSubmatch(name)
+		if t == nil {
+			continue
+		}
+		paper := "test" + t[1]
+		key := strconv.Itoa(year) + paper
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, National{Competition: "fr-tst", Year: year, Paper: paper, URL: u})
+	}
+	slices.SortFunc(out, func(a, b National) int {
+		if a.Year != b.Year {
+			return a.Year - b.Year
+		}
+		return strings.Compare(a.Paper, b.Paper)
+	})
+	return out
+}
