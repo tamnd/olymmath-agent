@@ -92,6 +92,9 @@ func runImportLoose(env Env, args []string) int {
 	}
 	r := &looseReader{corpus: corpus, al: al, located: *located, labels: strings.Split(*labels, ","), block: strings.Split(*block, ","), thisYear: time.Now().Year(), dropped: map[string]int{}}
 	r.used = map[string]bool{}
+	if r.removed, err = loadRemoved(*root); err != nil {
+		return fail(err)
+	}
 	for _, p := range corpus.All() {
 		for _, s := range p.Statements {
 			if s.Capture != "" {
@@ -360,11 +363,39 @@ type looseReader struct {
 	block    []string
 	thisYear int
 	used     map[string]bool
+	// removed are the rows that a review took out of the content (registers/loose-removed.tsv).
+	removed map[string]bool
 
 	pending                 []pendingLoose
 	rows                    []looseRow
 	read, already, droppedN int
 	dropped                 map[string]int
+}
+
+// RemovedFile lists the rows that a review took out of the content: the capture and the reason, separated by a tab. A loose problem that is removed leaves no capture, so without this file the next batch would bring its row back.
+const RemovedFile = "registers/loose-removed.tsv"
+
+// loadRemoved reads the captures of RemovedFile. A missing file is an empty list.
+func loadRemoved(root string) (map[string]bool, error) {
+	b, err := os.ReadFile(filepath.Join(root, RemovedFile)) // #nosec G304 -- a register of the content root that the user names.
+	if errors.Is(err, os.ErrNotExist) {
+		return map[string]bool{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]bool{}
+	for i, line := range strings.Split(string(b), "\n") {
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		capture, reason, ok := strings.Cut(line, "\t")
+		if !ok || !strings.Contains(capture, "#row=") || strings.TrimSpace(reason) == "" {
+			return nil, fmt.Errorf("%s:%d: want a capture, a tab and a reason", RemovedFile, i+1)
+		}
+		out[capture] = true
+	}
+	return out, nil
 }
 
 func (r *looseReader) drop(reason string) error {
@@ -380,6 +411,9 @@ func (r *looseReader) add(row seed.Row) error {
 	if r.used[capture] {
 		r.already++
 		return nil
+	}
+	if r.removed[capture] {
+		return r.drop("removed by a review")
 	}
 	src := r.corpus.Source(row.Source)
 	if src == nil || src.Origin == "M" || src.DoNotRepublish || (src.Zone.Statement != "Z1" && src.Zone.Statement != "Z2") {

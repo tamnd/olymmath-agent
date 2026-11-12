@@ -186,3 +186,25 @@ func TestImportLooseBlockLink(t *testing.T) {
 		t.Errorf("imo/2024/p1 got a statement: %+v", p)
 	}
 }
+
+func TestImportLooseRemoved(t *testing.T) {
+	text := "Prove that for any integer $n$, among the numbers $n, n+1, n+2, n+3, n+4$ there is at least one number that is coprime with the other four of these numbers."
+	root, dir := looseFixture(t, []seed.Row{{Labels: []string{"Some forum"}, Statement: text}, {Labels: []string{"Some forum"}, Statement: strings.Replace(text, "five", "5", 1) + " Find all such $n$."}})
+	reg := "# capture, reason\nhf-test/train.parquet#row=0\tnot one clear problem\n"
+	if err := os.WriteFile(filepath.Join(root, RemovedFile), []byte(reg), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errs := run("import", "-loose", "-content", root, "-seed", dir, "-sources", "hf-test", "-dry")
+	if code != ExitOK {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	if !strings.Contains(errs, "dropped, removed by a review: 1") || !strings.Contains(errs, "1 new problems from 1 rows") {
+		t.Errorf("the counts:\n%s", errs)
+	}
+	if err := os.WriteFile(filepath.Join(root, RemovedFile), []byte("hf-test/train.parquet#row=0\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, errs := run("import", "-loose", "-content", root, "-seed", dir, "-sources", "hf-test", "-dry"); code == ExitOK || !strings.Contains(errs, "want a capture, a tab and a reason") {
+		t.Errorf("a line with no reason: exit %d: %s", code, errs)
+	}
+}
