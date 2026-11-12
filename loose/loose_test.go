@@ -199,6 +199,22 @@ func TestDecideChoices(t *testing.T) {
 	}
 }
 
+func TestDecideNumbers(t *testing.T) {
+	a := "Let $a_{n, m}$ be the number written with all numbers from $n$ down to $m$, where $n > m \\geq 1$. For example, $a_{4,2}=432$. Prove that one of these numbers is divisible by 2021."
+	b := strings.Replace(a, "2021", "2022", 1)
+	rows := []Doc{{Text: a}, {Text: b}, {Text: b}, {Text: a + " "}}
+	ds := Decide(filler(40), rows, Options{Neighbors: 8})
+	want := []Kind{New, Hold, Hold, Join}
+	for i, w := range want {
+		if ds[i].Kind != w {
+			t.Errorf("row %d: %v (%+v), want %v", i, ds[i].Kind, ds[i], w)
+		}
+	}
+	if ds[1].Reason != "other numbers" {
+		t.Errorf("row 1: reason %q", ds[1].Reason)
+	}
+}
+
 func TestDecideSibling(t *testing.T) {
 	square := `Baron Munchausen discovered the following theorem: "For any positive integers $a$ and $b$ there exists a positive integer $n$ such that $an$ is a perfect square, while $bn$ is a perfect cube". Determine if the statement of Baron's theorem is correct.`
 	cube := strings.Replace(strings.Replace(square, "perfect cube", "perfect fifth power", 1), "perfect square", "perfect cube", 1)

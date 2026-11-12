@@ -279,6 +279,13 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 				}
 				if d.Target < 0 {
 					d.Kind, d.Target = Join, -1-d.Target
+					// Two rows of a derived dataset with the same words and other numbers are most often two versions of one problem, such as 2021 and 2022 or 33 and 123 points. The text signals and the exact key read past one number, so a join needs the same numbers as the row it joins and as the row that made the new problem.
+					if shapes[i].numbers != shapes[c.doc].numbers || shapes[i].numbers != shapes[n+d.Target].numbers {
+						if doubt.Kind == New {
+							doubt = Decision{Kind: Hold, Target: owner[c.doc], Signals: s, Reason: "other numbers"}
+						}
+						continue
+					}
 				}
 				if best == nil || better(s, best.Signals) {
 					best = &d
