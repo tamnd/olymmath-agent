@@ -33,6 +33,30 @@ func TestFind(t *testing.T) {
 	}
 }
 
+func TestFindFrom(t *testing.T) {
+	texts := []string{
+		"Let ABC be a triangle with incircle omega touching BC at D. Prove that the circumcircle passes through D.",
+		"Find all functions f from the reals to the reals with f(x+y)=f(x)+f(y).",
+		"In triangle ABC the incircle omega touches BC at D. Show that the circumcircle of the triangle passes through D.",
+	}
+	for i := 3; i < 30; i++ {
+		texts = append(texts, "Some other unrelated statement about chess boards and coins number "+string(rune('a'+i)))
+	}
+	all := Find(texts, 2, 0.2)
+	got := FindFrom(texts, 2, 2, 0.2)
+	if got[0] != nil || got[1] != nil {
+		t.Errorf("the texts before from have matches: %+v %+v", got[0], got[1])
+	}
+	for i := 2; i < len(texts); i++ {
+		if !reflect.DeepEqual(got[i], all[i]) {
+			t.Errorf("%d: FindFrom %+v, Find %+v", i, got[i], all[i])
+		}
+	}
+	if len(got[2]) == 0 || got[2][0].Doc != 0 {
+		t.Errorf("2: %+v", got[2])
+	}
+}
+
 func TestWords(t *testing.T) {
 	if got := Words("Let $x$ be a REAL number, and x2 > 0."); len(got) != 1 || got[0] != "x2" {
 		t.Errorf("%q", got)

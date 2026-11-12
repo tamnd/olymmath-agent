@@ -35,10 +35,14 @@ func d01(c *Context) {
 	byAt := map[string]int{}
 	ps := c.Corpus.All()
 	for i, p := range ps {
-		if len(p.Appearances) == 0 || p.Statement == "" {
+		if p.Statement == "" {
 			continue
 		}
-		at := p.Appearances[0].At
+		// A loose problem has no appearance, so its tag names it (spec 06.8).
+		at := p.Tag
+		if len(p.Appearances) > 0 {
+			at = p.Appearances[0].At
+		}
 		byAt[at] = i
 		x.Add(at, match.Shingles(p.Statement))
 	}

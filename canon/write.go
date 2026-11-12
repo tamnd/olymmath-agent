@@ -28,9 +28,11 @@ type outStatement struct {
 	Name   string `yaml:"name,omitempty"`
 	URL    string `yaml:"url,omitempty"`
 	Page   int    `yaml:"page,omitempty"`
-	Origin string `yaml:"origin"`
-	Zone   string `yaml:"zone"`
-	Kind   string `yaml:"kind"`
+	// Capture names the row of a seed source that gave the text, such as hf-ai-mo-aops/data/train.parquet#row=12.
+	Capture string `yaml:"capture,omitempty"`
+	Origin  string `yaml:"origin"`
+	Zone    string `yaml:"zone"`
+	Kind    string `yaml:"kind"`
 	// Extraction and Confidence are set for a text that a model read from a scan.
 	Extraction string  `yaml:"extraction,omitempty"`
 	Confidence float64 `yaml:"confidence,omitempty"`
@@ -64,7 +66,7 @@ func statementOf(id string, c *Candidate) outStatement {
 	if lang == "" {
 		lang = "en"
 	}
-	return outStatement{ID: id, Lang: lang, Source: c.Source, Name: c.Name, URL: c.URL, Origin: c.Origin, Zone: c.Zone, Kind: kind}
+	return outStatement{ID: id, Lang: lang, Source: c.Source, Name: c.Name, URL: c.URL, Capture: c.Capture, Origin: c.Origin, Zone: c.Zone, Kind: kind}
 }
 
 // Render writes the file of a new problem. typ is the problem type, or "" when it is not known.
@@ -162,6 +164,12 @@ func (a Additions) ID(c *Candidate) string {
 		}
 	}
 	return ""
+}
+
+// With gives a with one more statement: a link to the text of c, with the id S<n>.
+func (a Additions) With(n int, c *Candidate) Additions {
+	a.Statements = append(a.Statements, statementOf(fmt.Sprintf("S%d", n), c))
+	return a
 }
 
 // LinkID gives the id of a statement of p that is a link with no text to the page of c: the same source and the same URL. An earlier import adds such a link to a problem whose canonical statement is a link of zone Z3, so the text of c can fill that statement. It gives "" when p has no such statement, or when p has a text.

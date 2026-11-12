@@ -14,5 +14,9 @@ statements:
     origin: H3
     zone: Z1
     kind: transcription
+unplaced:
+  - at: imo/2024
+    source: mathse
+    label: IMO 2024
 ---
 Prove that $a^2 + b^2 \geq 2ab$ for all real numbers $a$ and $b$.

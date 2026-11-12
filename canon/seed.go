@@ -33,6 +33,11 @@ func isRef(text string) bool {
 	return !strings.Contains(text, "$") && len(strings.Fields(text)) < 20 && !strings.HasSuffix(text, "?") && refRE.MatchString(text)
 }
 
+// IsStatement tells if a normalized text states a problem: it is not shorter than MinText, it is not a title or a reference, a text with no formula has at least MinWords words, and the text has a formula or a mark that ends a sentence. A short list of references with no formula, separated by semicolons, is not a statement.
+func IsStatement(text string) bool {
+	return utf8.RuneCountInString(text) >= MinText && !titleRE.MatchString(text) && !isRef(text) && (len(strings.Fields(text)) >= MinWords || strings.Contains(text, "$")) && strings.ContainsAny(text, "$.?!:") && (!strings.Contains(text, ";") || strings.Contains(text, "$") || len(strings.Fields(text)) >= 30)
+}
+
 // Letter gives the letter of the edition of a competition with two papers each year, from the labels of a row: "AIME I" gives a, "AIME II" gives b and "AMC 10B" gives b. It returns "" when no label has a letter.
 func Letter(labels []string) string {
 	for _, l := range labels {
@@ -301,7 +306,7 @@ func (s *Seeds) candidate(r seed.Row, code, pos string) (*Candidate, bool) {
 		return nil, false
 	}
 	text := normalize.Statement(r.Statement, pos)
-	if utf8.RuneCountInString(text) < MinText || titleRE.MatchString(text) || isRef(text) || (len(strings.Fields(text)) < MinWords && !strings.Contains(text, "$")) || !strings.ContainsAny(text, "$.?!:") || (strings.Contains(text, ";") && !strings.Contains(text, "$") && len(strings.Fields(text)) < 30) {
+	if !IsStatement(text) {
 		s.skip(r, code, "not a statement")
 		return nil, false
 	}
