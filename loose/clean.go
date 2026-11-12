@@ -63,14 +63,16 @@ var (
 	blankRE = regexp.MustCompile(`\n[ \t]*\n(?:[ \t]*\n)+`)
 	// pointsRE is the points of a problem before its text, as "(3 points) Find the distance" or "[4 points] Find the number".
 	pointsRE = regexp.MustCompile(`(?i)^\s*[(\[]\s*[0-9]+\s*(?:points?|pts?\.?|marks?)\s*[)\]][\s.:]*`)
+	// gradeLeadRE is the grade of a problem before its text, as "(8th grade) Prove" or "(10-11 grades) Find".
+	gradeLeadRE = regexp.MustCompile(`(?i)^\s*\(\s*(?:[0-9]{1,2}\s*-\s*)?[0-9]{1,2}\s*(?:th|st|nd|rd)?\s*(?:grades?|class(?:es)?|form)\s*\)[\s.:]*`)
 	// sectionRE is a problem number of a section with no point after it, as "10.2 Plot the set of points".
 	sectionRE = regexp.MustCompile(`^\s*([1-9][0-9]?)(?:\.[0-9]{1,3})+\s+(\p{Lu}\p{Ll})`)
 	// gradingRE is a scheme of the points of a solution, or a note of a translator about the text. Neither is a problem.
 	gradingRE = regexp.MustCompile(`(?i)\b(?:grading|evaluation|marking|assessment|scoring) (?:criteria|scheme|guidelines|instructions)\b|\bcriteria for (?:evaluation|evaluating|grading)\b|\btranslat(?:or|ion)(?:'s)? notes?\b|\bnote:? the (?:translation|original text)\b`)
-	// leadRE is a problem mark at the start of a text, such as "Problem 4.", "**Problem 3.**", "Task 2:", "P6.", "7.", "11.4.", "2)", "Example 3." or the number of a problem of a book, as "1037.", "18.45*." or "(!) 11.".
-	leadRE = regexp.MustCompile(`(?i)^\s*(?:\(!\)\s*)?(?:\*\*|__)?\s*(?:(?:problem|task|question|exercise|example|задача)\s*-?\s*|[pq]\s*\.?\s*)?([1-9][0-9]{0,3})((?:\.[0-9]{1,3})*)\s*\**\s*(?:\.\)|[.:)])\s*(?:\*\*|__)?(?:\s|$)`)
-	// pairLeadRE is the mark of a problem of a grade or a round, as "3-3.", "3-ча 2." or "3-rd 5.", a number of a book that starts with 0, as "0.16.", or the mark of an example of a book with no number or with a note, as "Example." or "Example 1 (to item 2).".
-	pairLeadRE = regexp.MustCompile(`(?i)^\s*(?:[1-9][0-9]?-(?:[1-9][0-9]?|(?:ча|cha)\s*[1-9][0-9]?|(?:st|nd|rd|th)\s+[1-9][0-9]?)|0\.[0-9]{1,3}|example(?:\s+[0-9]{1,3})?\s*\([^()\n]{1,40}\)|example)\s*[.:]\s+`)
+	// leadRE is a problem mark at the start of a text, such as "Problem 4.", "**Problem 3.**", "Task 2:", "P6.", "7.", "11.4.", "2)", "Example 3.", "Ex. 119." or the number of a problem of a book, as "1037.", "18.45*." or "(!) 11.".
+	leadRE = regexp.MustCompile(`(?i)^\s*(?:\(!\)\s*)?(?:\*\*|__)?\s*(?:(?:problem|task|question|exercise|example|ex\.|задача)\s*-?\s*|[pq]\s*\.?\s*)?([1-9][0-9]{0,3})((?:\.[0-9]{1,3})*)\s*\**\s*(?:\.\)|[.:)])\s*(?:\*\*|__)?(?:\s|$)`)
+	// pairLeadRE is the mark of a problem of a grade or a round, as "3-3.", "3-ча 2." or "3-rd 5.", a number of a book that starts with 0, as "0.16.", the mark of an example of a book with no number or with a note, as "Example." or "Example 1 (to item 2).", or the number of a book with the number of an older edition after it, as "112(981)." or "37(!).".
+	pairLeadRE = regexp.MustCompile(`(?i)^\s*(?:[1-9][0-9]?-(?:[1-9][0-9]?|(?:ча|cha)\s*[1-9][0-9]?|(?:st|nd|rd|th)\s+[1-9][0-9]?)|0\.[0-9]{1,3}|example(?:\s+[0-9]{1,3})?\s*\([^()\n]{1,40}\)|example|[1-9][0-9]{0,3}\s?\((?:[0-9]{1,4}|!|U)\))\s*[.:]\s+`)
 	// wrapRE is a sign that a book repeats at a line break, so the dataset has it twice, as "$y=$ $=\\sqrt{x}$".
 	wrapRE = regexp.MustCompile(`=\$[ \n]*\$[ \n]*=|\+\$[ \n]*\$[ \n]*\+|-\$[ \n]*\$[ \n]*-|<\$[ \n]*\$[ \n]*<|>\$[ \n]*\$[ \n]*>|\\times\$[ \n]*\$[ \n]*\\times`)
 	// tightLeadRE is a problem number glued to the text, as "3-There is" or "1.Let".
@@ -128,6 +130,12 @@ var (
 	tailRE = regexp.MustCompile(`(?:\n\s*(?:\$\$\s*)?\*\s*\*\s*\*(?:\s*\$\$)?|\n\s*\n\s*\p{Lu}{2,}(?:[ \-]+\p{Lu}{2,})+)\s*$`)
 	// olympiadTailRE is the heading of an olympiad and the table of its problems by class and day that a book puts after the last problem of the olympiad, as "17th All-Union Olympiad, 1983 (Kishinev)" and "| Class | 1st day | 2nd day |". The heading has a year and no point, colon or question mark, so a table that a problem gives is kept.
 	olympiadTailRE = regexp.MustCompile(`(?is)\n\s*\n(?:\$\$\s*\\begin\{gathered\}\s*)?[^\n]*\bolympiad\b[^.:?]*?\b(?:19|20)[0-9]{2}\b[^.:?]*?\n\s*\n\s*\|\s*(?:class|racc|pass|grade)\b.*$`)
+	// pageRE is the number of a page that a book prints after the last problem of the page, as "388", alone in the last paragraph of a text. A number of four digits is most often a year, so it stays.
+	pageRE = regexp.MustCompile(`^[0-9]{1,3}$`)
+	// gradeRE is the grade or the points of a problem in the last paragraph of a text, as "(10-11 grades)", "(10th grade)" or "(7-8 pts)", once its "$" signs, "\\text" and braces are taken out.
+	gradeRE = regexp.MustCompile(`(?i)^\((?:[0-9]{1,2}-)?[0-9]{1,2}(?:(?:th|st|nd|rd)(?:grades?|classes?|form)?|grades?|classes?|pts\.?|points)\)\.?$`)
+	// gradeSkipRE is what is taken out of a last paragraph before gradeRE reads it.
+	gradeSkipRE = regexp.MustCompile(`\$|\\text|[{}\s]`)
 	// contextRE is a text that depends on another problem.
 	contextRE = regexp.MustCompile(`(?i)\b(?:previous|preceding|above|last|prior) (?:problem|exercise|question|task)\b|\b(?:problem|exercise|task) [0-9]{1,3} (?:above|before)\b|\bas in (?:problem|exercise|task) [0-9]{1,3}\b|\bfrom (?:problem|exercise|task) [0-9]{1,3}\b|\bof (?:the )?(?:previous|preceding) part\b`)
 	// figureRE is a text that needs a figure that the row does not have.
@@ -177,8 +185,8 @@ func Clean(raw string) (string, string) {
 		lead, _ = strconv.Atoi(text[m[2]:m[3]])
 		text = text[m[4]:]
 	}
-	text = strings.TrimSpace(pointsRE.ReplaceAllString(text, ""))
-	text = strings.TrimSpace(tailRE.ReplaceAllString(olympiadTailRE.ReplaceAllString(firstCopy(text), ""), ""))
+	text = strings.TrimSpace(gradeLeadRE.ReplaceAllString(pointsRE.ReplaceAllString(text, ""), ""))
+	text = bookTail(strings.TrimSpace(tailRE.ReplaceAllString(olympiadTailRE.ReplaceAllString(firstCopy(text), ""), "")))
 	// A step of a solution and the mark of the compendium often follow a problem number, as in "5. Since ..." or "27. (BLR) Ten points ...", so they are read after the number is cut.
 	switch {
 	case stepRE.MatchString(text):
@@ -242,6 +250,24 @@ func Clean(raw string) (string, string) {
 		return "", BrokenTeX
 	}
 	return text, ""
+}
+
+// bookTail cuts the number of a page and the grade or the points of the problem that a book prints after it, each in a last paragraph of its own. A page number is cut only after a text that ends as a sentence or a formula ends, so that "Find the number:\n\n17" keeps its number.
+func bookTail(text string) string {
+	for {
+		k := strings.LastIndex(text, "\n\n")
+		if k < 0 {
+			return text
+		}
+		head, last := strings.TrimSpace(text[:k]), strings.TrimSpace(text[k+2:])
+		switch {
+		case pageRE.MatchString(last) && head != "" && strings.ContainsAny(head[len(head)-1:], ".?!$)"):
+		case gradeRE.MatchString(gradeSkipRE.ReplaceAllString(last, "")):
+		default:
+			return text
+		}
+		text = head
+	}
 }
 
 // bare tells if a text is only a formula, with fewer than three words around it and none that asks for something, as "$f(x)=\\frac{x^{3}}{x^{2}-2}$.": the task was in a heading that the dataset left out. A formula that ends in "=" or "=?" asks for its value, and a list of choices makes a question, so neither is bare.
