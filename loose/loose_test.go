@@ -298,3 +298,45 @@ func TestDecideComplete(t *testing.T) {
 		t.Errorf("a complete edition: %v %d (%s), want a hold with 3", ds[0].Kind, ds[0].Target, ds[0].Reason)
 	}
 }
+
+func TestDecideWords(t *testing.T) {
+	problems := filler(40)
+	// AMC 12 2012A problem 21, as the content has it.
+	problems[5].Text = alignDollars
+	// The same problem with a bare align, other spacing and other choices.
+	ds := Decide(problems, []Doc{{Text: alignBare}}, Options{Neighbors: 8})
+	if ds[0].Kind != Link || ds[0].Target != 5 || !strings.HasPrefix(ds[0].Reason, "words") {
+		t.Errorf("other formulas: %v %d (%s) %+v, want a link to 5 by the words", ds[0].Kind, ds[0].Target, ds[0].Reason, ds[0].Signals)
+	}
+	for _, c := range []Signals{{W: 1, M: 1, Words: 20, Numbers: true}, {W: 1, M: 1, O: 0.8, Words: 12, Numbers: true}} {
+		if !c.byWords() {
+			t.Errorf("%+v: not the same by the words", c)
+		}
+	}
+	for _, c := range []Signals{{W: 1, M: 1, Words: 20}, {W: 1, M: 1, O: 1, Words: 8, Numbers: true}, {W: 1, M: 0.6, Words: 20, Numbers: true}, {W: 0.7, M: 1, Words: 20, Numbers: true}, {W: 1, M: 0.9, O: 0.6, Words: 12, Numbers: true}} {
+		if c.byWords() {
+			t.Errorf("%+v: the same by the words", c)
+		}
+	}
+}
+
+const (
+	alignDollars = "Let $a$, $b$, and $c$ be positive integers with $a\\ge$ $b\\ge$ $c$ such that\n$$\n\\begin{align*}a^{2}-b^{2}-c^{2}+ab&=2011\\text{ and}\\\\\na^{2}+3b^{2}+3c^{2}-3ab-2ac-2bc&=-1997\n\\end{align*}\n$$\nWhat is $a$?\n\n\\textbf{(A)}\\ 249 \\textbf{(B)}\\ 250 \\textbf{(C)}\\ 251 \\textbf{(D)}\\ 252 \\textbf{(E)}\\ 253"
+	alignBare    = "Let $a,b,$ and $c$ be positive integers with $a\\ge b\\ge c$ such that \\begin{align*} a^2-b^2-c^2+ab&=2011\\text{ and}\\\\ a^2+3b^2+3c^2-3ab-2ac-2bc&=-1997\\end{align*} What is $a$ ? $ \\textbf{(A)}\\ 249 \\qquad\\textbf{(B)}\\ 250 \\qquad\\textbf{(C)}\\ 251 \\qquad\\textbf{(D)}\\ 252 \\qquad\\textbf{(E)}\\ 253$"
+)
+
+func TestShape(t *testing.T) {
+	a, b := shapeOf(matchText(alignBare)), shapeOf(matchText(alignDollars))
+	if w, m := bagJaccard(a.words, b.words), bagJaccard(a.formulas, b.formulas); w < WordSame || m < FormulaSame || a.numbers != b.numbers {
+		t.Errorf("a bare align and one in dollars: words %.2f, formulas %.2f, numbers %q and %q", w, m, a.numbers, b.numbers)
+	}
+	if a.n < MinWords {
+		t.Errorf("words: %d", a.n)
+	}
+	// PAMO 2013 problem 2 and another equation in the same words: the same letters in another order.
+	f, g := shapeOf(matchText("Find all functions $f:\\mathbb{R}\\to\\mathbb{R}$ such that $$f(xy)=\\max\\{f(x+y),f(x) f(y)\\} $$ for all real numbers $x$ and $y$ .")), shapeOf(matchText("Find all functions $f:\\mathbb{R}\\to\\mathbb{R}$ such that $f(x)f(y)+f(x+y)=xy$ for all real numbers $x$ and $y$ ."))
+	s := Signals{W: bagJaccard(f.words, g.words), M: bagJaccard(f.formulas, g.formulas), O: bagJaccard(f.order, g.order), Words: min(f.n, g.n), Numbers: f.numbers == g.numbers}
+	if s.byWords() {
+		t.Errorf("two functional equations: the same by the words, %+v", s)
+	}
+}
