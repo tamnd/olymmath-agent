@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm)", runPapers})
+	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa)", runPapers})
 }
 
 func runPapers(env Env, args []string) int {
@@ -31,8 +31,8 @@ func runPapers(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm"}, pos[0]) {
-		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm")
+	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa"}, pos[0]) {
+		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -55,7 +55,7 @@ func runPapers(env Env, args []string) int {
 	switch pos[0] {
 	case "usa-tst-archive":
 		return tstPapers(ctx, env, fc, corpus, *root, *from, *to)
-	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm":
+	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa":
 		return nationalPapers(ctx, env, fc, corpus, *root, pos[0], *from, *to)
 	}
 	comp := corpus.Competition("imo")
@@ -154,6 +154,7 @@ var nationals = map[string]struct {
 	"aimo-awb":          {[]string{official.BWMListing}, content.OfficialPaper{Lang: "German", Code: "de"}, official.AWBPapers},
 	"oktatas-oktv":      {official.OKTVListings, content.OfficialPaper{Lang: "Hungarian", Code: "hu"}, official.OKTVPapers},
 	"ssmr-onm":          {official.SSMRListings, content.OfficialPaper{Lang: "Romanian", Code: "ro"}, official.SSMRPapers},
+	"dmfa-massa":        {[]string{official.DMFAListing}, content.OfficialPaper{Lang: "Slovenian", Code: "sl"}, official.DMFAPapers},
 }
 
 // nationalPapers records the papers of a national source from its listing page. It writes the edition file when the corpus does not have the edition. The papers of one edition replace the papers of the source in the edition file, and the papers of other sources stay. Then om fetch SOURCE gets the papers into the store.

@@ -370,6 +370,15 @@ om ocr -content olymmath -lanes native -source ssmr-onm -lang ro -paper grade7 r
 
 The Romanian Mathematical Society (SSMR) has a page for each olympiad, such as ssmr.ro/onm2016. The page links the paper of each grade of the national round. The file names vary: faza_nationala/subiecte/subiecte_7.pdf (2013, 2014), ONM_2016_Clasa_VII.pdf (2016 to 2019) and etapa_3/subiecte/Subiecte_cl_7.pdf (2021). The page of 2015 on ssmr.ro links only the earlier rounds, so the command reads onm2015.ssmr.ro/subiecte. That page links only the solutions of each grade, such as 07_2015_solutii.pdf, and they state each problem first. Each grade numbers its problems from 1, so the paper of grade G is gradeG. Only grades 7 to 12 are recorded. The Hungarian versions (_HU), the solutions of the other years, the county round and the selection tests (juniori, seniori) are left out. The listing holds only the years that the register of ro-nmo has. The copyright note of the SSMR (ssmr.ro/node/463) says that the SSMR holds the rights to the problems of its contests, and that commercial use needs its written consent. The robots.txt asks for a crawl delay of 10 seconds and does not disallow /files/.
 
+The Slovenian national olympiad works the same way, with the source `dmfa-massa`:
+
+```sh
+om papers -content olymmath dmfa-massa
+om fetch -content olymmath dmfa-massa
+```
+
+The archive page of the DMFA (dmfa.si/Tekmovanja/MaSSA/ArhivNalog.aspx) links one file for the national round (Drzavno) of each year from 2001, except 2020. The page writes the paths with backslashes, as \Tekmovanja\GetPDF.ashx?src=MaSSA_Drzavno_2010.pdf. One file holds the papers of the four grades and their solutions, so the paper has no id. The selection round (Odbirno), the regional round (Podrocno) and the school round (Solsko) are left out. Each file says that the DMFA allows the use of the file only for the personal use of a student and for preparation in a school, and that no other web site may publish it. So the content only links to the papers. The site has no robots.txt.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Journals
