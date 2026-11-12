@@ -1,6 +1,7 @@
 package official
 
 import (
+	"cmp"
 	"html"
 	"regexp"
 	"slices"
@@ -823,5 +824,57 @@ func AWBPapers(page string) []National {
 		out = append(out, National{Competition: "de-tst", Year: y, URL: "https://www.mathe-wettbewerbe.de" + m[1]})
 	}
 	slices.SortFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}
+
+// OKTVListings are the pages of the Hungarian Educational Authority (Oktatási Hivatal) that list the papers of the three categories of the OKTV in mathematics.
+var OKTVListings = []string{
+	"https://www.oktatas.hu/kozneveles/tanulmanyi_versenyek_/oktv_kereteben/versenyfeladatok_javitasi_utmutatok/tartalomjegyzek/matematika_I",
+	"https://www.oktatas.hu/kozneveles/tanulmanyi_versenyek_/oktv_kereteben/versenyfeladatok_javitasi_utmutatok/tartalomjegyzek/matematika_II",
+	"https://www.oktatas.hu/kozneveles/tanulmanyi_versenyek_/oktv_kereteben/versenyfeladatok_javitasi_utmutatok/tartalomjegyzek/matematika_III",
+}
+
+// oktvRE matches the link to a file of the OKTV. The directory gives the school year, as oktv2018_2019_donto or oktv_2009_2010.
+var oktvRE = regexp.MustCompile(`href="(/pub_bin/dload/kozoktatas/tanulmanyi_versenyek/oktv/oktv_?((?:19|20)[0-9]{2})_((?:19|20)[0-9]{2})[a-z0-9_]*/([A-Za-z0-9_]+)\.pdf)"`)
+
+// oktvFileRE matches the name of a file that holds the problems of one paper: mat2_flap1f_oktv_1819 (round 1), mat2_flap2f_oktv1011 (round 2), mat2_flap_d_oktv_1819 (final), oktv0910_mat2_d_flut and oktv0506_mat2_d_fl_ut (final, with the solutions), matematika1_fela (round 1 of 2004/05) and mat2_2foktv0405_fl (round 2 of 2004/05). The marking guides (javut, mego, ut) have other names.
+var oktvFileRE = regexp.MustCompile(`^(?:mat([123])_flap(?:([12])f|_(d))_.*|oktv[0-9]{4}_mat([123])_(d)_fl_?ut|matematika([123])_fela|mat([123])_(2)foktv[0-9]{4}_fl)$`)
+
+// OKTVPapers gives the papers of the OKTV in mathematics (hu-oktv) on the listing pages of the Oktatási Hivatal. The edition is the second year of the school year, so the papers of 2018/2019 are in the edition 2019. The paper of category C and round R is catC-roundR, and the final round is catC-final. Category III has no second round. A file that a page links twice is given once.
+func OKTVPapers(page string) []National {
+	var out []National
+	seen := map[string]bool{}
+	for _, m := range oktvRE.FindAllStringSubmatch(page, -1) {
+		f := oktvFileRE.FindStringSubmatch(m[4])
+		if f == nil {
+			continue
+		}
+		var cat, round string
+		for i := 1; i < len(f); i++ {
+			if f[i] == "" {
+				continue
+			}
+			if cat == "" {
+				cat = f[i]
+			} else {
+				round = f[i]
+			}
+		}
+		if round == "" {
+			round = "1"
+		}
+		y, _ := strconv.Atoi(m[3])
+		paper := "cat" + cat + "-round" + round
+		if round == "d" {
+			paper = "cat" + cat + "-final"
+		}
+		key := m[3] + "/" + paper
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, National{Competition: "hu-oktv", Year: y, Paper: paper, URL: "https://www.oktatas.hu" + m[1]})
+	}
+	slices.SortStableFunc(out, func(a, b National) int { return cmp.Or(a.Year-b.Year, strings.Compare(a.Paper, b.Paper)) })
 	return out
 }
