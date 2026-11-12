@@ -780,3 +780,26 @@ func TestPOFMPapers(t *testing.T) {
 		t.Errorf("POFMPapers = %+v", got)
 	}
 }
+
+func TestPUMaCPapers(t *testing.T) {
+	page := `<div class="parallax-item" data-url-id="2025">
+<h2 style="white-space:pre-wrap;">Division B</h2><h3 style="white-space:pre-wrap;"><strong>ALGEBRA</strong></h3><h3 style="margin-left:40px;white-space:pre-wrap;"><a href="/s/PUMaC_2025_Algebra_B.pdf" target="_blank">problems</a> • <a href="/s/Algebra-B-Solutions-tm7w.pdf" target="_blank">Solutions</a></h3>
+<h2 style="white-space:pre-wrap;">Team Round</h2><h3 style="margin-left:40px;white-space:pre-wrap;"><a href="/s/PUMaC_2025_Team.pdf" target="_blank">PROBLEMS</a> • <a href="/s/Team-Solutions.pdf">SOLUTIONS</a></h3>
+<h2 style="white-space:pre-wrap;">Division A</h2><h3 style="white-space:pre-wrap;"><strong>NUMBER THEORY</strong></h3><h3><a href="/s/PUMaC_2025_Number_Theory_A.pdf" target="_blank">problems</a></h3>
+<h2 style="white-space:pre-wrap;">Power Round</h2><h3><a href="/s/Power_2025.pdf" target="_blank">PROBLEMS</a></h3>
+<div class="parallax-item" data-url-id="2013">
+<h2>Division B</h2><h3 style="white-space:pre-wrap;">individuals Finals</h3><h3 style="margin-left:40px;"><a href="/s/PUMaC2013_FinalsB.pdf" target="_blank">problems</a> •&nbsp;<a href="/s/PUMaC2013_FinalsBSol.pdf">solutions</a></h3>
+<h2>Team Round</h2><h3><a href="/s/PUMaC2009_TeamRound.pdf" target="_blank"><strong>problems</strong></a></h3>
+<h2>Division A</h2><h2>Live Round</h2><h3><a href="/s/PUMaC2016_Live_Round.pdf">problems</a></h3>`
+	got := PUMaCPapers(page)
+	want := []National{
+		{Competition: "pumac", Year: 2013, Paper: "finals-b", URL: "https://pumac.princeton.edu/s/PUMaC2013_FinalsB.pdf"},
+		{Competition: "pumac", Year: 2013, Paper: "team", URL: "https://pumac.princeton.edu/s/PUMaC2009_TeamRound.pdf"},
+		{Competition: "pumac", Year: 2025, Paper: "algebra-b", URL: "https://pumac.princeton.edu/s/PUMaC_2025_Algebra_B.pdf"},
+		{Competition: "pumac", Year: 2025, Paper: "team", URL: "https://pumac.princeton.edu/s/PUMaC_2025_Team.pdf"},
+		{Competition: "pumac", Year: 2025, Paper: "number-theory-a", URL: "https://pumac.princeton.edu/s/PUMaC_2025_Number_Theory_A.pdf"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("PUMaCPapers = %+v", got)
+	}
+}

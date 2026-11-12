@@ -406,6 +406,15 @@ om fetch -content olymmath maths-olympiques
 
 The page of past tests of maths-olympiques.fr (?page_id=479) lists the tests of each school year under a heading such as "2024-2025 :". A link belongs to the school year of the last heading before it, and the edition of fr-tst is the second year of the school year, so 2024-2025 is the edition of 2025. From 2020-2021 each school year has five files named Test 1 to Test 5, as Sujet-Test-3-2024-2025.pdf or Énoncé-Web-Test-1.pdf. Test N is the paper testN. Each paper numbers its exercises from 1 across its Junior, Senior and EGMO groups. The earlier years name their files by the month and some months have a file for each group or day, so they are left out. The solutions (Corrigé) are left out. The site has no page of terms and the papers give no licence. The path robots.txt sends the home page, so the site has no robots.txt.
 
+The Princeton University Mathematics Competition works the same way, with the source `pumac-archive`:
+
+```sh
+om papers -content olymmath pumac-archive
+om ocr -content olymmath -lanes native -paper algebra-a pumac/2024 https://pumac.princeton.edu/s/PUMaC_2024_Algebra_A.pdf
+```
+
+The archive page pumac.princeton.edu/archives has a section for each year from 2007. Each section has the papers of division A and division B, under the headings "Division A" and "Division B". A link with the label "problems" belongs to the round of the last heading before it. Each subject test (algebra, combinatorics, geometry and number theory) and the individual finals have one paper for each division, such as algebra-a and finals-b, and each paper numbers its problems from 1. The team round has one paper, team. The power round and the live round are left out, and so are the solutions and the answer sheets. The file names vary, such as PUMaC2015_AlgebraB.pdf, 2019NT_A_Div.pdf and Algebra_A_2023.pdf. The site states no terms and no licence. Its robots.txt allows /s/ for all agents.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Journals
