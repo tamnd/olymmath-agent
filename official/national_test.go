@@ -669,3 +669,25 @@ func TestOKTVPapers(t *testing.T) {
 		t.Errorf("OKTVPapers = %+v", got)
 	}
 }
+
+func TestSSMRPapers(t *testing.T) {
+	var page string
+	for _, u := range []string{"http://ssmr.ro/files/onm2013/faza_nationala/subiecte/subiecte_10.pdf", "http://ssmr.ro/files/onm2013/faza_nationala/subiecte/subiecte_7_HU.pdf", "http://ssmr.ro/files/onm2013/faza_nationala/subiecte/subiecte_7.pdf",
+		"http://ssmr.ro/files/onm2013/faza_nationala/subiecte/solutii_8.pdf", "http://ssmr.ro/files/onm2013/faza_nationala/subiecte/subiecte_juniori.pdf", "http://ssmr.ro/files/onm2013/faza_nationala/subiecte/subiecte_5.pdf",
+		"http://ssmr.ro/files/onm2013/faza_judet/subiecte_9.pdf", "http://onm2015.ssmr.ro/files/onm2015/subiecte/12_2015_solutii.pdf", "http://onm2015.ssmr.ro/files/onm2015/subiecte/06_2015_solutii.pdf",
+		"http://ssmr.ro/files/onm2016/subiecte/ONM_2016_Clasa_VIII.pdf", "http://ssmr.ro/files/onm2016/subiecte/ONM_2016_Clasa_V.pdf", "http://ssmr.ro/files/onm2016/subiecte/ONM_2016_seniori.pdf", "http://ssmr.ro/files/onm2016/subiecte/ONM_2016_Clasa_VIII.pdf",
+		"https://ssmr.ro/files/onm2021/etapa_3/subiecte/Subiecte_cl_9.pdf", "https://ssmr.ro/files/onm2021/etapa_3/subiecte/Barem_solutii_9.pdf", "https://ssmr.ro/files/onm2021/etapa_2/cl_9_enunturi.pdf"} {
+		page += `<a href="` + u + `">x</a>`
+	}
+	got := SSMRPapers(page)
+	want := []National{
+		{Competition: "ro-nmo", Year: 2013, Paper: "grade7", URL: "https://ssmr.ro/files/onm2013/faza_nationala/subiecte/subiecte_7.pdf"},
+		{Competition: "ro-nmo", Year: 2013, Paper: "grade10", URL: "https://ssmr.ro/files/onm2013/faza_nationala/subiecte/subiecte_10.pdf"},
+		{Competition: "ro-nmo", Year: 2015, Paper: "grade12", URL: "https://onm2015.ssmr.ro/files/onm2015/subiecte/12_2015_solutii.pdf"},
+		{Competition: "ro-nmo", Year: 2016, Paper: "grade8", URL: "https://ssmr.ro/files/onm2016/subiecte/ONM_2016_Clasa_VIII.pdf"},
+		{Competition: "ro-nmo", Year: 2021, Paper: "grade9", URL: "https://ssmr.ro/files/onm2021/etapa_3/subiecte/Subiecte_cl_9.pdf"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("SSMRPapers = %+v", got)
+	}
+}
