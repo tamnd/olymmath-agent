@@ -125,6 +125,7 @@ func TestRules(t *testing.T) {
 		{"T02", map[string][][2]string{"registers/tags.tsv": {{"006SZE6NAS\tsolution", "006SZE6NAS\tsolution\n0000000000\tproblem"}}}},
 		{"T03", map[string][][2]string{"registers/redirects.tsv": {{"imo/2024/q1\timo/2024/p1", "imo/2024/q1\timo/2024/p9"}}}},
 		{"T04", map[string][][2]string{p2: {{"  - at: imo/2024/p2\n    primary: true", "  - at: imo/2024/p2\n    primary: true\n  - at: imo/2024/p1"}}}},
+		{"D01", map[string][][2]string{"problems/_loose/0J8/0J8TP3MFS9.md": {{"Prove that $a^2 + b^2 \\geq 2ab$ for all real numbers $a$ and $b$.", "Determine all real numbers $\\alpha$ such that, for every positive integer $n$, the integer\n$$\\lfloor \\alpha \\rfloor + \\lfloor 2\\alpha \\rfloor + \\cdots + \\lfloor n\\alpha \\rfloor$$\nis a multiple of $n$."}}}},
 		{"S01", map[string][][2]string{p2: {{"rule: official-original", "rule: best"}}}},
 		{"S02", map[string][][2]string{p2: {{"origin: H1", "origin: M"}}}},
 		{"S03", map[string][][2]string{p2: {{"source: imo-official", "source: nowhere"}}}},

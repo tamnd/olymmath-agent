@@ -97,6 +97,17 @@ problems/_loose/7K3/7K3QX2M9R2.md  a problem with no known appearance
 
 The primary appearance is the earliest official appearance in a competition. If the problem has no known appearance (a forum problem, a book problem), the file is in `_loose/`, sharded by the first three characters of the tag. A path is not an identity. The tag is the identity.
 
+A loose problem can still carry what its sources say about where it was set, in the key `unplaced`:
+
+```yaml
+unplaced:
+  - at: cn-mo/2015        # a competition code, or a code and an edition; never a position
+    source: hf-ai-mo-aops
+    label: "China National Olympiad 2015"
+```
+
+An `unplaced` entry is not an appearance. It has no position, it does not give the file its path, and it does not count in the coverage of the edition (document 14). It is there because many sources name the competition and the year of a problem but not its number, and a guessed number would be a false locator. The site shows the entries on the page of the problem and lists the problem under the competition and year in the index of loose problems. When a person or a later import finds the position, the problem gets a real appearance, moves to its locator path, and the entry goes. `at` must name a competition of the register. `label` is the free text of the source, kept as it is.
+
 ```markdown
 ---
 tag: 7K3QX2M9R2

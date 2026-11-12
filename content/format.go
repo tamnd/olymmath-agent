@@ -11,7 +11,7 @@ import (
 
 // keyOrder gives the order of the keys of each kind of front matter, and of the records inside it. A key that is not in the list goes after the known keys, in its old order. The loader reports such a key.
 var keyOrder = map[string][]string{
-	"problem":    {"tag", "kind", "appearances", "title", "type", "topics", "answer", "authors", "canonical", "statements", "xref", "links", "status"},
+	"problem":    {"tag", "kind", "appearances", "title", "type", "topics", "answer", "authors", "canonical", "statements", "xref", "links", "status", "unplaced"},
 	"solution":   {"tag", "kind", "problem", "origin", "author", "source", "url", "capture", "zone", "lang", "method", "complete", "answer_claimed", "answer_check", "follows", "grades", "grade", "run", "translated_by"},
 	"appearance": {"at", "primary", "note"},
 	"statement":  {"id", "lang", "source", "name", "url", "page", "capture", "origin", "zone", "kind", "diff_from", "traced", "extraction", "confidence"},
@@ -21,6 +21,7 @@ var keyOrder = map[string][]string{
 	"grade":      {"scale", "score", "bucket", "rubric", "at", "graders", "rule", "queue", "run_id"},
 	"judgement":  {"by", "family", "score", "max", "rubric", "at", "notes_hash", "revised"},
 	"link":       {"type", "to"},
+	"unplaced":   {"at", "source", "label"},
 }
 
 // children names the order list of the records under a key.
@@ -36,6 +37,7 @@ var children = map[string]string{
 	"grades":        "judgement",
 	"graders":       "judgement",
 	"links":         "link",
+	"unplaced":      "unplaced",
 }
 
 // Format returns a content file in its canonical form: the keys of the front matter in a fixed order, an indent of two spaces, no space at the end of a line and one newline at the end of the file. The text of the body does not change in any other way.

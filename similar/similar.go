@@ -48,12 +48,18 @@ type posting struct {
 
 // Find gives, for each text, at most n other texts with a score of at least least, the best first. A word that is in more than a tenth of the texts does not count, because it is too common to tell texts apart.
 func Find(texts []string, n int, least float64) [][]Match {
+	return FindFrom(texts, 0, n, least)
+}
+
+// FindFrom is Find for the texts from index from on: the weights and the matches come from all the texts, but only the texts from from on get their matches. The result has one entry for each text, and the entries before from are nil. An import uses it to find the matches of its new texts among the problems and the other new texts, with no work for each problem.
+func FindFrom(texts []string, from, n int, least float64) [][]Match {
 	sorted, vecs, index := weigh(texts)
 	out := make([][]Match, len(texts))
-	// The scores of one text do not depend on the other scores, so the workers share the texts.
 	var next atomic.Int64
+	next.Store(int64(from))
+	// The scores of one text do not depend on the other scores, so the workers share the texts.
 	var wg sync.WaitGroup
-	for range min(max(runtime.NumCPU(), 1), max(len(texts), 1)) {
+	for range min(max(runtime.NumCPU(), 1), max(len(texts)-from, 1)) {
 		wg.Go(func() {
 			// Each worker keeps one score buffer for all its texts, so a text does not make a new map.
 			s := newScores(len(texts))

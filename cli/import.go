@@ -31,6 +31,9 @@ func init() {
 }
 
 func runImport(env Env, args []string) int {
+	if i := slices.Index(args, "-loose"); i >= 0 {
+		return runImportLoose(env, slices.Delete(slices.Clone(args), i, i+1))
+	}
 	fs := newFlags("import", env.Stderr)
 	root := fs.String("content", ".", "the root of the content repository")
 	dir := fs.String("seed", seed.DefaultDir(), "the directory of the seed rows")
@@ -50,6 +53,7 @@ func runImport(env Env, args []string) int {
 	matchOut := fs.String("match-out", "", "write the pairs of the content match to this TSV file, with their scores and no text")
 	matchLane := fs.String("match-lane", "", "ask this lane, such as codex, whether each doubtful pair of the content match is one problem, one question at a time, and write the answer as a review of kind match")
 	matchAsks := fs.Int("match-asks", 20, "ask the lane at most this number of questions")
+	fs.Bool("loose", false, "import the rows that name no position as loose problems (spec 06.8); see om import -loose -h")
 	if _, err := parseMixed(fs, args); err != nil {
 		return ExitUsage
 	}

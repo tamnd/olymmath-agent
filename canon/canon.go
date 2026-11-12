@@ -33,6 +33,8 @@ type Candidate struct {
 	Key match.Key
 	// Reworded is true when the source changed the wording on purpose (the reworded field of the source register).
 	Reworded bool
+	// Capture names the row of the source, as hf-ai-mo-aops/data/train.parquet#row=12, when the statement keeps it.
+	Capture string
 
 	sh []uint64
 }

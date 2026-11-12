@@ -99,6 +99,9 @@ func TestLoadFindings(t *testing.T) {
 		{"bad code", "registers/competitions.yaml", "code: imo", "code: IMO", "is not valid"},
 		{"orphan text", "problems/imo/2024/p1.md", "is a multiple of $n$.", "is a multiple of $n$.\n\n<!-- S7 -->\nMore.", "no statement S7"},
 		{"solution of no problem", "solutions/imo/2024/p1/006SZE6NAS.md", "problem: 0HVHSDNNMY", "problem: 0ZZZZZZZZ0", "L01"},
+		{"unplaced position", "problems/_loose/0J8/0J8TP3MFS9.md", "at: imo/2024\n", "at: imo/2024/p1\n", "is not a competition or an edition"},
+		{"unplaced competition", "problems/_loose/0J8/0J8TP3MFS9.md", "at: imo/2024\n", "at: imx/2024\n", "names a competition that is not in the register"},
+		{"unplaced placed", "problems/imo/2024/p2.md", "kind: problem\n", "kind: problem\nunplaced:\n  - at: imo\n", "has a primary appearance and unplaced entries"},
 		{"bad tsv", "registers/redirects.tsv", "imo/2024/q1\timo/2024/p1", "imo/2024/q1", "line 2 has 1 fields"},
 	}
 	for _, tc := range cases {

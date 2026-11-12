@@ -345,6 +345,13 @@ type Link struct {
 // LinkTypes are the types of the edges of spec 04.7.
 var LinkTypes = []string{"variant_of", "generalizes", "special_case_of", "uses", "same_idea", "answers_at", "formalized_as"}
 
+// Unplaced is a competition, or a competition and an edition, that a source gives for a loose problem without a position.
+type Unplaced struct {
+	At     string `yaml:"at"`
+	Source string `yaml:"source,omitempty"`
+	Label  string `yaml:"label,omitempty"`
+}
+
 // Problem is one problem file.
 type Problem struct {
 	Tag         string            `yaml:"tag"`
@@ -360,6 +367,8 @@ type Problem struct {
 	Xref        map[string]string `yaml:"xref"`
 	Links       []Link            `yaml:"links"`
 	Status      Status            `yaml:"status"`
+	// Unplaced are what the sources of a loose problem say about where it was set, when they give no position (spec 04.3). They are not appearances.
+	Unplaced []Unplaced `yaml:"unplaced"`
 
 	// Statement is the canonical statement: Markdown with TeX math.
 	Statement string `yaml:"-"`

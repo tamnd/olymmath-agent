@@ -386,9 +386,27 @@ func (l *loader) solution(rel string) {
 	p.Solutions = append(p.Solutions, s)
 }
 
+// unplaced checks the unplaced entries of a problem: only a loose problem has them, and each names a competition of the register, or a competition and an edition, but never a position.
+func (l *loader) unplaced(p *Problem) {
+	if len(p.Unplaced) > 0 && p.Primary() != nil {
+		l.add(p.Path, "T03", "the problem has a primary appearance and unplaced entries")
+	}
+	for _, u := range p.Unplaced {
+		comp, edition, _ := strings.Cut(u.At, "/")
+		if strings.Contains(edition, "/") || (edition != "" && !locator.ValidEdition(edition)) {
+			l.add(p.Path, "T03", "the unplaced entry %q is not a competition or an edition", u.At)
+			continue
+		}
+		if l.corpus.byCode[comp] == nil {
+			l.add(p.Path, "T03", "the unplaced entry %q names a competition that is not in the register", u.At)
+		}
+	}
+}
+
 // link attaches each problem to its edition, puts the problems of each edition in the order of the papers, and orders the solutions.
 func (l *loader) link() {
 	for _, p := range l.corpus.all {
+		l.unplaced(p)
 		a := p.Primary()
 		if a == nil {
 			continue
