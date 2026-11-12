@@ -17,7 +17,10 @@ var (
 		`^{\circ}`, "°", `^\circ`, "°", `^{o}`, "°", `^o`, "°", `...`, `\dots`, `\cdots`, `\dots`, `\ldots`, `\dots`, `\dotsc`, `\dots`, `\dotsb`, `\dots`,
 		`\,`, "", `\;`, "", `\!`, "", `\:`, "", `\ `, "", `\displaystyle`, "",
 		`\textbf`, `\text`, `\textrm`, `\text`, `\mathrm`, `\text`,
+		`\measuredangle`, `\angle`, `\vartriangle`, `\triangle`, `\bigtriangleup`, `\triangle`,
 	)
+	// decoRE is a segment or an angle written with a mark around its letters, as \overline{AB}, \angle{ABC} and \triangle{ABC}. One copy of a problem has the mark and another has not, and the grams of the marks outweighed the problem.
+	decoRE = regexp.MustCompile(`\\(overline|angle|triangle)\s*\{([A-Za-z0-9']*)\}`)
 	// oneRE is a group of one letter or digit after _ or ^, such as x_{1}.
 	oneRE = regexp.MustCompile(`([_^])\{([A-Za-z0-9])\}`)
 	numRE = regexp.MustCompile(`^-?[0-9]+(?:[.,][0-9]+)?$`)
@@ -29,6 +32,13 @@ func matchText(text string) string {
 	return mathRE.ReplaceAllStringFunc(text, func(m string) string {
 		body := strings.Trim(m, "$")
 		body = texSame.Replace(body)
+		body = decoRE.ReplaceAllStringFunc(body, func(m string) string {
+			g := decoRE.FindStringSubmatch(m)
+			if g[1] == "overline" {
+				return g[2]
+			}
+			return `\` + g[1] + " " + g[2]
+		})
 		body = strings.Join(strings.Fields(body), "")
 		body = oneRE.ReplaceAllString(body, "$1$2")
 		if numRE.MatchString(body) {
