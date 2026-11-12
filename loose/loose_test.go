@@ -146,12 +146,43 @@ func TestDecideChoices(t *testing.T) {
 		{Text: digits + choices}, // 0: another problem with the same choices
 		{Text: strings.Replace(cube, "  ", " ", 1) + " " + strings.ReplaceAll(choices, "\\qquad", "")}, // 1: the problem with other spacing
 	}
+	area := "What is the area of the region enclosed by the graph of the equation $x^2+y^2=|x|+|y|?$"
+	problems = append(problems, Doc{Text: area + "\n\n\\textbf{(A)}\\ \\pi+\\sqrt{2} \\textbf{(B)}\\ \\pi+2 \\textbf{(C)}\\ \\pi+2\\sqrt{2} \\textbf{(D)}\\ 2\\pi+\\sqrt{2} \\textbf{(E)}\\ 2\\pi+2\\sqrt{2}"})
+	// 2: the same problem with its choices in a formula
+	rows = append(rows, Doc{Text: area + " $\\textbf{(A)}\\ \\pi+\\sqrt{2} \\textbf{(B)}\\ \\pi+2 \\textbf{(C)}\\ \\pi+2\\sqrt{2} \\textbf{(D)}\\ 2\\pi+\\sqrt{2} \\textbf{(E)}\\ 2\\pi+2\\sqrt{2}$"})
 	ds := Decide(problems, rows, Options{Neighbors: 8})
 	if ds[0].Kind == Link {
 		t.Errorf("row 0 links on its choices: %+v", ds[0])
 	}
+	if ds[2].Kind != Link || ds[2].Target != len(problems)-1 {
+		t.Errorf("row 2: %v %d (%+v), want a link to %d", ds[2].Kind, ds[2].Target, ds[2].Signals, len(problems)-1)
+	}
 	if ds[1].Kind != Link || ds[1].Target != 0 {
 		t.Errorf("row 1: %v %d (%+v), want a link to 0", ds[1].Kind, ds[1].Target, ds[1].Signals)
+	}
+}
+
+func TestDecideSibling(t *testing.T) {
+	square := `Baron Munchausen discovered the following theorem: "For any positive integers $a$ and $b$ there exists a positive integer $n$ such that $an$ is a perfect square, while $bn$ is a perfect cube". Determine if the statement of Baron's theorem is correct.`
+	cube := strings.Replace(strings.Replace(square, "perfect cube", "perfect fifth power", 1), "perfect square", "perfect cube", 1)
+	ed := []string{"caucasus/2018"}
+	problems := filler(40)
+	cases := []struct {
+		name     string
+		problems []Doc
+		rows     []Doc
+		want     Kind
+	}{
+		{"two rows of one edition", problems, []Doc{{Text: square, Editions: ed}, {Text: cube, Editions: ed}}, Hold},
+		{"two rows of no edition", problems, []Doc{{Text: square}, {Text: cube}}, Join},
+		{"a row and a loose problem of its edition", append([]Doc{{Text: square, Named: ed}}, problems...), []Doc{{Text: filler(41)[40].Text}, {Text: cube, Editions: ed}}, Hold},
+		{"the same text twice in one edition", problems, []Doc{{Text: square, Editions: ed}, {Text: square + " ", Editions: ed}}, Join},
+	}
+	for _, c := range cases {
+		ds := Decide(c.problems, c.rows, Options{Neighbors: 8})
+		if ds[1].Kind != c.want {
+			t.Errorf("%s: %v (%+v), want %v", c.name, ds[1].Kind, ds[1].Signals, c.want)
+		}
 	}
 }
 
@@ -209,6 +240,8 @@ func TestStem(t *testing.T) {
 		{"What is the number of digits of the least such $n$? $\\textbf{(A)}3\\textbf{(B)}4\\textbf{(C)}5$", "What is the number of digits of the least such $n$?"},
 		{"Find $x$ such that $x^2=4$ and $x>0$, and prove it.", "Find $x$ such that $x^2=4$ and $x>0$, and prove it."},
 		{"How many triangles? \\mathrm{(A)}1", "How many triangles? \\mathrm{(A)}1"},
+		{"What is the area of the region enclosed by the graph of $x^2+y^2=|x|+|y|?$\n\n\\textbf{(A)}\\ \\pi \\textbf{(B)}\\ 2", "What is the area of the region enclosed by the graph of $x^2+y^2=|x|+|y|?$"},
+		{"What is the area of the region enclosed by the graph of $x^2+y^2=|x|+|y|?$ $\\textbf{(A)}\\ \\pi \\textbf{(B)}\\ 2$", "What is the area of the region enclosed by the graph of $x^2+y^2=|x|+|y|?$"},
 	}
 	for _, c := range cases {
 		if got := stem(c[0]); got != c[1] {

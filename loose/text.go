@@ -39,7 +39,7 @@ func matchText(text string) string {
 }
 
 // choicesRE finds the start of the answer choices of a multiple choice problem: "\\textbf{(A)}", "\\mathrm{(A)}", "\\qquad (A)" or "(A)" at the start of a line.
-var choicesRE = regexp.MustCompile(`\$?\s*(?:\\(?:textbf|mathrm|textrm|text|mbox)\s*\{\s*\(A\)|\\qquad\s*\(A\)|(?m:^)\s*\(A\)\s)`)
+var choicesRE = regexp.MustCompile(`(?:\\(?:textbf|mathrm|textrm|text|mbox)\s*\{\s*\(A\)|\\qquad\s*\(A\)|(?m:^)\s*\(A\)\s)`)
 
 // stem gives a match text without the answer choices. The choices of two problems of one contest are often the same numbers, such as 3, 4, 5, 6 and 7, so they make two different problems look alike.
 func stem(form string) string {
@@ -47,5 +47,10 @@ func stem(form string) string {
 	if m == nil || m[0] < canon.MinText {
 		return form
 	}
-	return strings.TrimSpace(form[:m[0]])
+	st := strings.TrimSpace(form[:m[0]])
+	// The choices often start a formula: "$\textbf{(A)}". The "$" that opens it is not part of the stem, but the "$" that closes a formula before the choices is.
+	if strings.Count(st, "$")%2 == 1 && strings.HasSuffix(st, "$") {
+		st = strings.TrimSpace(strings.TrimSuffix(st, "$"))
+	}
+	return st
 }

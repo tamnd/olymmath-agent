@@ -20,6 +20,8 @@ type Doc struct {
 	Answer string
 	// Editions are the editions of the problem, as imo/2006, or for a row the edition that its source names.
 	Editions []string
+	// Named are the editions that the sources of a loose problem of the content name. The problem has no position in them, so the rule of the edition does not use them.
+	Named []string
 	// ID names the problem of a text of the content, so that two texts of one problem count once in an edition.
 	ID string
 }
@@ -204,6 +206,10 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 			if t < StemT && f < StemF {
 				s.T, s.F = t, f
 			}
+			// And the choices of one problem are written in many ways, in a formula or not, so the same stem is the same text.
+			if t >= match.Same {
+				s.T = max(s.T, t)
+			}
 		}
 		return s
 	}
@@ -234,6 +240,13 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 		doubt := Decision{Kind: New}
 		for _, c := range cands {
 			s := signals(i, c.doc, c.e)
+			if s.Same() && !s.Exact && s.T < match.Same && sibling(all[i], all[c.doc], c.doc >= n) {
+				// Two rows of one edition with close texts are often two papers of the contest, one for each grade, with one change in the data. They wait for a person.
+				if doubt.Kind == New {
+					doubt = Decision{Kind: Hold, Target: owner[c.doc], Signals: s, Reason: fmt.Sprintf("same edition, T %.2f", s.T)}
+				}
+				continue
+			}
 			if s.Same() {
 				d := Decision{Kind: Link, Target: owner[c.doc], Signals: s}
 				if d.Target < 0 {
@@ -273,6 +286,15 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 		}
 	}
 	return out
+}
+
+// sibling tells if a row and a doc with no position name a common edition: b is a row when row is true, and else a loose problem of the content.
+func sibling(a, b Doc, row bool) bool {
+	eds := b.Named
+	if row {
+		eds = b.Editions
+	}
+	return slices.ContainsFunc(a.Editions, func(e string) bool { return slices.Contains(eds, e) })
 }
 
 // edition compares the row i with the problems of the editions that it names, and gives a link or a doubt (sameEdition). Two texts of one problem in the content count once, at their best score.

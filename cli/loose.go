@@ -112,9 +112,15 @@ func runImportLoose(env Env, args []string) int {
 		for _, a := range p.Appearances {
 			eds = append(eds, a.Locator.EditionOf().String())
 		}
+		var named []string
+		for _, u := range p.Unplaced {
+			if strings.Contains(u.At, "/") {
+				named = append(named, u.At)
+			}
+		}
 		for _, s := range p.Statements {
 			if s.Text != "" {
-				docs = append(docs, loose.Doc{Text: s.Text, Answer: p.Answer, Editions: eds, ID: p.Tag})
+				docs = append(docs, loose.Doc{Text: s.Text, Answer: p.Answer, Editions: eds, Named: named, ID: p.Tag})
 				owners = append(owners, p)
 			}
 		}
