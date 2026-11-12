@@ -643,3 +643,29 @@ func TestAWBPapers(t *testing.T) {
 		t.Errorf("AWBPapers = %+v", got)
 	}
 }
+
+func TestOKTVPapers(t *testing.T) {
+	d := "/pub_bin/dload/kozoktatas/tanulmanyi_versenyek/oktv/"
+	u := "https://www.oktatas.hu" + d
+	var page string
+	for _, f := range []string{"oktv2018_2019_donto/mat2_flap_d_oktv_1819", "oktv2018_2019_donto/mat2_javut_d_oktv_1819", "oktv2018_2019_1ford/mat2_flap1f_oktv_1819", "oktv2018_2019_1ford/mat2_flap1f_oktv_1819",
+		"oktv2014_2015donto/mat1_flap_d_oktv_1415", "oktv_2010_2011/mat3_flap1f_oktv1011", "oktv_2009_2010/oktv0910_mat1_d_flut", "oktv_2005_2006/oktv0506_mat3_d_fl_ut",
+		"oktv_2004_2005/matematika3_fela", "oktv_2004_2005/matematika3_mego", "oktv_2004_2005/mat2_2foktv0405_fl", "oktv_2004_2005/mat2_2foktv0405_ut", "oktv2017_2018_1ford/mat3_flap1f_0708"} {
+		page += `<a href="` + d + f + `.pdf">x</a>`
+	}
+	got := OKTVPapers(page)
+	want := []National{
+		{Competition: "hu-oktv", Year: 2005, Paper: "cat2-round2", URL: u + "oktv_2004_2005/mat2_2foktv0405_fl.pdf"},
+		{Competition: "hu-oktv", Year: 2005, Paper: "cat3-round1", URL: u + "oktv_2004_2005/matematika3_fela.pdf"},
+		{Competition: "hu-oktv", Year: 2006, Paper: "cat3-final", URL: u + "oktv_2005_2006/oktv0506_mat3_d_fl_ut.pdf"},
+		{Competition: "hu-oktv", Year: 2010, Paper: "cat1-final", URL: u + "oktv_2009_2010/oktv0910_mat1_d_flut.pdf"},
+		{Competition: "hu-oktv", Year: 2011, Paper: "cat3-round1", URL: u + "oktv_2010_2011/mat3_flap1f_oktv1011.pdf"},
+		{Competition: "hu-oktv", Year: 2015, Paper: "cat1-final", URL: u + "oktv2014_2015donto/mat1_flap_d_oktv_1415.pdf"},
+		{Competition: "hu-oktv", Year: 2018, Paper: "cat3-round1", URL: u + "oktv2017_2018_1ford/mat3_flap1f_0708.pdf"},
+		{Competition: "hu-oktv", Year: 2019, Paper: "cat2-final", URL: u + "oktv2018_2019_donto/mat2_flap_d_oktv_1819.pdf"},
+		{Competition: "hu-oktv", Year: 2019, Paper: "cat2-round1", URL: u + "oktv2018_2019_1ford/mat2_flap1f_oktv_1819.pdf"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("OKTVPapers = %+v", got)
+	}
+}

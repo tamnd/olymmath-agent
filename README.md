@@ -335,6 +335,16 @@ om ocr -content olymmath -source aimo-awb -lang de -lanes native -sequence de-ts
 
 The task page of mathe-wettbewerbe.de, the page of the Bundeswettbewerb Mathematik, also links the papers of the selection (Auswahlwettbewerb) for the IMO 2000 to 2022. The file aufgaben_awb_05.pdf holds the tests of the selection for the IMO 2005, and the files of 2021 and 2022 are named 2021_IMO_Auswahlklausuren_HP.pdf. The files of the solutions (loes_awkl, Lsg) are left out. One file holds all the tests of its year, and each test numbers its problems from 1, so `om ocr` needs `-sequence`. The positions run through the year in the order of the tests. The pages state no licence. The robots.txt does not disallow the folder of the files.
 
+The Hungarian OKTV in mathematics works the same way, with the source `oktatas-oktv`:
+
+```
+om papers -content olymmath oktatas-oktv
+om fetch -content olymmath oktatas-oktv
+om ocr -content olymmath -lanes native -source oktatas-oktv -paper cat2-final hu-oktv/2019
+```
+
+The Oktatási Hivatal has one page for each category of the OKTV in mathematics, tartalomjegyzek/matematika_I, matematika_II and matematika_III. Each page links the papers of the school years 2004/2005 to 2020/2021, with a marking guide for each paper. The edition is the second year of the school year, so 2018/2019 is the edition 2019. The paper of category C and round R is catC-roundR, and the final round is catC-final. Category III has no second round. The pages link no final of 2019/2020 and 2020/2021 in categories I and II. The file names vary: mat2_flap1f_oktv_1819.pdf, mat2_flap_d_oktv1112.pdf, oktv0910_mat2_d_flut.pdf, matematika3_fela.pdf and mat2_2foktv0405_fl.pdf. The marking guides (javut, mego, ut) are left out. The finals of 2005/2006 to 2009/2010 are in one file with their solutions. The page of category II links the round 1 paper of category I for 2004/2005, and the page of category I links round 1 twice for 2011/2012 and has no round 2, so these papers are not recorded. The site blocks the default user agent of curl and answers only from some networks. The robots.txt allows all paths.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Journals
