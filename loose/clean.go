@@ -37,6 +37,8 @@ var (
 	headingRE = regexp.MustCompile(`^\s*#{1,6}\s*[^\n$]{0,40}\n`)
 	// leadRE is a problem mark at the start of a text, such as "Problem 4.", "**Problem 3.**", "Task 2:", "P6.", "7.", "11.4." or "2)".
 	leadRE = regexp.MustCompile(`(?i)^\s*(?:\*\*|__)?\s*(?:(?:problem|task|question|exercise|задача)\s*-?\s*|[pq]\s*\.?\s*)?([1-9][0-9]?)((?:\.[0-9]{1,2})*)\s*(?:\.\)|[.:)])\s*(?:\*\*|__)?(?:\s|$)`)
+	// tightLeadRE is a problem number glued to the text, as "3-There is" or "1.Let".
+	tightLeadRE = regexp.MustCompile(`^\s*([1-9][0-9]?)[-.]\p{Lu}\p{Ll}`)
 	// markRE is a problem mark inside a text, at the start of a line: "Problem 2", "Task 3", "p2." or "**3.**". A row with such a mark after its start holds more than one problem.
 	markRE = regexp.MustCompile(`(?im)(?:^|\n)\s*(?:\*\*|__)?\s*(?:(?:problem|task|задача)\s*[0-9]{1,2}\b|p[0-9]{1,2}\s*[.:)])|\*\*\s*[0-9]{1,2}\s*[.:)]\s*\*\*`)
 	// numLineRE is a line that starts with a number and a point, such as "4. Find".
@@ -77,6 +79,9 @@ func Clean(raw string) (string, string) {
 	if m := leadRE.FindStringSubmatchIndex(text); m != nil {
 		lead, _ = strconv.Atoi(text[m[2]:m[3]])
 		text = strings.TrimSpace(text[m[1]:])
+	} else if m := tightLeadRE.FindStringSubmatchIndex(text); m != nil {
+		lead, _ = strconv.Atoi(text[m[2]:m[3]])
+		text = strings.TrimSpace(text[m[3]+1:])
 	}
 	if m := answerRE.FindStringIndex(text); m != nil {
 		if m[0] < canon.MinText {

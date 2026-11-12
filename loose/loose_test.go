@@ -25,6 +25,9 @@ func TestClean(t *testing.T) {
 		{"a puzzle told by I", "I have five different pairs of socks. Every day for five days, I pick two socks at random. Find the probability that I wear a matching pair on the fifth day.", "I have five different pairs of socks. Every day for five days, I pick two socks at random. Find the probability that I wear a matching pair on the fifth day.", ""},
 		{"answer cut", "3. Five runners ran a relay. If the first runner ran twice as fast, they would have spent $5\\%$ less time. By what percentage less time would they have spent?\n\nOTBET: by $8\\%$", "Five runners ran a relay. If the first runner ran twice as fast, they would have spent $5\\%$ less time. By what percentage less time would they have spent?", ""},
 		{"too short", "Find $x$ if $x+1=2$.", "", TooShort},
+		{"glued number", "3-There is given a trapezoid $ABCD$ in the plane with $BC\\parallel AD$. Prove that $AB=CD$.", "There is given a trapezoid $ABCD$ in the plane with $BC\\parallel AD$. Prove that $AB=CD$.", ""},
+		{"glued dot", "1.Let $ABC$ be a triangle and $D$ the foot of the altitude from $A$. Prove that $BD<AB$.", "Let $ABC$ be a triangle and $D$ the foot of the altitude from $A$. Prove that $BD<AB$.", ""},
+		{"a number in the text", "2-colorings of a $3\\times 3$ board are counted up to rotation. How many are there in total?", "2-colorings of a $3\\times 3$ board are counted up to rotation. How many are there in total?", ""},
 		{"solution", "Solution. Since $a+b=c$ we get the claim, and the proof is done by induction on $n$.", "", Solution},
 		{"glued", "Problem 1. Prove that $n^2+n$ is even for every integer $n$.\nProblem 2. Find all real $x$ with $x^2=2x$.", "", Glued},
 		{"next number", "3. Prove that $n^2+n$ is even for every integer $n$ and every prime.\n4. Find all real $x$ with $x^2=2x$.", "", Glued},
@@ -273,6 +276,7 @@ func TestMatchText(t *testing.T) {
 	cases := [][2]string{
 		{"In triangle $A B C, A B=2$ and $x_{1} \\geq 2$, radius $2$.", "In triangle $ABC,AB=2$ and $x_1\\ge2$, radius 2."},
 		{"Find $\\left(\\dfrac{1}{2}\\right)$.\n\n*Proposed by John Cuya, Peru*", "Find $(\\frac{1}{2})$.\n"},
+		{"$\\overline{ID} \\perp \\overline{BC}$, $\\angle{BAE} = \\measuredangle ACD$ and $\\triangle{CFE}$", "$ID\\perpBC$, $\\angleBAE=\\angleACD$ and $\\triangleCFE$"},
 	}
 	for _, c := range cases {
 		if got := matchText(c[0]); got != c[1] {
