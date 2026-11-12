@@ -284,3 +284,17 @@ func TestMatchText(t *testing.T) {
 		}
 	}
 }
+
+func TestDecideComplete(t *testing.T) {
+	problems := filler(40)
+	problems[3].Editions = []string{"imo/1978"}
+	// IMO 1978 problem 2 in other words, which the text match does not find.
+	row := Doc{Text: "We consider a fixed point $P$ in the interior of a fixed sphere. We construct three segments $PA, PB, PC$, perpendicular two by two, with the vertexes $A, B, C$ on the sphere. Find the locus of the vertex $Q$ opposite to $P$ in the parallelepiped with $PA, PB, PC$ as edges.", Editions: []string{"imo/1978"}}
+	if ds := Decide(problems, []Doc{row}, Options{Neighbors: 8}); ds[0].Kind != New {
+		t.Fatalf("an edition that is not complete: %v, want new", ds[0].Kind)
+	}
+	ds := Decide(problems, []Doc{row}, Options{Neighbors: 8, Complete: map[string]bool{"imo/1978": true}})
+	if ds[0].Kind != Hold || ds[0].Target != 3 {
+		t.Errorf("a complete edition: %v %d (%s), want a hold with 3", ds[0].Kind, ds[0].Target, ds[0].Reason)
+	}
+}

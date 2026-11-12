@@ -70,6 +70,8 @@ type Options struct {
 	Limit int
 	// Neighbors is the number of the nearest texts of each row that are compared with it.
 	Neighbors int
+	// Complete are the editions whose problems are all in the content. A row that names one of them and matches none of its problems is held, not made a new problem: it is a copy in other words, or its label is wrong.
+	Complete map[string]bool
 }
 
 // Thresholds of the decisions (spec 06.5 and 06.8).
@@ -275,6 +277,15 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 			}
 		case doubt.Kind == Hold:
 			out[r] = doubt
+		case completeOf(all[i].Editions, o.Complete) != "" && len(peers(i)) > 0:
+			// The row waits with the problem of the edition that its text is nearest to.
+			ps, top := peers(i), 0
+			for k := range ps {
+				if peerE[i][k] > peerE[i][top] {
+					top = k
+				}
+			}
+			out[r] = Decision{Kind: Hold, Target: owner[ps[top]], Reason: fmt.Sprintf("the content has every problem of %s, nearest E %.2f", completeOf(all[i].Editions, o.Complete), peerE[i][top])}
 		default:
 			out[r] = Decision{Kind: New, Target: r}
 			owner[i] = -1 - r
@@ -287,6 +298,16 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 		}
 	}
 	return out
+}
+
+// completeOf gives the first of the editions that is complete, or "".
+func completeOf(editions []string, complete map[string]bool) string {
+	for _, e := range editions {
+		if complete[e] {
+			return e
+		}
+	}
+	return ""
 }
 
 // simText gives the text that E is taken on: the stem of a match form and the grams of its formulas. The choices are left out, because they are a formula in one text and plain text in another, and their grams would outweigh the problem.

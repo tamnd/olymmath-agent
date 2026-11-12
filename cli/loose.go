@@ -135,7 +135,7 @@ func runImportLoose(env Env, args []string) int {
 		}
 	}
 	fmt.Fprintf(env.Stderr, "om import -loose: %d texts of %d problems, %d rows to match.\n", len(docs), len(corpus.All()), len(rows))
-	ds := loose.Decide(docs, rows, loose.Options{Limit: *limit, Neighbors: *neighbors})
+	ds := loose.Decide(docs, rows, loose.Options{Limit: *limit, Neighbors: *neighbors, Complete: completeEditions(corpus)})
 
 	// groups holds the rows of each new problem, by the index of its first row. links holds the rows of each problem of the content.
 	groups := map[int][]int{}
@@ -297,6 +297,25 @@ func writeHeld(root string, lines []string) error {
 	}
 	head := "# The seed rows that om import -loose held for a review: the row, the problem or the row that it is near, the signals E, T and the keyword match, the answer signal and the reason (spec 06.8).\n"
 	return os.WriteFile(full, []byte(head+strings.Join(lines, "\n")+"\n"), 0o644) // #nosec G306 -- the list is public.
+}
+
+// completeEditions gives the editions that list their papers and have a problem of the content at each position.
+func completeEditions(corpus *content.Corpus) map[string]bool {
+	out := map[string]bool{}
+	for _, e := range corpus.Editions() {
+		want := e.Positions()
+		if len(want) == 0 {
+			continue
+		}
+		have := map[string]bool{}
+		for _, p := range append(slices.Clone(e.Problems), e.Also...) {
+			have[p.PositionIn(e)] = true
+		}
+		if !slices.ContainsFunc(want, func(pos string) bool { return !have[pos] }) {
+			out[e.Locator()] = true
+		}
+	}
+	return out
 }
 
 func writeLooseExplain(path string, rows []looseRow, ds []loose.Decision, owners []*content.Problem) error {
