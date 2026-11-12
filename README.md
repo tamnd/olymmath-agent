@@ -379,6 +379,15 @@ om fetch -content olymmath dmfa-massa
 
 The archive page of the DMFA (dmfa.si/Tekmovanja/MaSSA/ArhivNalog.aspx) links one file for the national round (Drzavno) of each year from 2001, except 2020. The page writes the paths with backslashes, as \Tekmovanja\GetPDF.ashx?src=MaSSA_Drzavno_2010.pdf. One file holds the papers of the four grades and their solutions, so the paper has no id. The selection round (Odbirno), the regional round (Podrocno) and the school round (Solsko) are left out. Each file says that the DMFA allows the use of the file only for the personal use of a student and for preparation in a school, and that no other web site may publish it. So the content only links to the papers. The site has no robots.txt.
 
+The Philippine Mathematical Olympiad works the same way, with the source `pmo-ph`:
+
+```sh
+om papers -content olymmath pmo-ph
+om fetch -content olymmath pmo-ph
+```
+
+The home page of pmo.ph links the papers of the last olympiad, and pmo.ph/downloads links the papers of the earlier ones. A link belongs to the olympiad of the last heading before it, as "25th PMO". The Nth olympiad ends in the year 1998+N, so the 25th olympiad is the edition of 2023. The command keeps only the written phase of the national stage. The 10th olympiad has one file for the area and the national stage, and the 11th has one file for all the stages. The problems of the written phase are numbered from 1 across its days, so the paper has no id. The papers of the qualifying stage, the area stage and the oral phase are left out. The site has no page of terms. Its robots.txt allows all paths except /wp-admin/ for other agents, and its content signal says search=yes, ai-train=no, use=reference.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Journals
