@@ -121,7 +121,7 @@ func runImportLoose(env Env, args []string) int {
 		}
 		for _, s := range p.Statements {
 			if s.Text != "" {
-				docs = append(docs, loose.Doc{Text: s.Text, Answer: p.Answer, Editions: eds, Named: named, ID: p.Tag})
+				docs = append(docs, loose.Doc{Text: s.Text, Answer: p.Answer, Editions: eds, Named: named, ID: p.Tag, Derived: len(p.Appearances) == 0 && s.Origin == "D"})
 				owners = append(owners, p)
 			}
 		}

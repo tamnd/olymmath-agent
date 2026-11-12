@@ -24,6 +24,8 @@ type Doc struct {
 	Named []string
 	// ID names the problem of a text of the content, so that two texts of one problem count once in an edition.
 	ID string
+	// Derived is true for a text of a loose problem of the content that a derived dataset gave (origin D). Such a problem came from a row of a dataset, so a link to it needs the same numbers as a join does.
+	Derived bool
 }
 
 // Kind is the decision for a row.
@@ -276,6 +278,13 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 				d := Decision{Kind: Link, Target: owner[c.doc], Signals: s}
 				if !(Signals{E: s.E, T: s.T, F: s.F, Shared: s.Shared, Tokens: s.Tokens, A: s.A, Exact: s.Exact}).Same() {
 					d.Reason = fmt.Sprintf("words %.2f, formulas %.2f", s.W, s.M)
+				}
+				// A link to a loose problem that a derived dataset gave, or through a row that links, is a join of two rows in all but name, so it needs the same numbers too.
+				if d.Target >= 0 && (c.doc >= n || all[c.doc].Derived) && shapes[i].numbers != shapes[c.doc].numbers {
+					if doubt.Kind == New {
+						doubt = Decision{Kind: Hold, Target: owner[c.doc], Signals: s, Reason: "other numbers"}
+					}
+					continue
 				}
 				if d.Target < 0 {
 					d.Kind, d.Target = Join, -1-d.Target
