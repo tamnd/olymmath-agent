@@ -795,3 +795,33 @@ func DMSPapers(page string) []National {
 	slices.SortFunc(out, func(a, b National) int { return a.Year - b.Year })
 	return out
 }
+
+var (
+	// awbLinkRE matches a link to a file of the German IMO selection on the listing page of the Bundeswettbewerb Mathematik.
+	awbLinkRE = regexp.MustCompile(`href="(/fileadmin/Mathe-Wettbewerbe/AIMO/Aufgaben_und_Loesungen_AIMO/[^"?#]+\.pdf)"`)
+	// awbNameRE matches the name of a file with the problems of the selection of one year: aufgaben_awb_05.pdf or 2022_IMO_Auswahlklausuren_HP.pdf. The files of the solutions (loes_awkl, Lsg) have other names.
+	awbNameRE = regexp.MustCompile(`^(?:aufgaben_awb_([0-9]{2})|((?:19|20)[0-9]{2})_IMO_Auswahlklausuren(?:_HP)?)\.pdf$`)
+)
+
+// AWBPapers gives the paper of each year of the German IMO selection (de-tst) on the listing page of the Bundeswettbewerb Mathematik, which is also the page of the selection. The year of a paper is the year of the IMO for which the selection was held: aufgaben_awb_05.pdf is the selection for the IMO 2005. One file holds all the tests (Auswahlklausuren) of its year, and each test numbers its problems from 1.
+func AWBPapers(page string) []National {
+	var out []National
+	seen := map[int]bool{}
+	for _, m := range awbLinkRE.FindAllStringSubmatch(page, -1) {
+		n := awbNameRE.FindStringSubmatch(m[1][strings.LastIndex(m[1], "/")+1:])
+		if n == nil {
+			continue
+		}
+		y, _ := strconv.Atoi(n[1] + n[2])
+		if n[1] != "" {
+			y += 2000
+		}
+		if seen[y] {
+			continue
+		}
+		seen[y] = true
+		out = append(out, National{Competition: "de-tst", Year: y, URL: "https://www.mathe-wettbewerbe.de" + m[1]})
+	}
+	slices.SortFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}

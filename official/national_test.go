@@ -626,3 +626,20 @@ func TestDMSPapers(t *testing.T) {
 		t.Errorf("DMSPapers = %+v", got)
 	}
 }
+
+func TestAWBPapers(t *testing.T) {
+	d := "/fileadmin/Mathe-Wettbewerbe/AIMO/Aufgaben_und_Loesungen_AIMO/"
+	page := `<a href="` + d + `2021_IMO_Auswahlklausuren_HP.pdf">A</a><a href="` + d + `2021_IMO_Auswahlklausuren_Lsg_HP.pdf">L</a>` +
+		`<a href="` + d + `aufgaben_awb_00.pdf">A</a><a href="` + d + `aufgaben_awb_13.pdf">A</a><a href="` + d + `loes_awkl_13.pdf">L</a>` +
+		`<a href="` + d + `loes_awkl1_02.pdf">L</a><a href="` + d + `aufgaben_awb_13.pdf">A</a>` +
+		`<a href="/fileadmin/Mathe-Wettbewerbe/Bundeswettbewerb_Mathematik/Dokumente/Aufgaben_und_Loesungen_BWM/aufgaben_00_1.pdf">B</a>`
+	u := "https://www.mathe-wettbewerbe.de" + d
+	want := []National{
+		{Competition: "de-tst", Year: 2000, URL: u + "aufgaben_awb_00.pdf"},
+		{Competition: "de-tst", Year: 2013, URL: u + "aufgaben_awb_13.pdf"},
+		{Competition: "de-tst", Year: 2021, URL: u + "2021_IMO_Auswahlklausuren_HP.pdf"},
+	}
+	if got := AWBPapers(page); !slices.Equal(got, want) {
+		t.Errorf("AWBPapers = %+v", got)
+	}
+}
