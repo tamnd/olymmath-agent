@@ -60,7 +60,9 @@ var (
 	// lostRE is a sentence that a blank line cuts where a dataset dropped a displayed formula, as in "Prove that if the equation\n\nhas three real roots, then", or a note of a translator that says so.
 	lostRE = regexp.MustCompile(`(?i)[a-z,]\n\n+(?:where|then|holds?|is|are|has|have|and|for|divides|takes|to|gdzie|dla|oraz|jest|ma)\b|\b(?:not (?:provided|given|included) in the (?:original )?text|original text had|untranslated)\b`)
 	// lostRE2 is a sentence that stops at a word that brings in a formula, as "satisfy the condition", with a blank line and a new sentence after it: the formula was lost. A note of a translator, as "The translation is provided as requested", stands in its place in some rows.
-	lostRE2 = regexp.MustCompile(`\b(?:condition|conditions|equation|equations|inequality|inequalities|equality|equalities|identity|identities|formula|formulas|relation|relations|relationship|system|expression|function|functions|holds?|satisfied|true|following|defined|then|that|if|by|number|numbers|polynomial|sequence|which|where|arranged|table|product|sum)\s*\n\n+[A-Z(]`)
+	lostRE2 = regexp.MustCompile(`\b(?:condition|conditions|equation|equations|inequality|inequalities|equality|equalities|identity|identities|formula|formulas|relation|relations|relationship|system|expression|function|functions|holds?|satisfied|true|following|defined|then|that|if|by|number|numbers|polynomial|sequence|which|where|arranged|table|product|sum|and)\s*\n\n+[A-Z(]`)
+	// lostEndRE is a text that stops at a word that brings in a formula or a claim, as "Prove that" or "satisfying the equation", or at a colon: the formula or the claim was lost.
+	lostEndRE = regexp.MustCompile(`(?i)(?:\b(?:that|then|and|if|where|equation|equations|inequality|inequalities|identity|equality|condition|conditions|system|holds|following)|:)[\s#]*$`)
 	// stepWordRE is a word of the steps of a solution. A text with two or more of them is a solution, not a problem: "Then its discriminant is ..., therefore ...". A problem may use one, as "Prove that then ...", but in the fourth batch nearly every text with two of them was a solution.
 	stepWordRE = regexp.MustCompile(`(?i)\b(?:we find|we will show|we prove|let(?:'s| us) (?:show|prove|find|consider|denote|check|note|estimate|compute|calculate)|indeed|hence|therefore|thus|it follows|consequently|which means|this means|as required|q\.e\.d|substituting|it remains to|from (?:here|this|where)|then its|so the answer|the answer is)\b`)
 	// economicsRE is a term of economics or of personal finance, out of scope as the other sciences: some olympiad sets mix the problems of an economics or a financial literacy olympiad with those of mathematics.
@@ -150,7 +152,7 @@ func Clean(raw string) (string, string) {
 		return "", Context
 	case templateRE.MatchString(text):
 		return "", Template
-	case lostRE.MatchString(text), lostRE2.MatchString(text):
+	case lostRE.MatchString(text), lostRE2.MatchString(text), lostEndRE.MatchString(text):
 		return "", Lost
 	case scienceRE.MatchString(text):
 		return "", Science
