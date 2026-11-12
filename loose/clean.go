@@ -165,6 +165,31 @@ var (
 	authorLineRE = regexp.MustCompile(`^(?:(?i:authors?)\s*:.*|(?i:folklore|folkior|folklor)\.?|(?:(?:\p{Lu}[\p{Ll}'-]+|\p{L}{1,2}\.|von|der|and)[\s,.:;]*)+)$`)
 	// initialRE is an initial of a name, as "A." in "Shapovalov A.V.".
 	initialRE = regexp.MustCompile(`(?:^|[\s.])\p{L}{1,2}\.`)
+	// leadTeXRE is the TeX that bookLead removes to read a paragraph before a problem.
+	leadTeXRE = regexp.MustCompile(`\\(?:begin|end)\{(?:array|aligned|gathered)\}(?:\{[lcr]*\})?|\\(?:text|underline|mathrm|mathbf|mathbb|textbf|stackrel|left|right|frac|cdot|quad|section\*?)\b|\\\\|[&${}~*]`)
+	// leadAuthorRE is an author line that the translation garbled, as "Avtor: Shapovalov A.V." or "Aвmp Zhenodarov R.G.".
+	leadAuthorRE = regexp.MustCompile(`(?i)^\W{0,4}(?:authors?|avor|auto|avt|avtor|aвmp|avoo|aesm|aamop)\b`)
+	// leadGuardRE is the start of a paragraph that is the problem itself: a word that asks for something, a verb or an article.
+	leadGuardRE = regexp.MustCompile(`(?i)^\W*(?:given|let|find|prove|solve|show|compute|calculate|evaluate|simplify|determine|construct|consider|suppose|denote|is|are|can|does|do|how|what|which|who|why|in|on|for|if|from|at|two|three|four|five|a|an|the|one|there|answer|example|problem|task|exercise|part|case)\b`)
+	// leadMarkRE is a mark of difficulty or of grades on a paragraph of its own, as "3+", "8,9" or "4 [ Parity ]".
+	leadMarkRE = regexp.MustCompile(`^(?:[1-6][+-]?|[0-9]{1,2}(?:[,.][0-9]{1,2})+)\s*(?:\[[^?=]*|\|.*)?$`)
+	// leadBracketRE is a paragraph that is only a topic tag in brackets, or a lone bracket.
+	leadBracketRE = regexp.MustCompile(`^\[[^?=]*\]$|^[\[\]]$`)
+	// leadNameRE is a name that the translation garbled, as "Crackov d:", "Tokarev S.I" or "$\Phi$ renkin B.R.".
+	leadNameRE = regexp.MustCompile(`^[^?=]{1,40}\b[A-Za-z]?\.?\s?[Dd]:$|^[A-Z][a-z]+ [A-Z]\.\s?[A-Z]\.?$|^[^?=]{0,30}\b[A-Z]\.\s?[A-Z]\.$`)
+	// leadKeepRE is a paragraph that starts a formula or a part of the problem, as "$$", "a)" or "2.".
+	leadKeepRE = regexp.MustCompile(`^\s*(?:\$\$|[a-z]\)|[0-9]+\)|[0-9]+\.)`)
+	// leadNextRE is the start of the paragraph of a problem after a line of the book.
+	leadNextRE = regexp.MustCompile(`^[A-Z$\[]`)
+	// leadTextRE is a \text group, and leadMathRE an inline formula, which bookLead leaves out when it counts the words of a paragraph.
+	leadTextRE = regexp.MustCompile(`\\text\s*\{[^{}]*\}`)
+	leadMathRE = regexp.MustCompile(`\$[^$]*\$`)
+	// leadWordRE is a word of three small letters or more.
+	leadWordRE = regexp.MustCompile(`\b[a-z]{3,}\b`)
+	// leadTagsOnlyRE is what is left of a block of topic tags once its \text groups and its TeX are taken out.
+	leadTagsOnlyRE = regexp.MustCompile(`^[\s\[\]().,:;|]*$`)
+	// escapedRE is a dollar sign that the dataset escaped where it meant a formula, as "$\$ A B C \$$" or "\$x\$". The TeX of such a row is broken, and in about half of them the names of points or the formulas are lost. An escaped dollar before a digit is money, as in "\$5", and is kept.
+	escapedRE = regexp.MustCompile(`\\\$(?:[^0-9]|$)`)
 	// figureRE is a text that needs a figure that the row does not have.
 	figureRE = regexp.MustCompile(`(?i)\[asy\]|\bfigure shown\b|\bas shown\b|\bthe (?:diagram|picture|photo)\b|\bphoto\b|\(see (?:the )?fig|\bfig\.\s*[0-9]|\[img\]|!\[|<img|\\includegraphics|https?://\S+\.(?:png|jpe?g|gif|svg)\b|\b(?:see|in|on) (?:the )?(?:figure|picture|diagram|drawing|image)\b|\b(?:figure|picture|diagram|drawing) (?:below|above|shows|on the right|on the left)\b|\bshown (?:below|above|in the (?:figure|picture|diagram))\b|\bpictured\b|\b(?:рисун\p{L}*|рис\.)`)
 )
@@ -215,6 +240,7 @@ func Clean(raw string) (string, string) {
 	}
 	text = strings.TrimSpace(gradeLeadRE.ReplaceAllString(pointsRE.ReplaceAllString(text, ""), ""))
 	text = bookTail(strings.TrimSpace(tailRE.ReplaceAllString(olympiadTailRE.ReplaceAllString(firstCopy(text), ""), "")))
+	text = bookLead(text)
 	// A step of a solution and the mark of the compendium often follow a problem number, as in "5. Since ..." or "27. (BLR) Ten points ...", so they are read after the number is cut.
 	switch {
 	case stepRE.MatchString(text):
@@ -274,7 +300,7 @@ func Clean(raw string) (string, string) {
 		return "", WebLink
 	case !canon.IsStatement(text), cut && !taskRE.MatchString(text), bare(text), !strings.ContainsAny(text, "$?") && personRE.MatchString(text) && !taskRE.MatchString(text):
 		return "", NotStated
-	case !balanced(text):
+	case !balanced(text), escapedRE.MatchString(text):
 		return "", BrokenTeX
 	}
 	return text, ""
@@ -337,6 +363,59 @@ func bookHead(text string) string {
 		rest = strings.TrimSpace(rest[len(m):])
 	}
 	return rest
+}
+
+// bookLead cuts up to four paragraphs that a problem book prints before a problem and that bookHead does not read line by line: an author line that the translation garbled, a mark of difficulty such as "3+", a block of topic tags in a formula, a topic tag in brackets, a garbled name and a short line of one word or none, as a name, or of no word when it has a formula. A paragraph is cut only when it has no question mark and no equals sign and a paragraph comes after it.
+func bookLead(text string) string {
+	ps := strings.Split(text, "\n\n")
+	i := 0
+	for i < len(ps)-1 && i < 4 && leadLine(strings.TrimSpace(ps[i]), strings.TrimSpace(ps[i+1])) {
+		i++
+	}
+	return strings.TrimSpace(strings.Join(ps[i:], "\n\n"))
+}
+
+// leadLine tells if a paragraph p before the paragraph next is a line of a book that is not the problem (see bookLead).
+func leadLine(p, next string) bool {
+	// The mark of the Polish olympiad is read after Clean, so it stays.
+	if strings.ContainsAny(p, "?=") || utf8.RuneCountInString(p) > 400 || polishRE.MatchString(p) {
+		return false
+	}
+	if leadTags(p) {
+		return true
+	}
+	plain := strings.Join(strings.Fields(leadTeXRE.ReplaceAllString(p, " ")), " ")
+	// A paragraph with a formula and a word is in most cases a sentence of the problem, as "$P(x)$ is a polynomial.".
+	words, most := leadWords(p), 1
+	if strings.Contains(p, "$") {
+		most = 0
+	}
+	switch {
+	case leadAuthorRE.MatchString(plain) && utf8.RuneCountInString(plain) < 110:
+		return true
+	case strings.HasPrefix(plain, "##") && strings.ContainsAny(plain, "[]"):
+		return true
+	case leadMarkRE.MatchString(plain), leadBracketRE.MatchString(plain) && words <= 12, leadNameRE.MatchString(plain):
+		return true
+	case utf8.RuneCountInString(p) <= 60 && words <= most && !leadGuardRE.MatchString(plain) && !leadKeepRE.MatchString(p) && !strings.HasSuffix(p, ":") && leadNextRE.MatchString(next):
+		// One word before a formula is the start of the problem, as "Solve\n\n$$x^2=4$$".
+		return len(strings.Fields(p)) > 1 || !strings.HasPrefix(next, "$") || strings.HasSuffix(p, ".")
+	}
+	return false
+}
+
+// leadTags tells if a paragraph is only topic tags in \text groups with brackets, wrapped in a formula, as "$$\n\\text { [ Invariants ] }\n$$".
+func leadTags(p string) bool {
+	wrapped := strings.HasPrefix(p, "$$") && strings.HasSuffix(p, "$$") || strings.HasPrefix(p, "\\")
+	if !wrapped || !strings.Contains(p, "\\text") || !strings.Contains(p, "[") {
+		return false
+	}
+	return leadTagsOnlyRE.MatchString(leadTeXRE.ReplaceAllString(leadTextRE.ReplaceAllString(p, ""), " "))
+}
+
+// leadWords counts the words of three small letters or more of a paragraph outside its formulas and its \text groups.
+func leadWords(p string) int {
+	return len(leadWordRE.FindAllString(leadMathRE.ReplaceAllString(leadTextRE.ReplaceAllString(p, ""), ""), -1))
 }
 
 // tagTable tells if the lines of a table at the start of a text are a table of topic tags: it has no digits but the grades before it, no question mark and no equals sign.
