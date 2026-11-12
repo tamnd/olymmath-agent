@@ -32,6 +32,16 @@ func TestClean(t *testing.T) {
 		{"glued", "Problem 1. Prove that $n^2+n$ is even for every integer $n$.\nProblem 2. Find all real $x$ with $x^2=2x$.", "", Glued},
 		{"bold marks in a line", "Compute the remainder when $(10!)^{20}$ is divided by $2024$ .**p14.** A right square pyramid with height $12$ is inscribed in a sphere $S$.", "", Glued},
 		{"next number", "3. Prove that $n^2+n$ is even for every integer $n$ and every prime.\n4. Find all real $x$ with $x^2=2x$.", "", Glued},
+		{"answer under a heading", "# 3. Answer: $\\frac{2}{5}$ or $\\frac{11}{40}$ for the two cases of the problem.", "", Solution},
+		{"a step of a solution", "Since the right side of the equation $(x+y)^{2}=49(3 x+5 y)$ is divisible by 49, then $x+y=7 k$.", "", Solution},
+		{"by the condition", "By the condition, $a_{k}=\\frac{120-a_{k}}{k+1}$ for all $k=1,2, \\ldots, n-1$, so we find $n$.", "", Solution},
+		{"template", "Given a regular param1. In how many ways can three of its vertices be chosen so that they form a scalene triangle?", "", Template},
+		{"lost formula", "Prove that if the equation\n\nhas three real roots, then\n\nIs the converse statement true?", "", Lost},
+		{"translator note", "Solve in integers the equation\n\nNote: The equation is not provided in the original text, so it is not included.", "", Lost},
+		{"physics", "(15 points) Two identical resistors $R_{0}$ are connected in series to a source of constant voltage. Find the power.", "", Science},
+		{"a club of physics", "The robotics club accepts only those who know mathematics, physics, or programming. How many members know all three?", "The robotics club accepts only those who know mathematics, physics, or programming. How many members know all three?", ""},
+		{"shortlist country", "N7 (GBR) A wobbly number is a positive integer whose digits are alternately nonzero and zero. Find all positive integers that do not divide any wobbly number.", "", Shortlist},
+		{"imo note", "(GDR 2) ${ }^{\\mathrm{IMO} 5}$ Is it possible to put 1987 points in the plane such that the distance between each pair of points is irrational?", "", Shortlist},
 		{"stub", "Prove the lemma.", "", TooShort},
 		{"stub long", "Prove Lemma 2 from the paper of Erdos and Szekeres on convex polygons.", "", Stub},
 		{"request", "Can someone help me with this one: prove that $a^2+b^2 \\ge 2ab$ for all real numbers $a$ and $b$?", "", Request},
@@ -348,5 +358,30 @@ func TestShape(t *testing.T) {
 	// Two texts with no formulas have the same formulas.
 	if m := bagJaccard(map[string]int{}, map[string]int{}); m != 1 {
 		t.Errorf("two empty multisets: %.2f, want 1", m)
+	}
+}
+
+func TestPolishMark(t *testing.T) {
+	cases := []struct {
+		in    string
+		ok    bool
+		want  Mark
+		after string
+	}{
+		{"XXXVIII OM - I - Problem 11\n\nProve that a sphere can be lit.", true, Mark{38, "I", 11, "XXXVIII OM - I - Problem 11"}, "Prove that a sphere can be lit."},
+		{"XXV - I - Problem 3  Prove that the bisectors are parallel.", true, Mark{25, "I", 3, "XXV - I - Problem 3"}, "Prove that the bisectors are parallel."},
+		{"LIX OM - III -Zadanie 2\n\nFunkcja $f$ trzech zmiennych.", true, Mark{59, "III", 2, "LIX OM - III -Zadanie 2"}, "Funkcja $f$ trzech zmiennych."},
+		{"I OM - B - Task 4\n\nFind two natural numbers.", true, Mark{1, "B", 4, "I OM - B - Task 4"}, "Find two natural numbers."},
+		{"IIII OM - I - Problem 1 Find $x$.", false, Mark{}, ""},
+		{"Find all functions $f$ such that $f(x)=x$.", false, Mark{}, ""},
+	}
+	for _, c := range cases {
+		m, after, ok := PolishMark(c.in)
+		if ok != c.ok || (ok && (m != c.want || after != c.after)) {
+			t.Errorf("PolishMark(%q) = %+v, %q, %v", c.in, m, after, ok)
+		}
+	}
+	if y := (Mark{Olympiad: 41}).Year(); y != 1990 {
+		t.Errorf("year of the 41st olympiad: %d", y)
 	}
 }

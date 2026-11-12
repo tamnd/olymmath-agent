@@ -124,3 +124,46 @@ func TestWrongList(t *testing.T) {
 		}
 	}
 }
+
+func TestImportLoosePolish(t *testing.T) {
+	text := "Prove that for every positive integer $n$ the number $n^{5}-n$ is divisible by $30$, and find all $n$ for which it is divisible by $60$."
+	rows := []seed.Row{
+		{Labels: []string{"Other"}, Statement: "XXXVIII OM - I - Problem 11\n\n" + text}, // new, unplaced pl-om/1987
+		{Labels: []string{"Other"}, Statement: "XXXVIII OM - III - Problem 4\n\nLet $a, b, c$ be positive reals with $a+b+c=1$. Prove that $a^2+b^2+c^2 \\ge 1/3$ and find when it is equal."},
+	}
+	root, dir := looseFixture(t, rows)
+	reg := "\n- code: pl-om\n  name: Polish Mathematical Olympiad\n  group: national\n  level: high-school\n  country: PL\n  url: https://om.sem.edu.pl/problems/\n  first_year: 1950\n  per_year: 6\n  sources: [hf-test]\n  description: The Polish olympiad.\n"
+	f, err := os.OpenFile(filepath.Join(root, "registers", "competitions.yaml"), os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(reg); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	code, _, errs := run("import", "-loose", "-content", root, "-seed", dir, "-sources", "hf-test")
+	if code != ExitOK {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	if !strings.Contains(errs, "1 new problems from 1 rows") || !strings.Contains(errs, "has a position") {
+		t.Errorf("the counts:\n%s", errs)
+	}
+	c, fs := content.Load(root)
+	if fs.Errors() > 0 {
+		t.Fatalf("findings:\n%v", fs)
+	}
+	var p *content.Problem
+	for _, x := range c.Loose {
+		if x.Statement == text {
+			p = x
+		}
+	}
+	if p == nil {
+		t.Fatalf("no loose problem with the text; loose: %d", len(c.Loose))
+	}
+	if len(p.Unplaced) != 1 || p.Unplaced[0].At != "pl-om/1987" || p.Unplaced[0].Label != "XXXVIII OM - I - Problem 11" {
+		t.Errorf("unplaced: %+v", p.Unplaced)
+	}
+}

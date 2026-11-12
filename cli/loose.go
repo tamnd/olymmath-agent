@@ -15,6 +15,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode/utf8"
 
 	"github.com/tamnd/olymmath-agent/canon"
 	"github.com/tamnd/olymmath-agent/content"
@@ -340,6 +341,9 @@ func writeLooseExplain(path string, rows []looseRow, ds []loose.Decision, owners
 	return f.Close()
 }
 
+// polishOlympiad is the code of the Polish olympiad, whose problems some rows mark in their text (loose.PolishMark).
+const polishOlympiad = "pl-om"
+
 // looseReader reads the seed rows for om import -loose.
 type looseReader struct {
 	corpus   *content.Corpus
@@ -443,6 +447,22 @@ func (r *looseReader) check(pr pendingLoose, accept func(string) bool) (*looseRo
 	if why != "" {
 		return nil, why
 	}
+	mark := ""
+	if m, rest, ok := loose.PolishMark(text); ok {
+		// The text names its olympiad, round and number. The content has the final, round III, by position, so a problem of the final is left to the import by position. A problem of round I or II has no position, and the mark gives its competition and year.
+		pl := r.corpus.Competition(polishOlympiad)
+		if pl == nil {
+			return nil, "no competition"
+		}
+		if m.Round == "III" && slices.Contains(pl.Shape(m.Year()).Positions(), "p"+strconv.Itoa(m.Number)) {
+			return nil, "has a position"
+		}
+		if utf8.RuneCountInString(rest) < canon.MinText {
+			return nil, loose.TooShort
+		}
+		text, comp, mark = rest, pl, m.Label
+		row.Year = m.Year()
+	}
 	lang := loose.Lang(text, row.Lang)
 	if lang == "" {
 		return nil, loose.NoLang
@@ -467,6 +487,9 @@ func (r *looseReader) check(pr pendingLoose, accept func(string) bool) (*looseRo
 		if row.Source == "hf-ai-mo-aops" {
 			name = label
 		}
+	}
+	if mark != "" {
+		label = mark
 	}
 	x := looseRow{row: row, cand: &canon.Candidate{
 		Source: row.Source, Origin: src.Origin, Zone: src.Zone.Statement, Lang: lang, Name: name, URL: url,
