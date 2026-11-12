@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs)", runPapers})
+	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb)", runPapers})
 }
 
 func runPapers(env Env, args []string) int {
@@ -31,8 +31,8 @@ func runPapers(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs"}, pos[0]) {
-		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm")
+	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb"}, pos[0]) {
+		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -55,7 +55,7 @@ func runPapers(env Env, args []string) int {
 	switch pos[0] {
 	case "usa-tst-archive":
 		return tstPapers(ctx, env, fc, corpus, *root, *from, *to)
-	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs":
+	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb":
 		return nationalPapers(ctx, env, fc, corpus, *root, pos[0], *from, *to)
 	}
 	comp := corpus.Competition("imo")
@@ -151,6 +151,7 @@ var nationals = map[string]struct {
 	"mo-cz":             {official.MOListings(time.Now().Year()), content.OfficialPaper{Lang: "Czech", Code: "cs"}, official.MOPapers},
 	"elmo-official":     {[]string{official.ELMOListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.ELMOPapers},
 	"dms-rs":            {[]string{official.DMSListing}, content.OfficialPaper{Lang: "Serbian", Code: "sr"}, official.DMSPapers},
+	"aimo-awb":          {[]string{official.BWMListing}, content.OfficialPaper{Lang: "German", Code: "de"}, official.AWBPapers},
 }
 
 // nationalPapers records the papers of a national source from its listing page. It writes the edition file when the corpus does not have the edition. The papers of one edition replace the papers of the source in the edition file, and the papers of other sources stay. Then om fetch SOURCE gets the papers into the store.

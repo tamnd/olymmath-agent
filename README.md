@@ -325,6 +325,16 @@ om anchor -content olymmath -missing dms-rs
 
 The secondary school page of the Mathematical Society of Serbia, dms.rs/matematika-srednje-skole/, links the paper of the Serbian MO for 2008 to 2014, 2016 to 2019 and 2022 to 2024. The file names vary: zadaci_smo_2012.pdf, zadaci-smo-2014.pdf, 2017_smo.pdf, SMO2019.pdf, SMO_2022_ZADACI.pdf and SMO_2023_SVE.pdf. The files of the solutions (resenja) and the results (rezultati) are left out. The papers are in Serbian. The papers of 2008 to 2011 and 2013 number the problems of each day 1 to 3, so only the first day splits by number, and a row that AoPS places at a first-day position can be a second-day problem. Read each link against the paper. The pages state no licence, so the content only links to the papers. The robots.txt only disallows /wp-admin/.
 
+The German IMO selection works the same way, with the source `aimo-awb`:
+
+```sh
+om papers -content olymmath aimo-awb
+om fetch -content olymmath aimo-awb
+om ocr -content olymmath -source aimo-awb -lang de -lanes native -sequence de-tst/2010
+```
+
+The task page of mathe-wettbewerbe.de, the page of the Bundeswettbewerb Mathematik, also links the papers of the selection (Auswahlwettbewerb) for the IMO 2000 to 2022. The file aufgaben_awb_05.pdf holds the tests of the selection for the IMO 2005, and the files of 2021 and 2022 are named 2021_IMO_Auswahlklausuren_HP.pdf. The files of the solutions (loes_awkl, Lsg) are left out. One file holds all the tests of its year, and each test numbers its problems from 1, so `om ocr` needs `-sequence`. The positions run through the year in the order of the tests. The pages state no licence. The robots.txt does not disallow the folder of the files.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Journals
