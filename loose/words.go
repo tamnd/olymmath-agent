@@ -97,7 +97,7 @@ func shapeOf(form string) shape {
 	return s
 }
 
-// bagJaccard is the Jaccard index of two multisets.
+// bagJaccard is the Jaccard index of two multisets. Two empty multisets agree: two texts with no formulas have the same formulas.
 func bagJaccard(a, b map[string]int) float64 {
 	inter, union := 0, 0
 	for k, x := range a {
@@ -111,7 +111,7 @@ func bagJaccard(a, b map[string]int) float64 {
 		}
 	}
 	if union == 0 {
-		return 0
+		return 1
 	}
 	return float64(inter) / float64(union)
 }
