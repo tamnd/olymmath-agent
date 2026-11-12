@@ -44,7 +44,11 @@ var (
 	// answerRE is the start of an answer or a solution that a dataset joined to the statement, on a line of its own.
 	answerRE = regexp.MustCompile(`(?im)^\s*(?:\*\*|__)?\s*(?:answer|answers|otbet|ответ|solution|решение|proof|hint|указание|comment)\s*(?:\*\*|__)?\s*[.:]`)
 	// solutionRE is a text that starts as a solution, not as a problem.
-	solutionRE = regexp.MustCompile(`(?i)^\s*(?:\*\*|__)?\s*(?:solution|sol\.|proof|answer|решение|ответ|otbet)\b`)
+	solutionRE = regexp.MustCompile(`(?i)^\s*(?:\*\*|__)?\s*(?:(?:(?:a|an|the)\s+)?(?:my|another|quick|short|simple|alternative|alternate|nice|easy|official|elegant|full|complete)\s+)?(?:solution|sol\.|proof|answer|решение|ответ|otbet)\b`)
+	// personRE is a line of a poster about himself. With no formula, no question and no task it marks a forum post that is news and not a problem.
+	personRE = regexp.MustCompile(`\bI(?:'m| am| have|'ve| will|'ll| plan)\b|\bsorry\b`)
+	// taskRE is a word that asks for something or states a claim. A text with none of them, once a cut leaves it or with no formula, is not a problem: "Given an odd number $m$." is what is left of "Given an odd number $m$. Proof: for any $c$ ...", where Proof stands for Prove.
+	taskRE = regexp.MustCompile(`(?i)\?|\b(?:prove|proof|show|find|determine|compute|calculate|evaluate|solve|what|how|which|whether|is there|are there|does|do|can|could|must|exists?|construct|describe|decide|give|simplify|express|count|demonstrate|verify|then|if|when|holds?|restore|reconstruct|mark|cut|inscribe|transform|draw|split|divide|arrange|fill|colou?r|obtain|define|consider|propose|discuss|build|design|let)\b|_{3,}|\b(?:докаж|найд|определ|сколько|можно|верно)`)
 	// contentsRE finds the lines of a table of contents: a dotted leader or the word contents.
 	contentsRE = regexp.MustCompile(`(?i)\.{5,}|\\ldots\s*\\ldots\s*\\ldots|\btable of contents\b|^\s*contents\s*$`)
 	// stubRE names a fact of the text around the row, such as "Prove the lemma." or "Prove Claim 2.". A row with such a name, no formula and few words is a stub.
@@ -59,7 +63,10 @@ var (
 
 // Clean gives the text of a row as a statement, or "" and the reason why the row is not one clear problem. The text is normalized (spec 06.4), a heading line and a problem mark at the start are removed, and an answer or a solution that the dataset joined to the end is cut.
 func Clean(raw string) (string, string) {
-	text := normalize.Statement(markup(raw), "")
+	plain := markup(raw)
+	text := normalize.Statement(plain, "")
+	// cut tells if an answer or a solution was cut from the end of the text.
+	cut := len(normalize.CutTail(plain)) < len(strings.TrimSpace(plain))
 	if solutionRE.MatchString(text) {
 		return "", Solution
 	}
@@ -76,6 +83,7 @@ func Clean(raw string) (string, string) {
 			return "", Solution
 		}
 		text = strings.TrimSpace(text[:m[0]])
+		cut = true
 	}
 	if markRE.MatchString(text) {
 		return "", Glued
@@ -106,7 +114,7 @@ func Clean(raw string) (string, string) {
 		return "", Figure
 	case linkRE.MatchString(text):
 		return "", WebLink
-	case !canon.IsStatement(text):
+	case !canon.IsStatement(text), cut && !taskRE.MatchString(text), !strings.ContainsAny(text, "$?") && personRE.MatchString(text) && !taskRE.MatchString(text):
 		return "", NotStated
 	case !balanced(text):
 		return "", BrokenTeX

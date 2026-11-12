@@ -14,6 +14,13 @@ func TestClean(t *testing.T) {
 		{"plain", "Let $ABC$ be an acute triangle with altitude $AD$. Show that $AC = BC$ if and only if $\\angle AGC = 90^{\\circ}$.", "Let $ABC$ be an acute triangle with altitude $AD$. Show that $AC = BC$ if and only if $\\angle AGC = 90^{\\circ}$.", ""},
 		{"lead mark", "Problem 1. Find all prime numbers $p$ for which $x^p+y^p+z^p-x-y-z$ is a product of exactly three distinct primes.", "Find all prime numbers $p$ for which $x^p+y^p+z^p-x-y-z$ is a product of exactly three distinct primes.", ""},
 		{"heading", "# Task 3.\n\nVintik drew a rectangle $9 \\times 11$ cm and marked two hundred points in it. Prove that some square contains three points.", "Vintik drew a rectangle $9 \\times 11$ cm and marked two hundred points in it. Prove that some square contains three points.", ""},
+		{"proof stands for prove", "Given positive odd number $m$ and integer ${a}.$\nProof: For any real number $c,$ the set has at most $2+\\log_2 m$ elements.", "", NotStated},
+		{"a quick solution", "A quick solution:\nLet R be the foot of the perpendicular from X to BC. Then P, R, Q are collinear by the Simson line.", "", Solution},
+		{"forum news", "The national olympiad is taking place this week and I am part of the big event. The subjects will be posted on the site soon, as for the contest the subjects will be posted on monday.", "", NotStated},
+		{"claim with no formula", "If a triangle has two equal angles then it has two equal sides, and the converse holds too.", "If a triangle has two equal angles then it has two equal sides, and the converse holds too.", ""},
+		{"the solution of", "The solution of the equation $7^{x+7}=8^x$ can be expressed in the form $x=\\log_b 7^7$. What is $b$?", "The solution of the equation $7^{x+7}=8^x$ can be expressed in the form $x=\\log_b 7^7$. What is $b$?", ""},
+		{"construction", "Restore a triangle by one of its vertices, the circumcenter and the Lemoine point of the triangle.", "Restore a triangle by one of its vertices, the circumcenter and the Lemoine point of the triangle.", ""},
+		{"a puzzle told by I", "I have five different pairs of socks. Every day for five days, I pick two socks at random. Find the probability that I wear a matching pair on the fifth day.", "I have five different pairs of socks. Every day for five days, I pick two socks at random. Find the probability that I wear a matching pair on the fifth day.", ""},
 		{"answer cut", "3. Five runners ran a relay. If the first runner ran twice as fast, they would have spent $5\\%$ less time. By what percentage less time would they have spent?\n\nOTBET: by $8\\%$", "Five runners ran a relay. If the first runner ran twice as fast, they would have spent $5\\%$ less time. By what percentage less time would they have spent?", ""},
 		{"too short", "Find $x$ if $x+1=2$.", "", TooShort},
 		{"solution", "Solution. Since $a+b=c$ we get the claim, and the proof is done by induction on $n$.", "", Solution},
@@ -118,14 +125,33 @@ func TestDecideEdition(t *testing.T) {
 		{Text: nt, Editions: ed},      // 2: not a problem of the edition
 	}
 	ds := Decide(problems, rows, Options{Neighbors: 8})
-	if ds[0].Kind != Link || ds[0].Target != 1 || !ds[0].Edition {
-		t.Errorf("row 0: %v %d %q (%+v), want an edition link to 1", ds[0].Kind, ds[0].Target, ds[0].Reason, ds[0].Signals)
+	// With other names T and the keyword match are low, so E alone holds the row and does not link it.
+	if ds[0].Kind != Hold || ds[0].Target != 1 {
+		t.Errorf("row 0: %v %d %q (%+v), want a hold on 1", ds[0].Kind, ds[0].Target, ds[0].Reason, ds[0].Signals)
 	}
 	if ds[1].Edition {
 		t.Errorf("row 1 has no edition but links by edition: %+v", ds[1])
 	}
 	if ds[2].Kind != New {
 		t.Errorf("row 2: %v %d %q, want new", ds[2].Kind, ds[2].Target, ds[2].Reason)
+	}
+}
+
+func TestDecideChoices(t *testing.T) {
+	choices := " $\\textbf{(A)}\\ 3 \\qquad\\textbf{(B)}\\ 4 \\qquad\\textbf{(C)}\\ 5 \\qquad\\textbf{(D)}\\ 6 \\qquad\\textbf{(E)}\\ 7$"
+	cube := "A wooden cube $n$ units on a side is painted red on all six faces and then cut into $n^3$ unit cubes. Exactly one-fourth of the total number of faces of the unit cubes are red. What is $n$?"
+	digits := "Let $n$ be the smallest positive integer such that $n$ is divisible by $20$, $n^2$ is a perfect cube, and $n^3$ is a perfect square. What is the number of digits of $n$?"
+	problems := append([]Doc{{Text: cube + choices}}, filler(40)...)
+	rows := []Doc{
+		{Text: digits + choices}, // 0: another problem with the same choices
+		{Text: strings.Replace(cube, "  ", " ", 1) + " " + strings.ReplaceAll(choices, "\\qquad", "")}, // 1: the problem with other spacing
+	}
+	ds := Decide(problems, rows, Options{Neighbors: 8})
+	if ds[0].Kind == Link {
+		t.Errorf("row 0 links on its choices: %+v", ds[0])
+	}
+	if ds[1].Kind != Link || ds[1].Target != 0 {
+		t.Errorf("row 1: %v %d (%+v), want a link to 0", ds[1].Kind, ds[1].Target, ds[1].Signals)
 	}
 }
 
@@ -149,7 +175,7 @@ func TestSameEdition(t *testing.T) {
 			t.Errorf("%v %v %+v: %v %v, want %v %v", c.best, c.next, c.s, same, unsure, c.same, c.unsure)
 		}
 	}
-	if !sameEditionText(0.6, 0.3, Signals{}) || sameEditionText(0.6, 0.5, Signals{}) || sameEditionText(0.45, 0.1, Signals{}) || sameEditionText(0.9, 0.1, Signals{A: match.AnswerMismatch}) {
+	if !sameEditionText(0.6, 0.3, Signals{T: 0.4}) || !sameEditionText(0.6, 0.3, Signals{F: 0.6}) || !sameEditionText(0.85, 0.3, Signals{}) || sameEditionText(0.6, 0.3, Signals{T: 0.1, F: 0.2}) || sameEditionText(0.6, 0.5, Signals{T: 0.4}) || sameEditionText(0.45, 0.1, Signals{T: 0.4}) || sameEditionText(0.9, 0.1, Signals{A: match.AnswerMismatch}) {
 		t.Errorf("sameEditionText does not keep its bars")
 	}
 }
@@ -174,6 +200,19 @@ func TestSignals(t *testing.T) {
 	for _, c := range cases {
 		if c.s.Same() != c.same || c.s.Doubt() != c.doubt {
 			t.Errorf("%+v: same %v doubt %q, want %v %q", c.s, c.s.Same(), c.s.Doubt(), c.same, c.doubt)
+		}
+	}
+}
+
+func TestStem(t *testing.T) {
+	cases := [][2]string{
+		{"What is the number of digits of the least such $n$? $\\textbf{(A)}3\\textbf{(B)}4\\textbf{(C)}5$", "What is the number of digits of the least such $n$?"},
+		{"Find $x$ such that $x^2=4$ and $x>0$, and prove it.", "Find $x$ such that $x^2=4$ and $x>0$, and prove it."},
+		{"How many triangles? \\mathrm{(A)}1", "How many triangles? \\mathrm{(A)}1"},
+	}
+	for _, c := range cases {
+		if got := stem(c[0]); got != c[1] {
+			t.Errorf("stem(%q) = %q, want %q", c[0], got, c[1])
 		}
 	}
 }

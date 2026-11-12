@@ -134,11 +134,18 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 	texts := make([]string, len(all))
 	feats := make([]keymatch.Features, len(all))
 	keys := make([]uint64, len(all))
+	// stems are the texts with no answer choices, or "" for a text with none.
+	stems := make([]string, len(all))
+	stemFeats := make([]keymatch.Features, len(all))
 	parallel(len(all), func(i int) {
 		forms[i] = matchText(all[i].Text)
+		keys[i] = exactKey(forms[i])
 		texts[i] = forms[i] + mathGrams(forms[i])
 		feats[i] = keymatch.Extract(forms[i])
-		keys[i] = exactKey(forms[i])
+		if st := stem(forms[i]); st != forms[i] {
+			stems[i] = st
+			stemFeats[i] = keymatch.Extract(st)
+		}
 	})
 	ks := make([]keymatch.Key, len(all))
 	for i := range all {
@@ -190,6 +197,14 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 	signals := func(i, j int, e float64) Signals {
 		s := Signals{E: e, T: match.Jaccard(sh(i), sh(j)), A: match.Answers(all[i].Answer, all[j].Answer), Exact: keys[i] == keys[j]}
 		s.F, s.Shared, s.Tokens = km.Score(feats[i], feats[j])
+		if stems[i] != "" && stems[j] != "" && !s.Exact {
+			// Two multiple choice problems of one contest often have the same choices, so the texts without them must agree too.
+			t := match.Jaccard(match.Shingles(stems[i]), match.Shingles(stems[j]))
+			f, _, _ := km.Score(stemFeats[i], stemFeats[j])
+			if t < StemT && f < StemF {
+				s.T, s.F = t, f
+			}
+		}
 		return s
 	}
 	out := make([]Decision, len(rows))
@@ -330,11 +345,25 @@ const (
 	EditionE       = 0.5
 	EditionMarginE = 0.2
 	EditionDoubtE  = 0.35
+	// EditionSureE is the E that links with no other signal, and EditionT and EditionF are the T and the keyword match that a lower E needs.
+	EditionSureE = 0.8
+	EditionT     = 0.3
+	EditionF     = 0.5
+)
+
+// StemT and StemF are the T and the keyword match of the texts of two multiple choice problems without their choices, below which the texts are scored without the choices.
+const (
+	StemT = 0.3
+	StemF = 0.5
 )
 
 // sameEditionText tells if the best text match of a row with the problems of an edition places the row on that problem.
 func sameEditionText(best, next float64, s Signals) bool {
-	return s.A != match.AnswerMismatch && best >= EditionE && best-next >= EditionMarginE
+	if s.A == match.AnswerMismatch || best < EditionE || best-next < EditionMarginE {
+		return false
+	}
+	// The content may not have the problem of the row, and then the best problem of the edition is another one on the same topic. Below EditionSureE the words or the keywords must agree a little too.
+	return best >= EditionSureE || s.T >= EditionT || s.F >= EditionF
 }
 
 // none marks a doc that no row can join: a held row, or a row that has no decision yet.

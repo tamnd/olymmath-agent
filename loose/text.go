@@ -3,6 +3,8 @@ package loose
 import (
 	"regexp"
 	"strings"
+
+	"github.com/tamnd/olymmath-agent/canon"
 )
 
 var (
@@ -34,4 +36,16 @@ func matchText(text string) string {
 		}
 		return "$" + body + "$"
 	})
+}
+
+// choicesRE finds the start of the answer choices of a multiple choice problem: "\\textbf{(A)}", "\\mathrm{(A)}", "\\qquad (A)" or "(A)" at the start of a line.
+var choicesRE = regexp.MustCompile(`\$?\s*(?:\\(?:textbf|mathrm|textrm|text|mbox)\s*\{\s*\(A\)|\\qquad\s*\(A\)|(?m:^)\s*\(A\)\s)`)
+
+// stem gives a match text without the answer choices. The choices of two problems of one contest are often the same numbers, such as 3, 4, 5, 6 and 7, so they make two different problems look alike.
+func stem(form string) string {
+	m := choicesRE.FindStringIndex(form)
+	if m == nil || m[0] < canon.MinText {
+		return form
+	}
+	return strings.TrimSpace(form[:m[0]])
 }
