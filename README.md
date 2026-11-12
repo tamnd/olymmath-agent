@@ -415,6 +415,15 @@ om ocr -content olymmath -lanes native -paper algebra-a pumac/2024 https://pumac
 
 The archive page pumac.princeton.edu/archives has a section for each year from 2007. Each section has the papers of division A and division B, under the headings "Division A" and "Division B". A link with the label "problems" belongs to the round of the last heading before it. Each subject test (algebra, combinatorics, geometry and number theory) and the individual finals have one paper for each division, such as algebra-a and finals-b, and each paper numbers its problems from 1. The team round has one paper, team. The power round and the live round are left out, and so are the solutions and the answer sheets. The file names vary, such as PUMaC2015_AlgebraB.pdf, 2019NT_A_Div.pdf and Algebra_A_2023.pdf. The site states no terms and no licence. Its robots.txt allows /s/ for all agents.
 
+The Berkeley Math Tournament works the same way, with the source `berkeley-mt`:
+
+```sh
+om papers -content olymmath berkeley-mt
+om ocr -content olymmath -lanes native -source berkeley-mt -paper algebra bmt/2023
+```
+
+The site berkeley.mt has one archive page for each tournament, such as berkeley.mt/archives/bmt-2019. The page has a table with one row for each round: its name, the file of the problems and the file of the solutions. Each round numbers its problems from 1, so each round is a paper of the layout. The paper is the name of the round in lower case with hyphens, such as individual, team, general, guts or number-theory. The file names vary: IS2014.pdf and AnaS2014.pdf (2012 to 2017), ALSP18.pdf (2018) and algebra-problems.pdf (2019 to 2025). The tiebreakers and the power round are left out. A tiebreaker is not a part of the score of its round, and the problems of a power round have parts with no fixed numbering. The listing holds the pages of 2012 to 2025. The middle school tournament (BmMT) is not recorded. The site has no page of terms. Its robots.txt allows all paths.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Journals
