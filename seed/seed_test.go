@@ -29,6 +29,11 @@ func TestNorm(t *testing.T) {
 		"IV Soros Olympiad 1997 - 98 (Russia)": "soros olympiad russia",
 		"53. Bulgarian Mathematical Olympiad":  "bulgarian mathematical olympiad",
 		"AMC 10 A":                             "amc 10 a",
+		"Iran MO (2nd Round)":                  "iran mathematical olympiad round 2",
+		"Iran MO (3rd round)":                  "iran mathematical olympiad round 3",
+		"Iran MO  (2nd  Round)":                "iran mathematical olympiad round 2",
+		"2019 Turkey MO (2nd round)":           "turkey mathematical olympiad round 2",
+		"51st Ukrainian National Mathematical Olympiad, 4th Round": "ukrainian national mathematical olympiad round 4",
 	}
 	for in, want := range cases {
 		if got := Norm(in); got != want {
