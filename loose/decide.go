@@ -142,7 +142,7 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 	parallel(len(all), func(i int) {
 		forms[i] = matchText(all[i].Text)
 		keys[i] = exactKey(forms[i])
-		texts[i] = forms[i] + mathGrams(forms[i])
+		texts[i] = simText(forms[i])
 		feats[i] = keymatch.Extract(forms[i])
 		if st := stem(forms[i]); st != forms[i] {
 			stems[i] = st
@@ -286,6 +286,12 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 		}
 	}
 	return out
+}
+
+// simText gives the text that E is taken on: the stem of a match form and the grams of its formulas. The choices are left out, because they are a formula in one text and plain text in another, and their grams would outweigh the problem.
+func simText(form string) string {
+	st := stem(form)
+	return st + mathGrams(st)
 }
 
 // sibling tells if a row and a doc with no position name a common edition: b is a row when row is true, and else a loose problem of the content.
