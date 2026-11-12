@@ -3,6 +3,8 @@ package loose
 import (
 	"strings"
 	"testing"
+
+	"github.com/tamnd/olymmath-agent/match"
 )
 
 func TestClean(t *testing.T) {
@@ -103,6 +105,52 @@ func TestDecide(t *testing.T) {
 	ds = Decide(problems, rows, Options{Neighbors: 8, Limit: 1})
 	if ds[0].Kind != Link || ds[1].Kind != New || ds[2].Kind != Skip || ds[5].Kind != Skip {
 		t.Errorf("with a limit of 1: %v %v %v", ds[1].Kind, ds[2].Kind, ds[5].Kind)
+	}
+}
+
+func TestDecideEdition(t *testing.T) {
+	ed := []string{"x/2008"}
+	problems := append([]Doc{{Text: tri, ID: "x/2008/p1", Editions: ed}, {Text: fn, ID: "x/2008/p2", Editions: ed}}, filler(40)...)
+	renamed := "Find all functions $g:\\mathbb{R}\\to\\mathbb{R}$ with $g(a+b)+g(ab)=g(a)g(b)+1$ for all reals $a$ and $b$."
+	rows := []Doc{
+		{Text: renamed, Editions: ed}, // 0: problem 1 with other names, in the edition
+		{Text: renamed},               // 1: the same text with no edition
+		{Text: nt, Editions: ed},      // 2: not a problem of the edition
+	}
+	ds := Decide(problems, rows, Options{Neighbors: 8})
+	if ds[0].Kind != Link || ds[0].Target != 1 || !ds[0].Edition {
+		t.Errorf("row 0: %v %d %q (%+v), want an edition link to 1", ds[0].Kind, ds[0].Target, ds[0].Reason, ds[0].Signals)
+	}
+	if ds[1].Edition {
+		t.Errorf("row 1 has no edition but links by edition: %+v", ds[1])
+	}
+	if ds[2].Kind != New {
+		t.Errorf("row 2: %v %d %q, want new", ds[2].Kind, ds[2].Target, ds[2].Reason)
+	}
+}
+
+func TestSameEdition(t *testing.T) {
+	floors := Signals{Tokens: 5, Shared: 10}
+	cases := []struct {
+		best, next   float64
+		s            Signals
+		same, unsure bool
+	}{
+		{0.7, 0.2, floors, true, false},
+		{0.7, 0.6, floors, false, true},
+		{0.4, 0.1, floors, false, true},
+		{0.2, 0.1, floors, false, false},
+		{0.9, 0.1, Signals{Tokens: 2, Shared: 10}, false, false},
+		{0.9, 0.1, Signals{Tokens: 5, Shared: 10, A: match.AnswerMismatch}, false, true},
+	}
+	for _, c := range cases {
+		same, unsure := sameEdition(c.best, c.next, c.s)
+		if same != c.same || unsure != c.unsure {
+			t.Errorf("%v %v %+v: %v %v, want %v %v", c.best, c.next, c.s, same, unsure, c.same, c.unsure)
+		}
+	}
+	if !sameEditionText(0.6, 0.3, Signals{}) || sameEditionText(0.6, 0.5, Signals{}) || sameEditionText(0.45, 0.1, Signals{}) || sameEditionText(0.9, 0.1, Signals{A: match.AnswerMismatch}) {
+		t.Errorf("sameEditionText does not keep its bars")
 	}
 }
 

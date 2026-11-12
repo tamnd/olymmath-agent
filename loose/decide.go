@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 
@@ -17,6 +18,10 @@ import (
 type Doc struct {
 	Text   string
 	Answer string
+	// Editions are the editions of the problem, as imo/2006, or for a row the edition that its source names.
+	Editions []string
+	// ID names the problem of a text of the content, so that two texts of one problem count once in an edition.
+	ID string
 }
 
 // Kind is the decision for a row.
@@ -51,8 +56,10 @@ type Decision struct {
 	// Target is the index of the problem for Link, the index of the row that made the new problem for Join, and for Hold the problem (0 or more) or the row (-1 - its index) that the row is near.
 	Target int
 	Signals
-	// Reason says why a row is held.
+	// Reason says why a row is held, or for a link by its edition the scores.
 	Reason string
+	// Edition is true when the row is the same as a problem of the edition that its source names, by the keyword match.
+	Edition bool
 }
 
 // Options of Decide.
@@ -108,7 +115,18 @@ func (s Signals) Doubt() string {
 	return ""
 }
 
-// Decide gives the decision for each row. The problems of the content come first in docs, then the rows, in order. Texts are compared in the form of matchText. A row is compared with the problems and with the rows before it that became a problem or joined one. The best same text wins: the same normalized text, then the highest T, then the highest E. A row with no same text and a doubtful one is held. Each other row is new, until the limit.
+// sameEdition gives the problem of the edition of a row that the keyword match places the row on, the doubtful problem that it comes near, and the signals of the best pair. A row of an edition that the content has is one of its problems more often than not, so the bar is the bar of the content match (#168), where the competition and the year agree: a score of keymatch.Strong, the floors of shared tokens, and a gap of keymatch.Margin to the next problem of the edition. A pair at keymatch.Doubtful, or at Strong with no gap, is held.
+func sameEdition(best, next float64, s Signals) (same, doubt bool) {
+	if s.A == match.AnswerMismatch || s.Tokens < keymatch.MinTokens || s.Shared < keymatch.MinShared {
+		return false, s.A == match.AnswerMismatch && best >= keymatch.Strong
+	}
+	if best >= keymatch.Strong && best-next >= keymatch.Margin {
+		return true, false
+	}
+	return false, best >= keymatch.Doubtful
+}
+
+// Decide gives the decision for each row. The problems of the content come first in docs, then the rows, in order. Texts are compared in the form of matchText. A row is compared with the problems and with the rows before it that became a problem or joined one. The best same text wins: the same normalized text, then the highest T, then the highest E. A row with no same text and a doubtful one is held. A row that names an edition is then compared with each problem of that edition (sameEdition). Each other row is new, until the limit.
 func Decide(problems, rows []Doc, o Options) []Decision {
 	n := len(problems)
 	all := append(append([]Doc{}, problems...), rows...)
@@ -127,7 +145,27 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 		ks[i] = keymatch.Key{F: feats[i]}
 	}
 	km := keymatch.NewMatcher(ks)
-	near := similar.FindFrom(texts, n, max(o.Neighbors, 1), Near)
+	byEdition := map[string][]int{}
+	for i := range n {
+		for _, e := range all[i].Editions {
+			if !slices.Contains(byEdition[e], i) {
+				byEdition[e] = append(byEdition[e], i)
+			}
+		}
+	}
+	// peers are the texts of the content in the editions that a row names.
+	peers := func(i int) []int {
+		var out []int
+		for _, e := range all[i].Editions {
+			for _, j := range byEdition[e] {
+				if !slices.Contains(out, j) {
+					out = append(out, j)
+				}
+			}
+		}
+		return out
+	}
+	near, peerE := similar.FindFromAlso(texts, n, max(o.Neighbors, 1), Near, peers)
 	shingles := make([][]uint64, len(all))
 	sh := func(i int) []uint64 {
 		if shingles[i] == nil {
@@ -195,6 +233,9 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 				doubt = Decision{Kind: Hold, Target: owner[c.doc], Signals: s, Reason: why}
 			}
 		}
+		if best == nil {
+			best, doubt = edition(i, all, peers(i), peerE[i], signals, doubt)
+		}
 		switch {
 		case best != nil:
 			out[r] = *best
@@ -217,6 +258,83 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 		}
 	}
 	return out
+}
+
+// edition compares the row i with the problems of the editions that it names, and gives a link or a doubt (sameEdition). Two texts of one problem in the content count once, at their best score.
+func edition(i int, all []Doc, peers []int, peerE []float64, signals func(i, j int, e float64) Signals, doubt Decision) (*Decision, Decision) {
+	type scored struct {
+		doc int
+		s   Signals
+	}
+	// Each problem of the edition keeps its text with the best keyword match and its text with the best E.
+	byF, byE := map[string]scored{}, map[string]scored{}
+	for k, j := range peers {
+		id := all[j].ID
+		if id == "" {
+			id = fmt.Sprint(j)
+		}
+		e := 0.0
+		if k < len(peerE) {
+			e = peerE[k]
+		}
+		s := signals(i, j, e)
+		if old, ok := byF[id]; !ok || s.F > old.s.F || (s.F == old.s.F && j < old.doc) {
+			byF[id] = scored{j, s}
+		}
+		if old, ok := byE[id]; !ok || s.E > old.s.E || (s.E == old.s.E && j < old.doc) {
+			byE[id] = scored{j, s}
+		}
+	}
+	rank := func(m map[string]scored, v func(Signals) float64) (top int, first, second float64, s Signals) {
+		top = -1
+		for _, c := range m {
+			x := v(c.s)
+			switch {
+			case top < 0 || x > first || (x == first && c.doc < top):
+				if top >= 0 {
+					second = max(second, first)
+				}
+				top, first, s = c.doc, x, c.s
+			case x > second:
+				second = x
+			}
+		}
+		return top, first, second, s
+	}
+	top, first, second, s := rank(byF, func(s Signals) float64 { return s.F })
+	if top < 0 {
+		return nil, doubt
+	}
+	topE, firstE, secondE, sE := rank(byE, func(s Signals) float64 { return s.E })
+	if same, _ := sameEdition(first, second, s); same {
+		return &Decision{Kind: Link, Target: top, Signals: s, Edition: true, Reason: fmt.Sprintf("edition keyword match %.2f, next %.2f", first, second)}, doubt
+	}
+	if sameEditionText(firstE, secondE, sE) {
+		return &Decision{Kind: Link, Target: topE, Signals: sE, Edition: true, Reason: fmt.Sprintf("edition text match %.2f, next %.2f", firstE, secondE)}, doubt
+	}
+	// A row that is held already keeps the pair that holds it.
+	if doubt.Kind != New {
+		return nil, doubt
+	}
+	if _, unsure := sameEdition(first, second, s); unsure {
+		return nil, Decision{Kind: Hold, Target: top, Signals: s, Reason: fmt.Sprintf("edition keyword match %.2f, next %.2f", first, second)}
+	}
+	if sE.A != match.AnswerMismatch && firstE >= EditionDoubtE {
+		return nil, Decision{Kind: Hold, Target: topE, Signals: sE, Reason: fmt.Sprintf("edition text match %.2f, next %.2f", firstE, secondE)}
+	}
+	return nil, doubt
+}
+
+// EditionE, EditionMarginE and EditionDoubtE are the bars of the text match (E) of a row with the problems of an edition that it names: E of EditionE and a gap of EditionMarginE to the next problem make the same problem, E of EditionDoubtE a held pair. They catch the rows that rename the variables of a problem, which the keyword match misses.
+const (
+	EditionE       = 0.5
+	EditionMarginE = 0.2
+	EditionDoubtE  = 0.35
+)
+
+// sameEditionText tells if the best text match of a row with the problems of an edition places the row on that problem.
+func sameEditionText(best, next float64, s Signals) bool {
+	return s.A != match.AnswerMismatch && best >= EditionE && best-next >= EditionMarginE
 }
 
 // none marks a doc that no row can join: a held row, or a row that has no decision yet.

@@ -108,9 +108,13 @@ func runImportLoose(env Env, args []string) int {
 	var docs []loose.Doc
 	var owners []*content.Problem
 	for _, p := range corpus.All() {
+		var eds []string
+		for _, a := range p.Appearances {
+			eds = append(eds, a.Locator.EditionOf().String())
+		}
 		for _, s := range p.Statements {
 			if s.Text != "" {
-				docs = append(docs, loose.Doc{Text: s.Text, Answer: p.Answer})
+				docs = append(docs, loose.Doc{Text: s.Text, Answer: p.Answer, Editions: eds, ID: p.Tag})
 				owners = append(owners, p)
 			}
 		}
@@ -118,6 +122,11 @@ func runImportLoose(env Env, args []string) int {
 	rows := make([]loose.Doc, len(r.rows))
 	for i, x := range r.rows {
 		rows[i] = loose.Doc{Text: x.cand.Text, Answer: x.cand.Answer}
+		for _, u := range x.unplaced {
+			if strings.Contains(u.At, "/") {
+				rows[i].Editions = append(rows[i].Editions, u.At)
+			}
+		}
 	}
 	fmt.Fprintf(env.Stderr, "om import -loose: %d texts of %d problems, %d rows to match.\n", len(docs), len(corpus.All()), len(rows))
 	ds := loose.Decide(docs, rows, loose.Options{Limit: *limit, Neighbors: *neighbors})

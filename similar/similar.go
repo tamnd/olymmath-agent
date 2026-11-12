@@ -53,8 +53,15 @@ func Find(texts []string, n int, least float64) [][]Match {
 
 // FindFrom is Find for the texts from index from on: the weights and the matches come from all the texts, but only the texts from from on get their matches. The result has one entry for each text, and the entries before from are nil. An import uses it to find the matches of its new texts among the problems and the other new texts, with no work for each problem.
 func FindFrom(texts []string, from, n int, least float64) [][]Match {
+	out, _ := FindFromAlso(texts, from, n, least, nil)
+	return out
+}
+
+// FindFromAlso is FindFrom, and gives too the score of each text i from from on with each text of also(i), in the order of also(i), whatever the score. also can be nil.
+func FindFromAlso(texts []string, from, n int, least float64, also func(i int) []int) ([][]Match, [][]float64) {
 	sorted, vecs, index := weigh(texts)
 	out := make([][]Match, len(texts))
+	extra := make([][]float64, len(texts))
 	var next atomic.Int64
 	next.Store(int64(from))
 	// The scores of one text do not depend on the other scores, so the workers share the texts.
@@ -68,12 +75,16 @@ func FindFrom(texts []string, from, n int, least float64) [][]Match {
 				if i >= len(texts) {
 					return
 				}
-				out[i] = best(i, sorted[i], vecs[i], index, n, least, s)
+				var a []int
+				if also != nil {
+					a = also(i)
+				}
+				out[i], extra[i] = best(i, sorted[i], vecs[i], index, n, least, s, a)
 			}
 		})
 	}
 	wg.Wait()
-	return out
+	return out, extra
 }
 
 // weigh gives the words of each text that count, in order, the weight of each word in each text, and the index of the texts of each word.
@@ -130,8 +141,8 @@ func newScores(n int) *scores {
 	return &scores{score: make([]float64, n), seen: make([]bool, n)}
 }
 
-// best gives the n best matches of text i. It uses s for the sums and leaves it empty for the next text.
-func best(i int, words []string, vec map[string]float64, index map[string][]posting, n int, least float64, s *scores) []Match {
+// best gives the n best matches of text i, and the scores of i with the texts of also. It uses s for the sums and leaves it empty for the next text.
+func best(i int, words []string, vec map[string]float64, index map[string][]posting, n int, least float64, s *scores, also []int) ([]Match, []float64) {
 	for _, w := range words {
 		x := vec[w]
 		for _, p := range index[w] {
@@ -143,6 +154,10 @@ func best(i int, words []string, vec map[string]float64, index map[string][]post
 				s.score[p.doc] += x * p.w
 			}
 		}
+	}
+	var extra []float64
+	for _, d := range also {
+		extra = append(extra, s.score[d])
 	}
 	ms := s.ms[:0]
 	for _, d := range s.hit {
@@ -160,9 +175,9 @@ func best(i int, words []string, vec map[string]float64, index map[string][]post
 	})
 	s.ms = ms
 	if len(ms) == 0 {
-		return nil
+		return nil, extra
 	}
-	return slices.Clone(ms[:min(n, len(ms))])
+	return slices.Clone(ms[:min(n, len(ms))]), extra
 }
 
 // Nearest gives, for each query, the doc with the best score, or a Match with Doc -1 when no doc shares a word with the query. The weights of the words come from the docs only, so that a large set of queries does not change them, and only the docs are indexed.
