@@ -264,6 +264,8 @@ func TestStem(t *testing.T) {
 		{"How many triangles? \\mathrm{(A)}1", "How many triangles? \\mathrm{(A)}1"},
 		{"What is the area of the region enclosed by the graph of $x^2+y^2=|x|+|y|?$\n\n\\textbf{(A)}\\ \\pi \\textbf{(B)}\\ 2", "What is the area of the region enclosed by the graph of $x^2+y^2=|x|+|y|?$"},
 		{"What is the area of the region enclosed by the graph of $x^2+y^2=|x|+|y|?$ $\\textbf{(A)}\\ \\pi \\textbf{(B)}\\ 2$", "What is the area of the region enclosed by the graph of $x^2+y^2=|x|+|y|?$"},
+		{"What is the area of the union of the regions enclosed by the square and the circle?\n\n$(\\text{A})200+25\\pi(\\text{B})100+75\\pi$", "What is the area of the union of the regions enclosed by the square and the circle?"},
+		{"What is the area of the union of the regions enclosed by the square and the circle? $(\\mathrm {A}) 200+25\\pi (\\mathrm {B}) 100+75\\pi$", "What is the area of the union of the regions enclosed by the square and the circle?"},
 	}
 	for _, c := range cases {
 		if got := stem(c[0]); got != c[1] {
