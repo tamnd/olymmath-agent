@@ -126,7 +126,7 @@ func (r Rule) Moves(name string) bool {
 	return false
 }
 
-// Rules gives the rule of Split for each top folder: All for a competition that is not in tier 1 and for the API records, and Copies for a competition in tier 1 and for the tag pages under p. The other folders keep their files.
+// Rules gives the rule of Split for each top folder: All for a competition that is not in tier 1 and for the API records, and for the tag pages under p and the lists under loose, and Copies for a competition in tier 1. The other folders keep their files.
 func Rules(corpus *content.Corpus, t Tiers) map[string]Rule {
 	rules := map[string]Rule{}
 	add := func(f string, r Rule) { rules[f] = max(rules[f], r) }
@@ -137,7 +137,10 @@ func Rules(corpus *content.Corpus, t Tiers) map[string]Rule {
 			add(c.Code, All)
 		}
 	}
-	add("p", Copies)
+	// The tag pages of the loose problems are many, so they go to R2 like the pages of a competition.
+	add("p", All)
+	// The lists of loose problems by source have a page for each 500 problems. The index pages stay.
+	add("loose", All)
 	// The API records go to R2 too, but the index of the API stays.
 	add("api", All)
 	return rules

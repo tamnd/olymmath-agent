@@ -225,6 +225,7 @@ func (b *builder) all() error {
 		b.static,
 		b.coverage,
 		b.sources,
+		b.loose,
 		b.ai,
 		b.topics,
 		b.facets,
@@ -248,13 +249,14 @@ func (b *builder) link(p string) string {
 
 func (b *builder) funcs() template.FuncMap {
 	return template.FuncMap{
-		"link":      b.link,
-		"asset":     func(p string) string { return b.link("assets/"+p) + "?v=" + b.asset },
-		"topic":     topicName,
-		"root":      content.TopicRoot,
-		"topicLink": func(t string) string { return b.link(topicPath(t)) },
-		"dots":      dots,
-		"year":      func() int { return b.opts.Date.Year() },
+		"link":       b.link,
+		"searchMore": b.searchMore,
+		"asset":      func(p string) string { return b.link("assets/"+p) + "?v=" + b.asset },
+		"topic":      topicName,
+		"root":       content.TopicRoot,
+		"topicLink":  func(t string) string { return b.link(topicPath(t)) },
+		"dots":       dots,
+		"year":       func() int { return b.opts.Date.Year() },
 		"short": func(s string) string {
 			if len(s) > 7 {
 				return s[:7]
@@ -517,6 +519,8 @@ type problemView struct {
 	Also []alsoView
 	// Similar are the problems with the most similar statements.
 	Similar []alsoView
+	// Where are the competitions and years that the sources give for a loose problem, with no position (spec 04.3).
+	Where []alsoView
 	// Label names the position in its edition, for example "Problem 3" or "G1".
 	Label string
 	// Primary is the title of the primary appearance when the view shows the problem in another edition.
@@ -576,6 +580,19 @@ func (b *builder) view(p *content.Problem) *problemView {
 		}
 	}
 	v.Formal = b.formalView(p)
+	seen := map[string]bool{}
+	for _, u := range p.Unplaced {
+		code, edition, _ := strings.Cut(u.At, "/")
+		if b.corpus.Competition(code) == nil || seen[u.At] {
+			continue
+		}
+		seen[u.At] = true
+		link := "/loose/" + code + "/"
+		if edition != "" {
+			link += "#y-" + edition
+		}
+		v.Where = append(v.Where, alsoView{Title: b.unplacedTitle(u), Link: b.link(link)})
+	}
 	for _, q := range b.similar[p] {
 		v.Similar = append(v.Similar, alsoView{Title: problemTitle(q), Link: b.link(problemPath(q))})
 	}
@@ -1053,7 +1070,7 @@ func (b *builder) sources() error {
 	for _, r := range b.corpus.Sources {
 		count[r.ID] = &sourceView{SourceRecord: r}
 	}
-	for _, p := range b.corpus.All() {
+	for _, p := range append(slices.Clip(b.corpus.All()), b.corpus.Loose...) {
 		for i := range p.Statements {
 			if v := count[p.Statements[i].Source]; v != nil {
 				v.Statements++
@@ -1125,10 +1142,33 @@ func flag(ok bool) int {
 	return 0
 }
 
+// SearchChunk is the number of loose problems in one file of the search index, and SitemapURLs the number of URLs in one sitemap file. A static asset can have at most 25 MiB, and a sitemap at most 50,000 URLs.
+var (
+	SearchChunk = 20000
+	SitemapURLs = 40000
+)
+
+// searchFiles gives the files of the search index: search.json with the problems that have a position, then a file under search/ for each SearchChunk loose problems. The search reads them in this order.
+func (b *builder) searchFiles() []string {
+	files := []string{"search.json"}
+	for i := 0; i*SearchChunk < len(b.corpus.Loose); i++ {
+		files = append(files, fmt.Sprintf("search/loose-%02d.json", i))
+	}
+	return files
+}
+
+// searchMore gives the links of the files of the search index after search.json, with a space between them.
+func (b *builder) searchMore() string {
+	var links []string
+	for _, f := range b.searchFiles()[1:] {
+		links = append(links, b.link(f))
+	}
+	return strings.Join(links, " ")
+}
+
 func (b *builder) searchIndex() error {
-	var entries []searchEntry
-	for _, p := range append(b.corpus.Problems(), b.corpus.Loose...) {
-		entries = append(entries, searchEntry{
+	entry := func(p *content.Problem) searchEntry {
+		return searchEntry{
 			Title:    problemTitle(p),
 			Link:     b.link(problemPath(p)),
 			Text:     Plain(p.Statement),
@@ -1142,25 +1182,61 @@ func (b *builder) searchIndex() error {
 			AI:       flag(hasOrigin(p, "ai")),
 			Verified: flag(p.Status.Statement == "verified"),
 			Locator:  p.Locator(),
-		})
+		}
 	}
-	data, err := json.Marshal(entries)
-	if err != nil {
-		return err
+	files := b.searchFiles()
+	parts := make([][]*content.Problem, len(files))
+	parts[0] = b.corpus.Problems()
+	for i, p := range b.corpus.Loose {
+		parts[1+i/SearchChunk] = append(parts[1+i/SearchChunk], p)
 	}
-	return b.write("search.json", data)
+	for i, ps := range parts {
+		entries := make([]searchEntry, 0, len(ps))
+		for _, p := range ps {
+			entries = append(entries, entry(p))
+		}
+		data, err := json.Marshal(entries)
+		if err != nil {
+			return err
+		}
+		if err := b.write(files[i], data); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// sitemap writes sitemap.xml with the URL of each page. A site with more than SitemapURLs pages gets the files sitemap-1.xml, sitemap-2.xml and so on, and sitemap.xml is their index.
+func (b *builder) sitemap() error {
+	sort.Strings(b.pages)
+	urlset := func(pages []string) []byte {
+		var sm strings.Builder
+		sm.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
+		for _, p := range pages {
+			fmt.Fprintf(&sm, "  <url><loc>%s/%s</loc></url>\n", b.opts.URL, strings.TrimPrefix(p, "/"))
+		}
+		sm.WriteString("</urlset>\n")
+		return []byte(sm.String())
+	}
+	if len(b.pages) <= SitemapURLs {
+		return b.write("sitemap.xml", urlset(b.pages))
+	}
+	var ix strings.Builder
+	ix.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
+	for i := 0; i*SitemapURLs < len(b.pages); i++ {
+		name := fmt.Sprintf("sitemap-%d.xml", i+1)
+		if err := b.write(name, urlset(b.pages[i*SitemapURLs:min((i+1)*SitemapURLs, len(b.pages))])); err != nil {
+			return err
+		}
+		fmt.Fprintf(&ix, "  <sitemap><loc>%s/%s</loc></sitemap>\n", b.opts.URL, name)
+	}
+	ix.WriteString("</sitemapindex>\n")
+	return b.write("sitemap.xml", []byte(ix.String()))
 }
 
 // machine writes the files for crawlers and programs: robots.txt, sitemap.xml, llms.txt and the headers file of Cloudflare.
 func (b *builder) machine() error {
-	sort.Strings(b.pages)
-	var sm strings.Builder
-	sm.WriteString(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n")
-	for _, p := range b.pages {
-		fmt.Fprintf(&sm, "  <url><loc>%s/%s</loc></url>\n", b.opts.URL, strings.TrimPrefix(p, "/"))
-	}
-	sm.WriteString("</urlset>\n")
-	if err := b.write("sitemap.xml", []byte(sm.String())); err != nil {
+	if err := b.sitemap(); err != nil {
 		return err
 	}
 	robots := fmt.Sprintf("User-agent: *\nAllow: /\n\nSitemap: %s/sitemap.xml\n", b.opts.URL)
@@ -1172,7 +1248,7 @@ func (b *builder) machine() error {
 	for _, c := range b.corpus.Competitions {
 		fmt.Fprintf(&llms, "- [%s](%s/c/%s/): %s\n", c.Name, b.opts.URL, c.Code, c.Description)
 	}
-	fmt.Fprintf(&llms, "\n## Data\n\n- [Search index](%s/search.json): each problem with its locator and its text.\n- [API index](%s/api/index.json): the JSON records of the problems, the solutions and the editions, at /api/problem/<tag>.json, /api/solutions/<tag>.json and /api/edition/<competition>/<edition>.json.\n- Each problem page has a Markdown copy and a JSON copy at the same path with .md and .json, for example [%s/imo/2024/p1.md](%s/imo/2024/p1.md).\n", b.opts.URL, b.opts.URL, b.opts.URL, b.opts.URL)
+	fmt.Fprintf(&llms, "\n## Data\n\n- [Search index](%s/search.json): each problem with its locator and its text. The loose problems are in search/loose-00.json, search/loose-01.json and so on.\n- [API index](%s/api/index.json): the JSON records of the problems, the solutions and the editions, at /api/problem/<tag>.json, /api/solutions/<tag>.json and /api/edition/<competition>/<edition>.json.\n- Each problem page has a Markdown copy and a JSON copy at the same path with .md and .json, for example [%s/imo/2024/p1.md](%s/imo/2024/p1.md).\n", b.opts.URL, b.opts.URL, b.opts.URL, b.opts.URL)
 	if err := b.write("llms.txt", []byte(llms.String())); err != nil {
 		return err
 	}

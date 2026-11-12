@@ -10,6 +10,24 @@
   function toggleTheme() {
     setTheme(root.getAttribute("data-theme") === "dark" ? "light" : "dark");
   }
+  // loadIndex reads the search index: the file of the element, then the files of its data-more one by one. It calls done with all the entries so far after each file, and fail when the first file does not load.
+  function loadIndex(first, el, done, fail) {
+    var more = (el.getAttribute("data-more") || "").split(" ").filter(Boolean);
+    var all = [];
+    var next = function (i) {
+      if (i >= more.length) return;
+      fetch(more[i]).then(function (r) { return r.json(); }).then(function (data) {
+        all = all.concat(data);
+        done(all);
+        next(i + 1);
+      }).catch(function () {});
+    };
+    fetch(first).then(function (r) { return r.json(); }).then(function (data) {
+      all = data;
+      done(all);
+      next(0);
+    }).catch(fail);
+  }
   var btn = document.querySelector(".theme");
   if (btn) btn.addEventListener("click", toggleTheme);
 
@@ -119,13 +137,13 @@
     facets.addEventListener("input", apply);
     facets.addEventListener("change", apply);
     facets.addEventListener("submit", function (e) { e.preventDefault(); });
-    fetch(facets.getAttribute("data-facets")).then(function (r) { return r.json(); }).then(function (data) {
+    loadIndex(facets.getAttribute("data-facets"), facets, function (data) {
       all = data;
       apply();
-    }).catch(function () { fstatus.textContent = "The list did not load. Try again later."; });
+    }, function () { fstatus.textContent = "The list did not load. Try again later."; });
   }
 
-  // Search: the index is one JSON file. Each word of the query must be in the title, the locator or the text.
+  // Search: the index is search.json and the files of the loose problems, which load after it. Each word of the query must be in the title, the locator or the text.
   var results = document.getElementById("results");
   if (!results) return;
   var input = document.getElementById("q");
@@ -214,8 +232,15 @@
   var q0 = new URL(location.href).searchParams.get("q");
   if (q0) input.value = q0;
   status.textContent = "Loading the index…";
-  fetch(results.getAttribute("data-index")).then(function (r) { return r.json(); }).then(function (data) {
+  var ready = false;
+  loadIndex(results.getAttribute("data-index"), results, function (data) {
     index = data;
+    if (ready) {
+      // A later file of the index adds the loose problems: run the query again.
+      if (input.value.trim()) run();
+      return;
+    }
+    ready = true;
     var exact = index.filter(function (e) { return e.l.toLowerCase() === input.value.trim().toLowerCase(); });
     if (exact.length === 1) { location.replace(exact[0].u); return; }
     run();
@@ -229,5 +254,5 @@
       if (/^[0-9a-z]{10}$/.test(q) && /\d/.test(q)) { location.href = document.body.getAttribute("data-base") + "p/" + q.toUpperCase(); return; }
       run();
     });
-  }).catch(function () { status.textContent = "The search index did not load. Try again later."; });
+  }, function () { status.textContent = "The search index did not load. Try again later."; });
 })();

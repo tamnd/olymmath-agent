@@ -69,7 +69,7 @@
 </form>
 <p class="muted" id="search-status" aria-live="polite">Type words to search the statements.</p>
 <p class="muted search-help">Words find the problems that have all of them. A query with a TeX command, a script, a brace or an equals sign is a formula: <code>x^2+y^2</code> finds the statements with that formula, and <code>\frac12</code> is the same as <code>\frac{1}{2}</code>. A locator such as <code>imo/2024/p1</code> or a tag goes to its page when you press Enter.</p>
-<ol class="results" id="results" data-index="{{link "search.json"}}"></ol>
+<ol class="results" id="results" data-index="{{link "search.json"}}" data-more="{{searchMore}}"></ol>
 <noscript><p>The search needs JavaScript. Use the <a href="{{link "c/"}}">list of competitions</a>.</p></noscript>
 {{template "bottom" .}}{{end}}
 
@@ -138,7 +138,7 @@
 {{define "problems.html"}}{{template "top" .}}{{with .Data}}
 <nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Problems</span></nav>
 <h1>Problems</h1>
-<form class="facets" data-facets="{{.Index}}">
+<form class="facets" data-facets="{{.Index}}" data-more="{{searchMore}}">
   <label>Competition <select name="c"><option value="">All</option>{{range .Competitions}}<option value="{{.Value}}" data-country="{{.Country}}">{{.Name}}</option>{{end}}</select></label>
   <label>Country <select name="n"><option value="">All</option>{{range .Countries}}<option value="{{.Value}}">{{.Name}}</option>{{end}}</select></label>
   <label>Topic <select name="g"><option value="">All</option>{{range .Topics}}<option value="{{.Value}}">{{.Name}}</option>{{end}}</select></label>
@@ -219,3 +219,37 @@
 </div>
 {{end}}
 {{end}}{{template "bottom" .}}{{end}}
+
+{{define "loose.html"}}{{template "top" .}}{{with .Data}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><span>Problems with no position</span></nav>
+<div class="prose">
+<h1>Problems with no position</h1>
+<p class="lede">{{.Total}} problems on olymmath have no known position in a competition, so they have no locator. Each has its page at its tag.</p>
+<p>Many sources name the competition and the year of a problem but not its number. olymmath keeps what the source says and lists the problem under that competition, but does not guess a number. {{.Nowhere}} problems have no competition at all.</p>
+</div>
+{{with .Competitions}}<h2>By competition</h2>
+<ul class="topic-list">
+{{range .}}<li><a href="{{.Link}}">{{.Name}}</a> <span class="muted">{{.Count}}</span></li>
+{{end}}</ul>{{end}}
+<h2>By source</h2>
+<ul class="topic-list">
+{{range .Sources}}<li><a href="{{.Link}}">{{.Name}}</a> <span class="muted">{{.Count}}</span></li>
+{{end}}</ul>
+{{end}}{{template "bottom" .}}{{end}}
+
+{{define "loose-list.html"}}{{template "top" .}}{{with .Data}}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="{{link ""}}">Home</a><a href="{{link "loose/"}}">Problems with no position</a><span>{{.Title}}</span></nav>
+<div class="prose">
+<h1>{{.Title}}</h1>
+<p class="lede">{{.Lede}}</p>
+</div>
+{{template "loose-pages" .}}
+{{range .Groups}}{{if .Name}}<h2 id="{{.ID}}">{{.Name}}</h2>{{end}}
+<ul class="loose-list">
+{{range .Problems}}<li><a href="{{.Link}}">{{.Title}}</a>{{with .Label}} <span class="muted">{{.}}</span>{{end}}<br><span class="muted">{{.Text}}</span></li>
+{{end}}</ul>
+{{end}}
+{{template "loose-pages" .}}
+{{end}}{{template "bottom" .}}{{end}}
+
+{{define "loose-pages"}}{{if .Pages}}<nav class="pages" aria-label="Pages"><ul class="chips">{{range $i, $l := .Pages}}<li>{{if eq (add $i 1) $.Page}}<span aria-current="page">{{add $i 1}}</span>{{else}}<a href="{{$l}}">{{add $i 1}}</a>{{end}}</li>{{end}}</ul></nav>{{end}}{{end}}
