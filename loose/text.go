@@ -48,8 +48,8 @@ func matchText(text string) string {
 	})
 }
 
-// choicesRE finds the start of the answer choices of a multiple choice problem: "\\textbf{(A)}", "\\mathrm{(A)}", "\\qquad (A)" or "(A)" at the start of a line.
-var choicesRE = regexp.MustCompile(`(?:\\(?:textbf|mathrm|textrm|text|mbox)\s*\{\s*\(A\)|\\qquad\s*\(A\)|(?m:^)\s*\(A\)\s)`)
+// choicesRE finds the start of the answer choices of a multiple choice problem: "\\textbf{(A)}", "\\mathrm{(A)}", "(\\mathrm{A})", "\\qquad (A)" or "(A)" at the start of a line. The content writes the letter in the command and the parentheses outside it, as "(\\mathrm {A})", which the match form makes "(\\text{A})"; a row of the same problem has "\\textbf{(A)}". When only one of the two loses its choices, their texts are far apart.
+var choicesRE = regexp.MustCompile(`(?:\\(?:textbf|mathrm|textrm|text|mbox)\s*\{\s*\(A\)|\(\s*\\(?:textbf|mathrm|textrm|text|mbox)\s*\{\s*A\s*\}\s*\)|\\qquad\s*\(A\)|(?m:^)\s*\(A\)\s)`)
 
 // stem gives a match text without the answer choices. The choices of two problems of one contest are often the same numbers, such as 3, 4, 5, 6 and 7, so they make two different problems look alike.
 func stem(form string) string {
