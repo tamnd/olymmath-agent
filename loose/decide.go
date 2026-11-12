@@ -207,7 +207,8 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 				s.T, s.F = t, f
 			}
 			// And the choices of one problem are written in many ways, in a formula or not, so the same stem is the same text.
-			if t >= match.Same {
+			// But a short stem like "Find the largest number" is shared by many problems, so the keywords of the choices must agree too.
+			if t >= match.Same && s.F >= StemF {
 				s.T = max(s.T, t)
 			}
 		}
