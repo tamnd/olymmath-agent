@@ -30,6 +30,10 @@ const (
 	BrokenTeX = "broken TeX"
 	NoLang    = "unknown language"
 	WebLink   = "links to a page"
+	Template  = "a template"
+	Lost      = "formulas lost"
+	Science   = "physics or chemistry"
+	Shortlist = "a shortlist or longlist row"
 )
 
 var (
@@ -46,7 +50,17 @@ var (
 	// answerRE is the start of an answer or a solution that a dataset joined to the statement, on a line of its own.
 	answerRE = regexp.MustCompile(`(?im)^\s*(?:\*\*|__)?\s*(?:answer|answers|otbet|ответ|solution|решение|proof|hint|указание|comment)\s*(?:\*\*|__)?\s*[.:]`)
 	// solutionRE is a text that starts as a solution, not as a problem.
-	solutionRE = regexp.MustCompile(`(?i)^\s*(?:\*\*|__)?\s*(?:(?:(?:a|an|the)\s+)?(?:my|another|quick|short|simple|alternative|alternate|nice|easy|official|elegant|full|complete)\s+)?(?:solution|sol\.|proof|answer|решение|ответ|otbet)\b`)
+	solutionRE = regexp.MustCompile(`(?i)^\s*(?:#{1,6}\s*)?(?:[0-9]{1,2}\.\s*)?(?:\*\*|__)?\s*(?:(?:(?:a|an|the)\s+)?(?:my|another|quick|short|simple|alternative|alternate|nice|easy|official|elegant|full|complete)\s+)?(?:solution|sol\.|proof|answer|решение|ответ|otbet)\b`)
+	// stepRE is a text that starts with a step of a solution, as "Since the right side is divisible by 49, ..." or "By the condition, ...". Some datasets give the solution of a problem as its statement.
+	stepRE = regexp.MustCompile(`^\s*(?:By the condition|From the condition|Since\b|Hence\b|Therefore\b|Thus\b|From this\b|Then\b)`)
+	// templateRE is a parameter of a template, as in "Given a regular param1." A template stands for several problems, which a table at its end gives.
+	templateRE = regexp.MustCompile(`(?i)\bparam\s?[0-9]+\b`)
+	// lostRE is a sentence that a blank line cuts where a dataset dropped a displayed formula, as in "Prove that if the equation\n\nhas three real roots, then", or a note of a translator that says so.
+	lostRE = regexp.MustCompile(`(?i)[a-z,]\n\n+(?:where|then|holds?|is|are|has|have|and|for|divides|takes|to|gdzie|dla|oraz|jest|ma)\b|\b(?:not (?:provided|given|included) in the (?:original )?text|original text had|untranslated)\b`)
+	// scienceRE is a term of physics or chemistry. Problems of physics and of the other sciences are out of scope (spec 02); some olympiad sets mix them with the problems of mathematics. A puzzle that only names physics, as a club of physics, does not match.
+	scienceRE = regexp.MustCompile(`(?i)\((?:physics|chemistry)\)|\b(?:refractive|refraction|coefficient of friction|friction(?:al)? force|voltage|resistors?|resistivity|internal resistance|capacitors?|capacitance|piston|heat capacity|specific heat|latent heat|buoyan\w*|kinetic energy|potential energy|pendulum|wavelength|joules?|ohms?|electronegativity|hybridi[sz]ed|hybridization|moles? of|molar mass|(?:sulfuric|sulphuric|nitric|hydrochloric|hydroiodic|orthophosphoric|phosphoric|acetic) acid|isotopes?|acceleration due to gravity|air resistance|thermostat|spring constant|stiffness(?:es)? of the springs?|amperes?|ammeter|voltmeter|galvanic|emf|electromotive|ideal gas|(?:converging|diverging|collecting|thin) lens|focal length|optical (?:power|axis|center|centre)|electric (?:field|current|charge|circuit)|electrical circuit|current source|precipitat\w*|aqueous|alkanes?|alkynes?|alkenes?|gravitational forces?|elastic collision)\b`)
+	// shortlistRE is the mark of a problem of the IMO shortlist or longlist in a compendium: the country that proposed it, as "(GBR 2)" or "A2 (GBR)" at the start, or a note that the problem was set at the IMO, as "${ }^{\mathrm{IMO} 5}$". The row does not give the year, and the content has the shortlists, the longlists and the IMO by position, so such a row is left to them.
+	shortlistRE = regexp.MustCompile(`^\s*(?:[IVX]{1,3}\s+[0-9]{1,2}\s+)?(?:[ACGNS][0-9]{1,2}\s+)?\([A-Z]{3}(?:\s+[0-9]{1,2})?\)|\^\{\s*\\(?:mathrm|text)\s*\{\s*IMO`)
 	// personRE is a line of a poster about himself. With no formula, no question and no task it marks a forum post that is news and not a problem.
 	personRE = regexp.MustCompile(`\bI(?:'m| am| have|'ve| will|'ll| plan)\b|\bsorry\b`)
 	// taskRE is a word that asks for something or states a claim. A text with none of them, once a cut leaves it or with no formula, is not a problem: "Given an odd number $m$." is what is left of "Given an odd number $m$. Proof: for any $c$ ...", where Proof stands for Prove.
@@ -69,8 +83,11 @@ func Clean(raw string) (string, string) {
 	text := normalize.Statement(plain, "")
 	// cut tells if an answer or a solution was cut from the end of the text.
 	cut := len(normalize.CutTail(plain)) < len(strings.TrimSpace(plain))
-	if solutionRE.MatchString(text) {
+	switch {
+	case solutionRE.MatchString(text), stepRE.MatchString(text):
 		return "", Solution
+	case shortlistRE.MatchString(text):
+		return "", Shortlist
 	}
 	if m := headingRE.FindStringIndex(text); m != nil && !strings.ContainsAny(text[:m[1]], "?") {
 		text = strings.TrimSpace(text[m[1]:])
@@ -115,6 +132,12 @@ func Clean(raw string) (string, string) {
 		return "", Request
 	case contextRE.MatchString(text):
 		return "", Context
+	case templateRE.MatchString(text):
+		return "", Template
+	case lostRE.MatchString(text):
+		return "", Lost
+	case scienceRE.MatchString(text):
+		return "", Science
 	case figureRE.MatchString(text):
 		return "", Figure
 	case linkRE.MatchString(text):
