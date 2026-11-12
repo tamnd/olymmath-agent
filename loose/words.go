@@ -81,15 +81,11 @@ func shapeOf(form string) shape {
 			}
 		}
 	}
-	nums := map[string]bool{}
+	var keys []string
 	for _, d := range digitsRE.FindAllString(form, -1) {
 		if d = strings.TrimLeft(d, "0"); d == "" {
 			d = "0"
 		}
-		nums[d] = true
-	}
-	keys := make([]string, 0, len(nums))
-	for d := range nums {
 		keys = append(keys, d)
 	}
 	slices.Sort(keys)

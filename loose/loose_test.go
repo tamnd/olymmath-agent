@@ -356,6 +356,10 @@ func TestSignals(t *testing.T) {
 		{Signals{E: 0.75}, false, "E 0.75"},
 		{Signals{E: 0.55, F: 0.4, Tokens: 4}, false, "E 0.55 and keyword match 0.40"},
 		{Signals{E: 0.55, F: 0.2, Tokens: 4}, false, ""},
+		// The same words with another claim: "does not exceed 1" and "is at least 1" (ro-tst 2008 problem 3 and a row of the sixth batch).
+		{Signals{E: 0.787, F: 1, T: 0, Tokens: 5, Shared: 10}, false, "E 0.79"},
+		{Signals{E: 0.85, F: 1, T: 0.1, Tokens: 5, Shared: 10}, true, ""},
+		{Signals{E: 0.7, F: 0.8, T: 0.35, Tokens: 5, Shared: 10}, true, ""},
 	}
 	for _, c := range cases {
 		if c.s.Same() != c.same || c.s.Doubt() != c.doubt {
@@ -451,6 +455,10 @@ func TestShape(t *testing.T) {
 	if s.byWords() {
 		t.Errorf("two functional equations: the same by the words, %+v", s)
 	}
+	// The numbers count each time they appear: two quartics with the digits 4, 3 and 2 have other coefficients.
+	if p, q := shapeOf(matchText("Find $a$ and $b$ such that $x^4+x^3-x^2+ax+b$ is the square of a polynomial.")), shapeOf(matchText("Find $a$ and $b$ such that $x^4+3x^3+x^2+ax+b$ is the square of a polynomial.")); p.numbers == q.numbers {
+		t.Errorf("two quartics: the same numbers %q", p.numbers)
+	}
 	// Two texts with no formulas have the same formulas.
 	if m := bagJaccard(map[string]int{}, map[string]int{}); m != 1 {
 		t.Errorf("two empty multisets: %.2f, want 1", m)
@@ -479,5 +487,51 @@ func TestPolishMark(t *testing.T) {
 	}
 	if y := (Mark{Olympiad: 41}).Year(); y != 1990 {
 		t.Errorf("year of the 41st olympiad: %d", y)
+	}
+}
+
+func TestRowPair(t *testing.T) {
+	row := func(n string) Doc {
+		return Doc{Capture: "hf-numinamath-1-5/data/train-00000-of-00003.parquet#row=" + n}
+	}
+	other := Doc{Capture: "hf-numina-olympiads/default/train/0000.parquet#row=26491"}
+	cases := []struct {
+		name    string
+		a, b    Doc
+		s       Signals
+		numbers bool
+		join    bool
+		want    string
+	}{
+		{"other numbers", row("100"), row("900"), Signals{T: 0.9}, false, true, "other numbers"},
+		{"a join with low T", row("100"), row("900"), Signals{E: 0.9, F: 0.9, T: 0.2}, true, true, "two rows, T 0.20"},
+		{"a link with low T", row("100"), row("900"), Signals{E: 0.9, F: 0.9, T: 0.2}, true, false, ""},
+		{"a circle and a sphere, 2 rows apart", row("27698"), row("27696"), Signals{E: 0.95, F: 0.9, T: 0.6}, true, true, "neighbour rows, T 0.60"},
+		{"neighbours with T at Same", row("27698"), row("27696"), Signals{T: 0.85}, true, true, ""},
+		{"the same text", row("27698"), row("27696"), Signals{T: 0.6, Exact: true}, true, true, ""},
+		{"far apart", row("27698"), row("27600"), Signals{E: 0.95, F: 0.9, T: 0.6}, true, true, ""},
+		{"another file", row("26491"), other, Signals{E: 0.95, F: 0.9, T: 0.6}, true, true, ""},
+		{"no capture", Doc{}, Doc{}, Signals{E: 0.95, F: 0.9, T: 0.6}, true, true, ""},
+	}
+	for _, c := range cases {
+		if got := rowPair(c.a, c.b, c.s, c.numbers, c.join); got != c.want {
+			t.Errorf("%s: %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestDecideNeighbours(t *testing.T) {
+	circle := "Points $A$, $B$, $C$ and $D$ lie on a circle with centre $O$. Prove that the sum of the squares of the distances from $O$ to the midpoints of the segments $AB$, $BC$, $CD$ and $DA$ is the same for any such points."
+	sphere := strings.Replace(strings.Replace(circle, "on a circle", "on a sphere", 1), "for any such", "for all such", 1)
+	file := "s/f.parquet#row="
+	for _, c := range []struct {
+		name string
+		at   string
+		want Kind
+	}{{"neighbour rows", "12", Hold}, {"rows far apart", "90", Join}} {
+		ds := Decide(filler(40), []Doc{{Text: circle, Capture: file + "10"}, {Text: sphere, Capture: file + c.at}}, Options{Neighbors: 8})
+		if ds[0].Kind != New || ds[1].Kind != c.want {
+			t.Errorf("%s: %v %v (%+v), want new and %v", c.name, ds[0].Kind, ds[1].Kind, ds[1], c.want)
+		}
 	}
 }

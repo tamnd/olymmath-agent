@@ -5,6 +5,7 @@ import (
 	"hash/fnv"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -26,6 +27,8 @@ type Doc struct {
 	ID string
 	// Derived is true for a text of a loose problem of the content that a derived dataset gave (origin D). Such a problem came from a row of a dataset, so a link to it needs the same numbers as a join does.
 	Derived bool
+	// Capture is where the text comes from, as <source>/<file>#row=<n>, or "". Two rows of one file a few rows apart are often two problems of one page of a book.
+	Capture string
 }
 
 // Kind is the decision for a row.
@@ -92,6 +95,11 @@ const (
 	KeySum = 1.6
 	// KeyShort is the lowest signal E of such a pair that has few shared tokens.
 	KeyShort = 0.95
+	// KeyT and KeyE: such a pair with T below KeyT needs E at KeyE or above. In the sixth batch 12 of the 59 links with T below 0.3 and E below 0.8 were two problems with the same words and another claim, as "does not exceed 1" and "is at least 1".
+	KeyT = 0.3
+	KeyE = 0.8
+	// NearRows is the distance in rows within which two rows of one file are neighbours. A join of neighbours, or a link of a row to a loose problem from a neighbour row, needs T at match.Same or above: a book sets a problem and then the same problem with one change, a circle for a sphere or triangles for all polygons.
+	NearRows = 10
 )
 
 // Same tells if the signals of a pair say that the two texts are one problem: the same normalized text, or signal T at match.Same or above, or signal E at Near or above with a keyword match at KeyStrong or above, and in each case answers that do not disagree.
@@ -102,8 +110,8 @@ func (s Signals) Same() bool {
 	if s.Exact || s.T >= match.Same {
 		return true
 	}
-	// A pair with other words needs a strong keyword match and enough of all three signals. A pair of two short texts has few tokens to share, so it needs nearly the same words.
-	return s.E >= Near && s.F >= KeyStrong && s.E+s.F+s.T >= KeySum && ((s.Tokens >= keymatch.MinTokens && s.Shared >= keymatch.MinShared) || s.E >= KeyShort) || s.byWords()
+	// A pair with other words needs a strong keyword match and enough of all three signals, and E at KeyE when T is low. A pair of two short texts has few tokens to share, so it needs nearly the same words.
+	return s.E >= Near && s.F >= KeyStrong && s.E+s.F+s.T >= KeySum && (s.T >= KeyT || s.E >= KeyE) && ((s.Tokens >= keymatch.MinTokens && s.Shared >= keymatch.MinShared) || s.E >= KeyShort) || s.byWords()
 }
 
 // byWords tells if the rule of the words says that the two texts are one problem: nearly the same words and formulas, the same numbers, and for a short text formulas in nearly the same order.
@@ -279,19 +287,21 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 				if !(Signals{E: s.E, T: s.T, F: s.F, Shared: s.Shared, Tokens: s.Tokens, A: s.A, Exact: s.Exact}).Same() {
 					d.Reason = fmt.Sprintf("words %.2f, formulas %.2f", s.W, s.M)
 				}
-				// A link to a loose problem that a derived dataset gave, or through a row that links, is a join of two rows in all but name, so it needs the same numbers too.
-				if d.Target >= 0 && (c.doc >= n || all[c.doc].Derived) && shapes[i].numbers != shapes[c.doc].numbers {
-					if doubt.Kind == New {
-						doubt = Decision{Kind: Hold, Target: owner[c.doc], Signals: s, Reason: "other numbers"}
+				// A link to a loose problem that a derived dataset gave, or through a row that links, is a join of two rows in all but name, so it needs the same numbers and the bars of a join too.
+				if d.Target >= 0 && (c.doc >= n || all[c.doc].Derived) {
+					if why := rowPair(all[i], all[c.doc], s, shapes[i].numbers == shapes[c.doc].numbers, false); why != "" {
+						if doubt.Kind == New {
+							doubt = Decision{Kind: Hold, Target: owner[c.doc], Signals: s, Reason: why}
+						}
+						continue
 					}
-					continue
 				}
 				if d.Target < 0 {
 					d.Kind, d.Target = Join, -1-d.Target
 					// Two rows of a derived dataset with the same words and other numbers are most often two versions of one problem, such as 2021 and 2022 or 33 and 123 points. The text signals and the exact key read past one number, so a join needs the same numbers as the row it joins and as the row that made the new problem.
-					if shapes[i].numbers != shapes[c.doc].numbers || shapes[i].numbers != shapes[n+d.Target].numbers {
+					if why := rowPair(all[i], all[c.doc], s, shapes[i].numbers == shapes[c.doc].numbers && shapes[i].numbers == shapes[n+d.Target].numbers, true); why != "" {
 						if doubt.Kind == New {
-							doubt = Decision{Kind: Hold, Target: owner[c.doc], Signals: s, Reason: "other numbers"}
+							doubt = Decision{Kind: Hold, Target: owner[c.doc], Signals: s, Reason: why}
 						}
 						continue
 					}
@@ -339,6 +349,33 @@ func Decide(problems, rows []Doc, o Options) []Decision {
 		}
 	}
 	return out
+}
+
+// rowPair gives the reason why two rows of datasets that are the same by their signals are held, or "" when they are one problem: two rows with other numbers, a join with T below KeyT, and two neighbour rows of one file with T below match.Same. In the sixth batch 39 of the 449 joins were two problems, all with T below 0.8; the numbers and these bars hold 31 of them. A link to a loose problem with T below KeyT is often a row of another dataset in other words, so it only needs the bar of Same.
+func rowPair(a, b Doc, s Signals, numbers, join bool) string {
+	switch {
+	case !numbers:
+		return "other numbers"
+	case s.Exact:
+		return ""
+	case join && s.T < KeyT:
+		return fmt.Sprintf("two rows, T %.2f", s.T)
+	case s.T < match.Same && neighbours(a.Capture, b.Capture):
+		return fmt.Sprintf("neighbour rows, T %.2f", s.T)
+	}
+	return ""
+}
+
+// neighbours tells if two captures are rows of one file at most NearRows apart.
+func neighbours(a, b string) bool {
+	fa, ra, okA := strings.Cut(a, "#row=")
+	fb, rb, okB := strings.Cut(b, "#row=")
+	if !okA || !okB || fa != fb {
+		return false
+	}
+	x, errA := strconv.Atoi(ra)
+	y, errB := strconv.Atoi(rb)
+	return errA == nil && errB == nil && x-y <= NearRows && y-x <= NearRows
 }
 
 // completeOf gives the first of the editions that is complete, or "".
