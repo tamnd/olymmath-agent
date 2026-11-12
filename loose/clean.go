@@ -67,16 +67,18 @@ var (
 	sectionRE = regexp.MustCompile(`^\s*([1-9][0-9]?)(?:\.[0-9]{1,3})+\s+(\p{Lu}\p{Ll})`)
 	// gradingRE is a scheme of the points of a solution, or a note of a translator about the text. Neither is a problem.
 	gradingRE = regexp.MustCompile(`(?i)\b(?:grading|evaluation|marking|assessment|scoring) (?:criteria|scheme|guidelines|instructions)\b|\bcriteria for (?:evaluation|evaluating|grading)\b|\btranslat(?:or|ion)(?:'s)? notes?\b|\bnote:? the (?:translation|original text)\b`)
-	// leadRE is a problem mark at the start of a text, such as "Problem 4.", "**Problem 3.**", "Task 2:", "P6.", "7.", "11.4." or "2)".
-	leadRE = regexp.MustCompile(`(?i)^\s*(?:\*\*|__)?\s*(?:(?:problem|task|question|exercise|задача)\s*-?\s*|[pq]\s*\.?\s*)?([1-9][0-9]?)((?:\.[0-9]{1,2})*)\s*(?:\.\)|[.:)])\s*(?:\*\*|__)?(?:\s|$)`)
+	// leadRE is a problem mark at the start of a text, such as "Problem 4.", "**Problem 3.**", "Task 2:", "P6.", "7.", "11.4.", "2)", "Example 3." or the number of a problem of a book, as "1037.", "18.45*." or "(!) 11.".
+	leadRE = regexp.MustCompile(`(?i)^\s*(?:\(!\)\s*)?(?:\*\*|__)?\s*(?:(?:problem|task|question|exercise|example|задача)\s*-?\s*|[pq]\s*\.?\s*)?([1-9][0-9]{0,3})((?:\.[0-9]{1,3})*)\s*\**\s*(?:\.\)|[.:)])\s*(?:\*\*|__)?(?:\s|$)`)
+	// pairLeadRE is the mark of a problem of a grade or a round, as "3-3." or "3-ча 2.".
+	pairLeadRE = regexp.MustCompile(`(?i)^\s*[1-9][0-9]?-(?:[1-9][0-9]?|(?:ча|cha)\s*[1-9][0-9]?)\.\s+`)
 	// tightLeadRE is a problem number glued to the text, as "3-There is" or "1.Let".
 	tightLeadRE = regexp.MustCompile(`^\s*([1-9][0-9]?)[-.]\p{Lu}\p{Ll}`)
 	// markRE is a problem mark inside a text: "Problem 2", "Task 3" or "p2." at the start of a line, or a bold "**3.**" or "**p14.**" anywhere. A row with such a mark after its start holds more than one problem. A post of a whole test often runs its problems on one line, as "... divided by $2024$ .**p14.** A right square pyramid ...".
 	markRE = regexp.MustCompile(`(?im)(?:^|\n)\s*(?:\*\*|__)?\s*(?:(?:problem|task|задача)\s*[0-9]{1,2}\b|p[0-9]{1,2}\s*[.:)])|\*\*\s*p?[0-9]{1,2}\s*[.:)]\s*\*\*`)
 	// numLineRE is a line that starts with a number and a point, such as "4. Find".
-	numLineRE = regexp.MustCompile(`(?m)^\s*([1-9][0-9]?)\.\s`)
+	numLineRE = regexp.MustCompile(`(?m)^\s*([1-9][0-9]{0,3})\.\s`)
 	// answerRE is the start of an answer or a solution that a dataset joined to the statement, on a line of its own.
-	answerRE = regexp.MustCompile(`(?im)^\s*(?:\*\*|__)?\s*(?:answer|answers|otbet|ответ|solution|решение|proof|hint|указание|comment)\s*(?:\*\*|__)?\s*[.:]`)
+	answerRE = regexp.MustCompile(`(?im)^\s*(?:\*\*|__)?\s*(?:answer|answers|a n s w e r|otbet|ответ|solution|решение|proof|hint|указание|comment)\s*(?:\*\*|__)?\s*[.:]`)
 	// solutionRE is a text that starts as a solution, not as a problem.
 	solutionRE = regexp.MustCompile(`(?i)^\s*(?:#{1,6}\s*)?(?:[0-9]{1,2}\.\s*)?(?:\*\*|__)?\s*(?:(?:(?:a|an|the)\s+)?(?:my|another|quick|short|simple|alternative|alternate|nice|easy|official|elegant|full|complete)\s+)?(?:solution|sol\.|proof|answer|решение|ответ|otbet)\b`)
 	// stepRE is a text that starts with a step of a solution, as "Since the right side is divisible by 49, ..." or "By the condition, ...". Some datasets give the solution of a problem as its statement.
@@ -94,10 +96,10 @@ var (
 	// economicsRE is a term of economics or of personal finance, out of scope as the other sciences: some olympiad sets mix the problems of an economics or a financial literacy olympiad with those of mathematics.
 	economicsRE = regexp.MustCompile(`(?i)perfectly competitive|demand function|supply function|monetary units|microeconomics|macroeconomics|\beconomics\b|taxpayer|tax resident|tax deduction|income tax|securities|financial instrument|\bScore: [0-9]|\b(?:mortgage|inflation|interest-free loan|loan agreement|nominal value|cadastral|tax (?:rate|period|return|base)s?|(?:transport|land|property) tax|pension (?:fund|savings|programs?)|(?:funded|insurance) part of (?:her|his|the) pension|insurance premium|brokerage (?:account|firm)|stock market|mutual fund|labou?r market|alternative costs?|opportunity costs?|full score|financial (?:institution|organi[sz]ation|literacy|situation)|credit card|real return|exchange rate of|maximi[sz]ing (?:his|its|their) profit|budget revenues?|zero-coupon|ordinary shares|preferred shares|investment options?|deposit rates?|loyalty program|bonus program|producers? surplus|consumer surplus)\b`)
 	// noteRE is a note of the translator at the end of the text about its form, as "Note: The translation maintains the original format and line breaks.". The note is cut and the problem is kept, unless the note says that a part of the text is missing or unclear (doubtRE); such a row is dropped.
-	noteRE  = regexp.MustCompile(`(?is)\s*(?:-{3,}\s*)?[(*_]*\s*Note:?\s*The translation (?:maintains|preserves|keeps|retains|is provided)\b.*$`)
+	noteRE  = regexp.MustCompile(`(?is)\s*(?:-{3,}\s*)?[(*_]*\s*(?:Note:?\s*)?The (?:provided )?translation (?:maintains|preserves|keeps|retains|is provided)\b.*$`)
 	doubtRE = regexp.MustCompile(`(?i)\bhowever\b|\bnot\b|\bmissing\b|\bincomplete\b|\bunclear\b|\bseems?\b|\blost\b`)
 	// promptRE is a request to translate that a dataset left at the end of the text.
-	promptRE = regexp.MustCompile(`(?is)\s*Translate the (?:text above|above text) into English,? (?:please keep|preserving|keeping).*$`)
+	promptRE = regexp.MustCompile(`(?is)\s*(?:Translate the (?:text above|above text) into English\b|将上面的文本翻译成英文|翻译结果如上).*$`)
 	// scienceRE is a term of physics or chemistry. Problems of physics and of the other sciences are out of scope (spec 02); some olympiad sets mix them with the problems of mathematics. A puzzle that only names physics, as a club of physics, does not match.
 	scienceRE = regexp.MustCompile(`(?i)\((?:physics|chemistry)\)|\b(?:refractive|refraction|coefficient of friction|friction(?:al)? force|voltage|resistors?|resistivity|internal resistance|capacitors?|capacitance|piston|heat capacity|specific heat|latent heat|buoyan\w*|kinetic energy|potential energy|pendulum|wavelength|joules?|ohms?|electronegativity|hybridi[sz]ed|hybridization|moles? of|molar mass|(?:sulfuric|sulphuric|nitric|hydrochloric|hydroiodic|orthophosphoric|phosphoric|acetic) acid|isotopes?|acceleration due to gravity|air resistance|thermostat|spring constant|stiffness(?:es)? of the springs?|amperes?|ammeter|voltmeter|galvanic|emf|electromotive|ideal gas|(?:converging|diverging|collecting|thin) lens|focal length|optical (?:power|axis|center|centre)|electric (?:field|current|charge|circuit)|electrical circuit|current source|precipitat\w*|aqueous|alkanes?|alkynes?|alkenes?|gravitational forces?|elastic collision|heat engines?|heaters?|density of (?:the |a |its )?(?:water|wood|ice|kerosene|aluminum|aluminium|copper|iron|steel|oil|material|body|liquid|mercury|glass|air|saltwater|milk)|densit(?:y|ies) (?:is|are) defined|spring scales?|on a spring|of the spring|DC power|power source|boiling point|monatomic|diatomic|thermally insulated|resistance force|calorimeter|eudiometer|jet engine|sound signal|(?:plane|ideal|flat) mirror|refrigerat(?:ing|ion) machines?|hot air balloon|charged (?:with|to)|carbon dioxide|chemical (?:reaction|experiment)s?|fully submerged|completely submerged in (?:water|kerosene|a liquid|liquid)|floats in (?:a |the )?(?:water|lake|liquid|glass|vessel))\b|kg\s*/\s*m\b`)
 	// informaticsRE marks a task of an olympiad of informatics or of an applied contest: a heading such as "Text of the task." or "Problem statement.", a request to write a program, or terms of programming. Some olympiad sets mix such tasks with the problems of mathematics.
@@ -114,6 +116,14 @@ var (
 	stubRE = regexp.MustCompile(`(?i)\b(?:lemma|claim|corollary|proposition)\b`)
 	// requestRE is a post that asks for help or for a translation.
 	requestRE = regexp.MustCompile(`(?i)\b(?:please|pls|plz)\b[^.?!]{0,40}\b(?:help|translate|solve|post|check)\b|\bhelp me\b|\bappreciate (?:any |some )?help\b|\bcan (?:someone|anyone|somebody)\b|\b(?:anyone|somebody|someone) (?:can|could|help|knows?)\b|\bany (?:hints?|ideas?|help)\b|\bthank(?:s| you)\b|\btranslat(?:e|ion) (?:this|please|needed|request)|\bi (?:need|want) (?:a |the )?(?:solution|help|hint)|\bhow (?:do|can|should) i\b|\bi (?:can't|cannot|couldn't|could not) (?:solve|prove|find)\b|\bmy (?:teacher|friend|solution|attempt)\b`)
+	// refRE is a text of a book that names another problem or a section, as "(see problem II. 296)", "Solve problem 1.67 using ..." or "See also problems 248 a) - c) from § 1". Such a text depends on the book around it. The mark of a problem of the Polish olympiad at the start, as "XXXVIII OM - I - Problem 11", is not a reference.
+	refRE = regexp.MustCompile(`(?i)\b(?:problems?|exercises?)\s+(?:[IVX]{1,3}\.\s*)?[0-9]{1,4}(?:\.[0-9]{1,3})?\b|§|^\s*the same (?:question|problem)\b`)
+	// verbRE is a word that asks for a computation, as "Multiply:" or "Differentiate".
+	verbRE = regexp.MustCompile(`(?i)\b(?:multiply|divide|add|subtract|expand|factori[sz]e|differentiate|integrate|reduce|graph|draw|estimate|compare|check|rationali[sz]e|decompose|transform)\b`)
+	// valueRE is a formula that ends in "=", which asks for its value, as "$1^{3}+2^{3}+\\ldots+9^{3}=$".
+	valueRE = regexp.MustCompile(`=\s*(?:\\quad\s*)?(?:\\ldots|\\cdots|\\_+|_+)?\s*\$+\s*[.,]?\s*$|=\s*\$+\s*,`)
+	// tailRE is a line that a book puts after a problem: a heading of the next section in capitals, as "TILINGS WITH POLYGONS", or a row of stars.
+	tailRE = regexp.MustCompile(`(?:\n\s*(?:\$\$\s*)?\*\s*\*\s*\*(?:\s*\$\$)?|\n\s*\n\s*\p{Lu}{2,}(?:[ \-]+\p{Lu}{2,})+)\s*$`)
 	// contextRE is a text that depends on another problem.
 	contextRE = regexp.MustCompile(`(?i)\b(?:previous|preceding|above|last|prior) (?:problem|exercise|question|task)\b|\b(?:problem|exercise|task) [0-9]{1,3} (?:above|before)\b|\bas in (?:problem|exercise|task) [0-9]{1,3}\b|\bfrom (?:problem|exercise|task) [0-9]{1,3}\b|\bof (?:the )?(?:previous|preceding) part\b`)
 	// figureRE is a text that needs a figure that the row does not have.
@@ -151,7 +161,7 @@ func Clean(raw string) (string, string) {
 			text = rest
 		}
 	}
-	text = strings.TrimSpace(pointsRE.ReplaceAllString(text, ""))
+	text = strings.TrimSpace(pointsRE.ReplaceAllString(pairLeadRE.ReplaceAllString(text, ""), ""))
 	lead := 0
 	if m := leadRE.FindStringSubmatchIndex(text); m != nil {
 		lead, _ = strconv.Atoi(text[m[2]:m[3]])
@@ -164,7 +174,7 @@ func Clean(raw string) (string, string) {
 		text = text[m[4]:]
 	}
 	text = strings.TrimSpace(pointsRE.ReplaceAllString(text, ""))
-	text = firstCopy(text)
+	text = strings.TrimSpace(tailRE.ReplaceAllString(firstCopy(text), ""))
 	// A step of a solution and the mark of the compendium often follow a problem number, as in "5. Since ..." or "27. (BLR) Ten points ...", so they are read after the number is cut.
 	switch {
 	case stepRE.MatchString(text):
@@ -202,7 +212,7 @@ func Clean(raw string) (string, string) {
 		return "", Stub
 	case requestRE.MatchString(text):
 		return "", Request
-	case contextRE.MatchString(text):
+	case contextRE.MatchString(text), refRE.MatchString(polishRE.ReplaceAllString(text, "")):
 		return "", Context
 	case templateRE.MatchString(text):
 		return "", Template
@@ -222,12 +232,29 @@ func Clean(raw string) (string, string) {
 		return "", Figure
 	case linkRE.MatchString(text):
 		return "", WebLink
-	case !canon.IsStatement(text), cut && !taskRE.MatchString(text), !strings.ContainsAny(text, "$?") && personRE.MatchString(text) && !taskRE.MatchString(text):
+	case !canon.IsStatement(text), cut && !taskRE.MatchString(text), bare(text), !strings.ContainsAny(text, "$?") && personRE.MatchString(text) && !taskRE.MatchString(text):
 		return "", NotStated
 	case !balanced(text):
 		return "", BrokenTeX
 	}
 	return text, ""
+}
+
+// bare tells if a text is only a formula, with fewer than three words around it and none that asks for something, as "$f(x)=\\frac{x^{3}}{x^{2}-2}$.": the task was in a heading that the dataset left out. A formula that ends in "=" or "=?" asks for its value, and a list of choices makes a question, so neither is bare.
+func bare(text string) bool {
+	prose := strings.TrimSpace(stripMath(text))
+	return proseWords(text) < 3 && !taskRE.MatchString(prose) && !taskHeadRE.MatchString(prose) && !verbRE.MatchString(prose) && !strings.Contains(text, "?") && !strings.Contains(text, "(A)") && !valueRE.MatchString(text)
+}
+
+// proseWords counts the words of a text outside its formulas. A text such as "$f(x)=\\frac{x^{3}}{x^{2}-2}$." has none: the task was in a heading that the dataset left out.
+func proseWords(text string) int {
+	n := 0
+	for _, w := range strings.Fields(stripMath(text)) {
+		if utf8.RuneCountInString(strings.TrimFunc(w, func(r rune) bool { return !unicode.IsLetter(r) })) >= 2 {
+			n++
+		}
+	}
+	return n
 }
 
 // balanced tells if the dollar signs of a text that are not escaped pair up, and if the braces inside the formulas pair up.
