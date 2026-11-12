@@ -139,7 +139,7 @@ func TestLetter(t *testing.T) {
 }
 
 func TestAnswer(t *testing.T) {
-	cases := map[string]string{"proof": "", " Proof. ": "", "not found": "", "$12$": "$12$", "7": "7"}
+	cases := map[string]string{"proof": "", " Proof. ": "", "not found": "", "notfound": "", "Not Found.": "", "seesolution": "", "=2": "", ")=1": "", "$12$": "$12$", "7": "7", "x=2": "x=2", "(1,2)": "(1,2)"}
 	for in, want := range cases {
 		if got := Answer(in); got != want {
 			t.Errorf("Answer(%q) = %q, want %q", in, got, want)

@@ -68,6 +68,28 @@ func TestClean(t *testing.T) {
 		{"asy", "Find the area of the shaded region.\n[asy]draw((0,0)--(1,1));[/asy]", "", Figure},
 		{"link", "Prove the claim of this [problem](http://www.mathlinks.ro/Forum/viewtopic.php?p=845756) for every $n$.", "", WebLink},
 		{"details", "Prove that given $n$ points in the plane, not all on a line, some line passes through exactly two of them.\n\n<details><summary>original wording</summary>Demostrar que dados n puntos</details>", "Prove that given $n$ points in the plane, not all on a line, some line passes through exactly two of them.", ""},
+		{"a heading that starts the problem", "# 3. Solve the system of equations\n\n$$\nx^{5}+3 x^{4}=2, \\quad x^{3}+x=1\n$$", "Solve the system of equations\n\n$$\nx^{5}+3 x^{4}=2, x^{3}+x=1\n$$", ""},
+		{"a heading of two words", "# 3. In the equation\n\n$$\nx^{2}+p x+q=0\n$$\n\nthe coefficients $p$ and $q$ are odd integers. Prove that it has no rational root.", "In the equation\n\n$$\nx^{2}+p x+q=0\n$$\n\nthe coefficients $p$ and $q$ are odd integers. Prove that it has no rational root.", ""},
+		{"a title", "## 26. Gold Coins\n\nThe king is waiting for each of his 30 vassals to present him with 30 gold coins. How many coins does he get?", "The king is waiting for each of his 30 vassals to present him with 30 gold coins. How many coins does he get?", ""},
+		{"points first", "(3 points) Find the distance between the curves $y=e^{3 x+5}$ and $y=(\\ln x-5) / 3$.", "Find the distance between the curves $y=e^{3 x+5}$ and $y=(\\ln x-5) / 3$.", ""},
+		{"points after the number", "1. [4 points] Find the number of eight-digit numbers, the product of whose digits equals 700.", "Find the number of eight-digit numbers, the product of whose digits equals 700.", ""},
+		{"points and condition lines", "# Problem 5. (3 points)\n\n## Condition:\n\nIn triangle $ABC$, $AB = 3 \\cdot BC$ and $M$ is the midpoint of $AB$. Find the angle $MDB$.\n\n(10 points)", "In triangle $ABC$, $AB = 3 \\cdot BC$ and $M$ is the midpoint of $AB$. Find the angle $MDB$.", ""},
+		{"a section number", "10.2 Plot on the coordinate plane the set of points satisfying the equation $2 x^{2}+3 x y+y^{2}+x=1$.", "Plot on the coordinate plane the set of points satisfying the equation $2 x^{2}+3 x y+y^{2}+x=1$.", ""},
+		{"a lone hash at the end", "What is the maximum number of sides a polygon can have if each of its angles is either $172^{\\circ}$ or $173^{\\circ}$?\n\n#", "What is the maximum number of sides a polygon can have if each of its angles is either $172^{\\circ}$ or $173^{\\circ}$?", ""},
+		{"the form of the answer", "Find the sum of all natural numbers $n$ with $n^2 < 2024$ that are divisible by 7.\n\nThe answer to the task should be an integer.", "Find the sum of all natural numbers $n$ with $n^2 < 2024$ that are divisible by 7.", ""},
+		{"points for the problem", "Find the sum of all natural numbers $n$ with $n^2 < 2024$ that are divisible by 7.\n\nPoints for the problem: 13.", "Find the sum of all natural numbers $n$ with $n^2 < 2024$ that are divisible by 7.", ""},
+		{"one variant", "## Variant 1\n\nFind the sum of all natural numbers $n$ with $n^2 < 2024$ that are divisible by 7.", "Find the sum of all natural numbers $n$ with $n^2 < 2024$ that are divisible by 7.", ""},
+		{"two variants", "## Variant 1\n\nFind the sum of all natural numbers $n$ with $n^2 < 2024$.\n\n## Variant 2\n\nFind the sum of all natural numbers $n$ with $n^2 < 2025$.", "", Glued},
+		{"grading", "Find all real $x$ with $x^2 = 2x + 3$ and $x > 0$.\n\nEvaluation criteria: 7 points for a full solution.", "", Grading},
+		{"a note on the form", "Find all real $x$ with $x^2 = 2x + 3$ and $x > 0$.\n\n---\n\nNote: The translation preserves the original text's line breaks and formatting.", "Find all real $x$ with $x^2 = 2x + 3$ and $x > 0$.", ""},
+		{"a note on a lost part", "Find all real $x$ with $x^2 = 2x + 3$ and $x > 0$.\n\nNote: The translation is provided as requested. However, the mathematical expressions are not complete.", "", Grading},
+		{"a tournament", "In a chess tournament, 29 people are playing. One point is awarded for a win, half a point for a draw, and zero for a loss. How many points can the winner have?", "In a chess tournament, 29 people are playing. One point is awarded for a win, half a point for a draw, and zero for a loss. How many points can the winner have?", ""},
+		{"an example heading", "## Example 5. Given the function\n\n$$\nf(x)=c e^{-x^{2}}\n$$\n\nFor what value of the constant $c$ is the function $f(x)$ a probability density?", "Given the function\n\n$$\nf(x)=c e^{-x^{2}}\n$$\n\nFor what value of the constant $c$ is the function $f(x)$ a probability density?", ""},
+		{"a mark before a formula", "## Problem 3\n\n$D$ is a point inside the equilateral triangle $ABC$ and $E$ is a point inside $DBC$. Show that $DB+DC>EB+EC$.", "$D$ is a point inside the equilateral triangle $ABC$ and $E$ is a point inside $DBC$. Show that $DB+DC>EB+EC$.", ""},
+		{"a title before a capital", "## On the Café Terrace\n\nOne beautiful spring evening, Dupont and Durand were playing dice. If the sum was 7, Durand won a point. On whom would you bet?", "One beautiful spring evening, Dupont and Durand were playing dice. If the sum was 7, Durand won a point. On whom would you bet?", ""},
+		{"a prompt that preserves", "Find the first 2000 digits after the decimal point of the number $(9+4 \\sqrt{5})^{2021}$.\n\nTranslate the above text into English, preserving the original text's line breaks and format.", "Find the first 2000 digits after the decimal point of the number $(9+4 \\sqrt{5})^{2021}$.", ""},
+		{"given twice", "Solve the system of inequalities:\n\n$$\n\\left\\{\\begin{array}{l} 13 x^{2}-4 x y+4 y^{2} \\leq 2 \\\\ 2 x-4 y \\leq-3 \\end{array}\\right.\n$$\n\nSolve the following system of inequalities:\n\n$$\n\\left\\{\\begin{array}{l} 13 x^{2}-4 x y+4 y^{2} \\leq 2 \\\\ 2 x-4 y \\leq-3 \\end{array}\\right.\n$$", "Solve the system of inequalities:\n\n$$\n\\left\\{\\begin{array}{l} 13 x^{2}-4 x y+4 y^{2} \\leq 2 \\\\ 2 x-4 y \\leq-3 \\end{array}\\right.\n$$", ""},
+		{"two parts", "a) Prove that the number $n^{3}+2n$ is divisible by 3 for every integer $n$.\n\nb) Prove that the number $n^{5}+4n$ is divisible by 5 for every integer $n$.", "a) Prove that the number $n^{3}+2n$ is divisible by 3 for every integer $n$.\n\nb) Prove that the number $n^{5}+4n$ is divisible by 5 for every integer $n$.", ""},
 		{"bbcode", "Find all [i]good[/i] numbers $n$ such that <u>every</u> divisor $d$ of $n$ has $d+1$ prime.[list][*]$n$ is odd.[/list]", "Find all *good* numbers $n$ such that every divisor $d$ of $n$ has $d+1$ prime.\n\n- $n$ is odd.", ""},
 	}
 	for _, c := range cases {
@@ -212,6 +234,24 @@ func TestDecideNumbers(t *testing.T) {
 	}
 	if ds[1].Reason != "other numbers" {
 		t.Errorf("row 1: reason %q", ds[1].Reason)
+	}
+}
+
+func TestDecideLinkNumbers(t *testing.T) {
+	a := "Let $a_{n, m}$ be the number written with all numbers from $n$ down to $m$, where $n > m \\geq 1$. For example, $a_{4,2}=432$. Prove that one of these numbers is divisible by 2021."
+	b := strings.Replace(a, "2021", "2022", 1)
+	problems := append(filler(40), Doc{Text: a, Derived: true}, Doc{Text: a})
+	ds := Decide(problems[:41], []Doc{{Text: b}, {Text: a}}, Options{Neighbors: 8})
+	if ds[0].Kind != Hold || ds[0].Reason != "other numbers" {
+		t.Errorf("a row with other numbers than a derived loose problem: %v %q, want a hold", ds[0].Kind, ds[0].Reason)
+	}
+	if ds[1].Kind != Link || ds[1].Target != 40 {
+		t.Errorf("a row with the same numbers: %v %d, want a link to 40", ds[1].Kind, ds[1].Target)
+	}
+	// A problem that is not from a derived dataset keeps the old rule: the text signals decide.
+	ds = Decide(append(filler(40), problems[41]), []Doc{{Text: b}}, Options{Neighbors: 8})
+	if ds[0].Kind != Link {
+		t.Errorf("a row near a placed problem: %v %q, want a link", ds[0].Kind, ds[0].Reason)
 	}
 }
 

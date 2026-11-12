@@ -446,10 +446,16 @@ func validPosition(c *content.Competition, year int, pos string) bool {
 // placeholders are answer values that some datasets give to a problem with no answer.
 var placeholders = []string{"", "proof", "not found", "none", "n/a", "na", "null", "-", "see solution", "no answer"}
 
-// Answer cleans the answer of a seed row. A placeholder, such as "proof" for a proof problem, gives "".
+// Answer cleans the answer of a seed row. A placeholder, such as "proof" for a proof problem, gives "". Some datasets lost the spaces of the answers, so "notfound" is "not found". An answer that starts with "=" or ")" is the end of a formula whose start was lost, as "=2" or ")=1", and gives "" too.
 func Answer(s string) string {
 	s = strings.TrimSpace(s)
-	if slices.Contains(placeholders, strings.ToLower(strings.Trim(s, ".$ "))) {
+	word := strings.ToLower(strings.Trim(s, ".$ "))
+	if slices.ContainsFunc(placeholders, func(p string) bool {
+		return word == p || strings.ReplaceAll(word, " ", "") == strings.ReplaceAll(p, " ", "")
+	}) {
+		return ""
+	}
+	if strings.HasPrefix(s, "=") || strings.HasPrefix(s, ")") {
 		return ""
 	}
 	return s
