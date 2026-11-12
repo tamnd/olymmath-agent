@@ -22,6 +22,9 @@ type Aliases struct {
 
 var ordinalRE = regexp.MustCompile(`\b[0-9]+(st|nd|rd|th)\b`)
 
+// roundRE finds the ordinal of a round, as in "Iran MO (2nd Round)". Rounds of one olympiad can be different competitions, so the number of the round stays in the key.
+var roundRE = regexp.MustCompile(`\b([0-9]+)(?:st|nd|rd|th)\s+round\b`)
+
 var camelRE = regexp.MustCompile(`([a-z])([A-Z])`)
 
 // expand gives the long form of the usual short words of competition names. Both sides of a lookup go through Norm, thus "Balkan MO" and "Balkan Mathematical Olympiad" give the same key.
@@ -46,10 +49,11 @@ var (
 	romanRE       = regexp.MustCompile(`^[ivxl]+$`)
 )
 
-// Norm gives the key of a label: lower case, words of a CamelCase name apart, no years, no year ranges, no ordinals, no edition number at the start, no punctuation, the long form of short words and single spaces. "51st Ukrainian National Mathematical Olympiad, 2015" gives "ukrainian national mathematical olympiad", and "NewZealand_MO" gives "new zealand mathematical olympiad".
+// Norm gives the key of a label: lower case, words of a CamelCase name apart, no years, no year ranges, no ordinals except the number of a round, no edition number at the start, no punctuation, the long form of short words and single spaces. "51st Ukrainian National Mathematical Olympiad, 2015" gives "ukrainian national mathematical olympiad", and "NewZealand_MO" gives "new zealand mathematical olympiad". "Iran MO (2nd Round)" gives "iran mathematical olympiad round 2".
 func Norm(s string) string {
 	s = camelRE.ReplaceAllString(s, "$1 $2")
 	s = strings.ToLower(s)
+	s = roundRE.ReplaceAllString(s, " round $1 ")
 	s = ordinalRE.ReplaceAllString(s, " ")
 	s = letterDigitRE.ReplaceAllString(s, "$1 $2")
 	s = digitLetterRE.ReplaceAllString(s, "$1 $2")
