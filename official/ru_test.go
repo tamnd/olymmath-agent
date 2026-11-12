@@ -144,4 +144,7 @@ func TestRuExtraction(t *testing.T) {
 	if got := RuExtraction(RuProblem{Page: 2}); got != "native/pdftotext (om-rutex/1)" {
 		t.Errorf("pdf: %s", got)
 	}
+	if got := RuExtraction(RuProblem{Page: 2, Model: "claude-opus-5-5"}); got != "native/pdftotext (claude-opus-5-5)" {
+		t.Errorf("model: %s", got)
+	}
 }

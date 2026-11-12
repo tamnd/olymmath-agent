@@ -103,6 +103,11 @@ func Text(ctx context.Context, r Runner, path string, page int) (string, error) 
 	return strings.TrimRight(string(out), "\f\n "), nil
 }
 
+// Words gives the words of all pages of the file at path with their boxes, in the order of the content of each page, as the output of pdftotext -raw -bbox.
+func Words(ctx context.Context, r Runner, path string) ([]byte, error) {
+	return r.Run(ctx, "pdftotext", "-raw", "-bbox", path, "-")
+}
+
 // MinDPI and MaxDPI are the limits of Render. Below 100 dpi a model cannot read the subscripts. Above 400 dpi the image is too large to send.
 const (
 	MinDPI = 100

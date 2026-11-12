@@ -153,6 +153,12 @@ om fill -content olymmath ru-moscow
 om fill -content olymmath -keys -write -from 1999 -to 2008 ru-moscow
 ```
 
+The Moscow olympiad of 2009 to 2018 gives its papers only as PDFs, at mmo.mccme.ru/YEAR/var.pdf and a second file for the second day of grade 11. The command reads their words with `pdftotext -raw -bbox`, finds the heading of each grade and the number of each problem, and keeps the page of each problem. Some of these PDFs use old TeX fonts with KOI8-R or Windows-1251 codes and no Unicode table, and the command puts their letters back to Cyrillic. But the text layer loses letters, exponents and the signs of angles and degrees, and one file of 2013 is a scan. So a problem with a small word or a formula that lost its form is flagged. The text of such a page can come from a model that read the page image: `-texts` names a JSON lines file of `{"at", "figure", "text"}`, and `-model` names the model. A text of the file takes the place of the text layer at its position. A line with `url` and `page` adds a position that the text layer does not give. The text still must agree with the problems.ru key, and its extraction is `native/pdftotext (<model>)`:
+
+```sh
+om fill -content olymmath -keys -write -texts mmo.jsonl -model claude-opus-5-5 -from 2009 -to 2018 ru-moscow
+```
+
 ### Read problems.ru
 
 ```sh

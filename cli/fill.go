@@ -3,6 +3,7 @@ package cli
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -17,6 +18,7 @@ import (
 	"github.com/tamnd/olymmath-agent/fetch"
 	"github.com/tamnd/olymmath-agent/ocr"
 	"github.com/tamnd/olymmath-agent/official"
+	"github.com/tamnd/olymmath-agent/pdfsrc"
 )
 
 func init() {
@@ -65,8 +67,14 @@ func runFill(env Env, args []string) int {
 	write := fs.Bool("write", false, "with -keys, fill the records that agree and write the review file")
 	explain := fs.Bool("explain", false, "with -keys, print the signals of each appearance; the problems.ru text is not printed")
 	figures := fs.Bool("figures", false, "fill a problem whose official text has a picture too; the picture must then be added with om figure")
+	textsFile := fs.String("texts", "", `a JSON lines file of texts that a model read from the images of the official pages, as {"at":"ru-moscow/2013/p81","figure":false,"text":"..."}; figure is true when the problem needs its picture. Such a text takes the place of the text layer and still must agree with the problems.ru text`)
+	model := fs.String("model", "", "the model that read the texts of -texts, as claude-opus-5-5")
 	pos, err := parseMixed(fs, args)
 	if err != nil {
+		return ExitUsage
+	}
+	if (*textsFile == "") != (*model == "") {
+		fmt.Fprintln(env.Stderr, "om fill: -texts and -model go together")
 		return ExitUsage
 	}
 	if len(pos) != 1 {
@@ -89,6 +97,11 @@ func runFill(env Env, args []string) int {
 		return ExitUsage
 	}
 	targets := fillTargets(corpus, pos[0], *from, *to)
+	texts, err := readFillTexts(*textsFile)
+	if err != nil {
+		fmt.Fprintf(env.Stderr, "om fill: %v\n", err)
+		return ExitUsage
+	}
 	st, err := openStore(*dir, *remote)
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om fill: %v\n", err)
@@ -118,6 +131,7 @@ func runFill(env Env, args []string) int {
 			code = ExitFailure
 			continue
 		}
+		probs = withFillTexts(probs, texts, pos[0], ed, *model)
 		byPos := map[string]official.RuProblem{}
 		for _, p := range probs {
 			byPos[p.Position] = p
@@ -238,6 +252,70 @@ func runFill(env Env, args []string) int {
 		fmt.Fprintf(env.Stdout, "%d link-only appearances in %d editions, %d problems %s, %d appearances for review.\n", total, len(editions), filled, verb, len(review))
 	}
 	return code
+}
+
+// fillText is a text that a model read from the image of an official page: a line of the file of -texts. URL and Page name the page of a problem that the text layer does not give, as a scanned page.
+type fillText struct {
+	At     string `json:"at"`
+	Figure bool   `json:"figure"`
+	Text   string `json:"text"`
+	URL    string `json:"url"`
+	Page   int    `json:"page"`
+}
+
+// withFillTexts puts the texts of -texts in the place of the texts of the problems of edition ed of comp, with no flags. A text with a URL for a position that probs do not have is added as a new problem.
+func withFillTexts(probs []official.RuProblem, texts map[string]fillText, comp, ed, model string) []official.RuProblem {
+	have := map[string]bool{}
+	for i, p := range probs {
+		have[p.Position] = true
+		if t, ok := texts[p.At(comp)]; ok {
+			probs[i].Text, probs[i].Figure, probs[i].Flags, probs[i].Model = t.Text, t.Figure, nil, model
+		}
+	}
+	var add []string
+	prefix := comp + "/" + ed + "/"
+	for at, t := range texts {
+		p, ok := strings.CutPrefix(at, prefix)
+		if ok && t.URL != "" && !strings.Contains(p, "/") && !have[p] {
+			add = append(add, at)
+		}
+	}
+	slices.Sort(add)
+	for _, at := range add {
+		t := texts[at]
+		probs = append(probs, official.RuProblem{Edition: ed, Position: strings.TrimPrefix(at, prefix), Text: t.Text, Figure: t.Figure, URL: t.URL, Page: t.Page, Model: model})
+	}
+	return probs
+}
+
+// readFillTexts reads the file of -texts, one JSON object for each line.
+func readFillTexts(path string) (map[string]fillText, error) {
+	out := map[string]fillText{}
+	if path == "" {
+		return out, nil
+	}
+	b, err := os.ReadFile(path) // #nosec G304 -- a file named by the user.
+	if err != nil {
+		return nil, err
+	}
+	for i, l := range strings.Split(string(b), "\n") {
+		if strings.TrimSpace(l) == "" {
+			continue
+		}
+		var t fillText
+		if err := json.Unmarshal([]byte(l), &t); err != nil {
+			return nil, fmt.Errorf("%s:%d: %w", path, i+1, err)
+		}
+		t.Text = strings.TrimSpace(t.Text)
+		if t.At == "" || t.Text == "" {
+			return nil, fmt.Errorf("%s:%d: want at and text", path, i+1)
+		}
+		if _, ok := out[t.At]; ok {
+			return nil, fmt.Errorf("%s:%d: %s is twice", path, i+1, t.At)
+		}
+		out[t.At] = t
+	}
+	return out, nil
 }
 
 // fillTargets gives the appearances of the link-only records of comp in the years from to to, by edition. A record is link-only when it has no text and links to problems.ru.
@@ -435,6 +513,23 @@ func mmoRead(ctx context.Context, fc *fetch.Client, source, edition string) ([]o
 		u = fmt.Sprintf("https://mmo.mccme.ru/%d/mmo%d.htm", y, y)
 	case y >= 2019:
 		u = fmt.Sprintf("https://mmo.mccme.ru/%d/", y)
+	case len(mmoPDFs[y]) > 0:
+		var out []official.RuProblem
+		seen := map[string]bool{}
+		for _, f := range mmoPDFs[y] {
+			ps, err := ruPDFRead(ctx, fc, source, fmt.Sprintf("https://mmo.mccme.ru/%d/%s", y, f.name), edition, mmoGrades, f.day2)
+			if err != nil {
+				return nil, err
+			}
+			// The first file that gives a position counts.
+			for _, p := range ps {
+				if !seen[p.Position] {
+					seen[p.Position] = true
+					out = append(out, p)
+				}
+			}
+		}
+		return out, nil
 	default:
 		return nil, nil
 	}
@@ -446,5 +541,51 @@ func mmoRead(ctx context.Context, fc *fetch.Client, source, edition string) ([]o
 	if err != nil {
 		return nil, err
 	}
-	return official.RuPage(page, edition, u, func(g int) bool { return g >= 7 && g <= 11 }), nil
+	return official.RuPage(page, edition, u, mmoGrades), nil
+}
+
+// mmoGrades are the grades of the Moscow olympiad that have positions.
+func mmoGrades(g int) bool { return g >= 7 && g <= 11 }
+
+// mmoPDF is a PDF of the papers of a year of the Moscow olympiad. day2 tells that it holds the second day of grade 11.
+type mmoPDF struct {
+	name string
+	day2 bool
+}
+
+// mmoPDFs are the PDFs of the years whose page has no text of the problems, in the order they count. The PDF vars8-10.pdf of 2010 has a font with no letters, and the second day of 2013 is a scan, so they are left out.
+var mmoPDFs = map[int][]mmoPDF{
+	2009: {{name: "vars8-10.pdf"}, {name: "mmo72-11.pdf"}},
+	2010: {{name: "var-2010.pdf"}, {name: "var11.pdf"}},
+	2011: {{name: "var-2011.pdf"}, {name: "mmo11_2den.pdf", day2: true}},
+	2012: {{name: "var-2012.pdf"}, {name: "11-2.pdf", day2: true}},
+	2013: {{name: "var.pdf"}},
+	2014: {{name: "var.pdf"}, {name: "11kl-2.pdf", day2: true}},
+	2015: {{name: "var.pdf"}, {name: "11-2.pdf", day2: true}},
+	2016: {{name: "var.pdf"}, {name: "11-2.pdf", day2: true}},
+	2017: {{name: "var.pdf"}, {name: "11-2.pdf", day2: true}},
+	2018: {{name: "var.pdf"}, {name: "11-2.pdf", day2: true}},
+}
+
+// ruPDFRead gets an official PDF into the store and reads the problems of its grade papers from its text layer.
+func ruPDFRead(ctx context.Context, fc *fetch.Client, source, u, edition string, grades func(int) bool, day2 bool) ([]official.RuProblem, error) {
+	raw, err := get(ctx, fc, source, u)
+	if err != nil {
+		return nil, err
+	}
+	dir, err := os.MkdirTemp("", "om-fill-")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = os.RemoveAll(dir) }()
+	f := filepath.Join(dir, "paper.pdf")
+	if err := os.WriteFile(f, []byte(raw), 0o600); err != nil {
+		return nil, err
+	}
+	b, err := pdfsrc.Words(ctx, figureRunner, f)
+	if err != nil {
+		return nil, err
+	}
+	lines, koi8 := official.RuPDFLines(b)
+	return official.RuPDF(lines, edition, u, grades, day2, koi8), nil
 }
