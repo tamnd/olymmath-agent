@@ -257,3 +257,58 @@ func retryAfter(v string) time.Duration {
 	}
 	return 0
 }
+
+// Read gets u and gives its body, with the same identity, robots.txt rules, pace and retries as Get, but it does not put the body in the store. It is for a text that may serve only as a key in memory and must not be kept, such as a statement of problems.ru.
+func (c *Client) Read(ctx context.Context, u string) ([]byte, error) {
+	pu, err := url.Parse(u)
+	if err != nil {
+		return nil, err
+	}
+	rules, err := c.rules(ctx, pu)
+	if err != nil {
+		return nil, err
+	}
+	if !rules.allowed(pu.EscapedPath()) {
+		return nil, fmt.Errorf("%s: %w", u, ErrRobots)
+	}
+	backoff := 2 * time.Second
+	for attempt := 0; ; attempt++ {
+		if err := c.pace(ctx, pu.Host, rules.delay); err != nil {
+			return nil, err
+		}
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", c.agent())
+		resp, err := c.HTTP.Do(req)
+		retry := err != nil
+		var wait time.Duration
+		if err == nil {
+			if resp.StatusCode/100 == 2 {
+				b, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+				_ = resp.Body.Close()
+				return b, err
+			}
+			if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode/100 == 5 {
+				retry = true
+				wait = retryAfter(resp.Header.Get("Retry-After"))
+			}
+			err = fmt.Errorf("%s: %s", u, resp.Status)
+			_ = resp.Body.Close()
+		}
+		if !retry || attempt >= c.Retries {
+			return nil, err
+		}
+		if wait == 0 {
+			wait = backoff + rand.N(backoff/2) // #nosec G404 -- the jitter of a retry needs no strong random numbers.
+			backoff *= 2
+		}
+		if c.MaxWait > 0 {
+			wait = min(wait, c.MaxWait)
+		}
+		if err := c.wait(ctx, wait); err != nil {
+			return nil, err
+		}
+	}
+}
