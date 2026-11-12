@@ -99,3 +99,28 @@ func TestImportLoose(t *testing.T) {
 		t.Errorf("second run, exit %d:\n%s", code, errs)
 	}
 }
+
+func TestWrongList(t *testing.T) {
+	ibero := &content.Competition{Code: "ibero", Name: "Iberoamerican Mathematical Olympiad"}
+	isl := &content.Competition{Code: "isl", Name: "IMO Shortlist"}
+	cases := []struct {
+		comp  *content.Competition
+		label string
+		wrong bool
+		rng   bool
+	}{
+		{ibero, "IberoAmerican Shortlist 1992 - 2010 - Geometry", true, true},
+		{ibero, "IberoAmerican Shortlist 2011+ Geometry", true, true},
+		{ibero, "2000 IberoAmerican", false, false},
+		{isl, "2007 IMO Shortlist", false, false},
+		{isl, "IMO Shortlist 1959-1966", false, true},
+	}
+	for _, c := range cases {
+		if got := wrongList(c.comp, c.label); got != c.wrong {
+			t.Errorf("wrongList(%s, %q) = %v", c.comp.Code, c.label, got)
+		}
+		if got := yearRangeRE.MatchString(c.label); got != c.rng {
+			t.Errorf("year range in %q: %v", c.label, got)
+		}
+	}
+}
