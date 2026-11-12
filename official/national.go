@@ -1131,3 +1131,40 @@ func pumacRound(h string) string {
 	}
 	return ""
 }
+
+// BMTListings are the archive pages of the Berkeley Math Tournament (BMT), one page for each tournament from 2012 to 2025, such as https://berkeley.mt/archives/bmt-2019/.
+var BMTListings = bmtListings(2012, 2025)
+
+func bmtListings(from, to int) []string {
+	var out []string
+	for y := from; y <= to; y++ {
+		out = append(out, "https://berkeley.mt/archives/bmt-"+strconv.Itoa(y)+"/")
+	}
+	return out
+}
+
+// bmtYearRE matches the canonical address of an archive page, which gives the year of the tournament.
+var bmtYearRE = regexp.MustCompile(`<link rel="canonical" href="(https://berkeley\.mt/archives/bmt-([0-9]{4})/)"`)
+
+// bmtRowRE matches one row of the table of rounds: the name of the round and the link in the column of the problems, if there is one.
+var bmtRowRE = regexp.MustCompile(`(?s)<tr>\s*<td>([^<]*)</td>\s*<td class="text-center">\s*(?:<a href="([^"]*)")?`)
+
+// BMTPapers gives the papers of the Berkeley Math Tournament (bmt) on one archive page. The page has a table with one row for each round: its name, the file of the problems and the file of the solutions. The links are relative to the page. The paper of a round is its name in lower case with hyphens, such as individual, team, general, guts or number-theory. The tiebreakers and the power round are left out: a tiebreaker is not a part of the score of the round, and the problems of a power round have parts with no fixed numbering. A row with no file of the problems gives no paper.
+func BMTPapers(page string) []National {
+	m := bmtYearRE.FindStringSubmatch(page)
+	if m == nil {
+		return nil
+	}
+	base := m[1]
+	y, _ := strconv.Atoi(m[2])
+	var out []National
+	for _, r := range bmtRowRE.FindAllStringSubmatch(page, -1) {
+		name := strings.TrimSpace(html.UnescapeString(r[1]))
+		if r[2] == "" || name == "Power" || strings.Contains(name, "Tiebreaker") {
+			continue
+		}
+		paper := strings.ReplaceAll(strings.ToLower(name), " ", "-")
+		out = append(out, National{Competition: "bmt", Year: y, Paper: paper, URL: base + r[2]})
+	}
+	return out
+}

@@ -803,3 +803,58 @@ func TestPUMaCPapers(t *testing.T) {
 		t.Errorf("PUMaCPapers = %+v", got)
 	}
 }
+
+func TestBMTPapers(t *testing.T) {
+	page := `<link rel="canonical" href="https://berkeley.mt/archives/bmt-2017/" />
+<table class="prose table-fixed w-full"><tbody>
+        <tr>
+            <td>Individual</td>
+            <td class="text-center">
+                <a href="IS2017.pdf">PDF</a>
+            </td>
+            <td class="text-center">
+                <a href="IS2017A.pdf">PDF</a>
+            </td>
+        </tr>
+        <tr>
+            <td>Power</td>
+            <td class="text-center">
+                <a href="PowS2017.pdf">PDF</a>
+            </td>
+        </tr>
+        <tr>
+            <td>Number Theory Tiebreaker</td>
+            <td class="text-center">
+                <a href="NTSP18TB.pdf">PDF</a>
+            </td>
+        </tr>
+        <tr>
+            <td>Number Theory</td>
+            <td class="text-center">
+                <a href="NTSP18.pdf">PDF</a>
+            </td>
+        </tr>
+        <tr>
+            <td>Geometry</td>
+            <td class="text-center">
+            </td>
+            <td class="text-center">
+                <a href="GeoS2017A.pdf">PDF</a>
+            </td>
+        </tr>
+</tbody></table>`
+	got := BMTPapers(page)
+	want := []National{
+		{Competition: "bmt", Year: 2017, Paper: "individual", URL: "https://berkeley.mt/archives/bmt-2017/IS2017.pdf"},
+		{Competition: "bmt", Year: 2017, Paper: "number-theory", URL: "https://berkeley.mt/archives/bmt-2017/NTSP18.pdf"},
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("BMTPapers = %+v", got)
+	}
+	if BMTPapers("<p>no canonical link</p>") != nil {
+		t.Error("BMTPapers of a page with no canonical link is not nil")
+	}
+	if n := len(BMTListings); n != 14 || BMTListings[0] != "https://berkeley.mt/archives/bmt-2012/" {
+		t.Errorf("BMTListings = %d pages, first %s", n, BMTListings[0])
+	}
+}
