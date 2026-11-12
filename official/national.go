@@ -1073,3 +1073,61 @@ func POFMPapers(page string) []National {
 	})
 	return out
 }
+
+// PUMaCListing is the archive page of the Princeton University Mathematics Competition (PUMaC). It links the problems and the solutions of each round of each year.
+const PUMaCListing = "https://pumac.princeton.edu/archives"
+
+// pumacRE matches the start of the section of one year, as data-url-id="2025", a heading, as <h3 style="white-space:pre-wrap;"><strong>ALGEBRA</strong></h3>, or a link to the problems of a round, as <a href="/s/PUMaC_2025_Algebra_B.pdf" target="_blank">problems</a>.
+var pumacRE = regexp.MustCompile(`(?i)data-url-id="((?:19|20)[0-9]{2})"|<h[1-4][^>]*>(?:<strong>)?\s*([^<]+?)\s*(?:</strong>)?</h[1-4]>|<a href="(/s/[^"]+\.pdf)"[^>]*>(?:<strong>)?\s*problems\s*(?:</strong>)?</a>`)
+
+// PUMaCPapers gives the papers of the PUMaC (pumac) on its archive page. A link belongs to the year of the section that holds it, to the division of the last heading "Division A" or "Division B" before it, and to the round of the last other heading before it. Each subject test (algebra, combinatorics, geometry and number theory) and the individual finals have one paper for each division, such as algebra-a and finals-b. The team round has one paper, team. The power round and the live round are left out, and so are the solutions and the answer sheets.
+func PUMaCPapers(page string) []National {
+	var out []National
+	seen := map[string]bool{}
+	year, div, round := 0, "", ""
+	for _, m := range pumacRE.FindAllStringSubmatch(page, -1) {
+		switch {
+		case m[1] != "":
+			year, _ = strconv.Atoi(m[1])
+			div, round = "", ""
+		case m[2] != "":
+			h := strings.ToLower(html.UnescapeString(m[2]))
+			if d, ok := strings.CutPrefix(h, "division "); ok && (d == "a" || d == "b") {
+				div, round = d, ""
+				continue
+			}
+			round = pumacRound(h)
+		default:
+			paper := round
+			if round == "" || year == 0 {
+				continue
+			}
+			if round != "team" {
+				if div == "" {
+					continue
+				}
+				paper += "-" + div
+			}
+			key := strconv.Itoa(year) + "/" + paper
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, National{Competition: "pumac", Year: year, Paper: paper, URL: "https://pumac.princeton.edu" + m[3]})
+		}
+	}
+	slices.SortStableFunc(out, func(a, b National) int { return a.Year - b.Year })
+	return out
+}
+
+// pumacRound gives the round of a heading of the archive page, or "" for a heading that names no round of the layout.
+func pumacRound(h string) string {
+	for _, r := range []struct{ word, round string }{
+		{"algebra", "algebra"}, {"combinatorics", "combinatorics"}, {"geometry", "geometry"}, {"number theory", "number-theory"}, {"finals", "finals"}, {"team", "team"},
+	} {
+		if strings.Contains(h, r.word) {
+			return r.round
+		}
+	}
+	return ""
+}

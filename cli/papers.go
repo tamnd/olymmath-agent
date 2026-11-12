@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques)", runPapers})
+	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive)", runPapers})
 }
 
 func runPapers(env Env, args []string) int {
@@ -31,8 +31,8 @@ func runPapers(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques"}, pos[0]) {
-		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques")
+	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive"}, pos[0]) {
+		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -55,7 +55,7 @@ func runPapers(env Env, args []string) int {
 	switch pos[0] {
 	case "usa-tst-archive":
 		return tstPapers(ctx, env, fc, corpus, *root, *from, *to)
-	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques":
+	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive":
 		return nationalPapers(ctx, env, fc, corpus, *root, pos[0], *from, *to)
 	}
 	comp := corpus.Competition("imo")
@@ -156,6 +156,7 @@ var nationals = map[string]struct {
 	"ssmr-onm":          {official.SSMRListings, content.OfficialPaper{Lang: "Romanian", Code: "ro"}, official.SSMRPapers},
 	"dmfa-massa":        {[]string{official.DMFAListing}, content.OfficialPaper{Lang: "Slovenian", Code: "sl"}, official.DMFAPapers},
 	"pmo-ph":            {official.PMOListings, content.OfficialPaper{Lang: "English", Code: "en"}, official.PMOPapers},
+	"pumac-archive":     {[]string{official.PUMaCListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.PUMaCPapers},
 	"stanford-smt":      {official.SMTListings(), content.OfficialPaper{Lang: "English", Code: "en"}, official.SMTPapers},
 	"maths-olympiques":  {[]string{official.POFMListing}, content.OfficialPaper{Lang: "French", Code: "fr"}, official.POFMPapers},
 }
