@@ -397,6 +397,15 @@ om fetch -content olymmath stanford-smt
 
 The site has one archive page for each year, such as stanfordmathtournament.org/past-tests/SMT/2024, for 2011 to 2014 and 2018 to 2025. SMT was not held at Stanford in 2015 to 2017. A page links the problems and the solutions of each round, as /pdfs/smt2024/algebra-problems.pdf. Each round numbers its problems from 1, so the paper of a round is the name of its file: algebra, calculus, discrete, geometry, general, team and guts, and advanced (2011 to 2014), combo and nt (2021). The solutions and the tiebreakers are left out. The power round is left out, because it is one long problem with many numbered parts, and so is the integration bee of 2025. The links of the power round of 2018 and the guts round of 2020 give a web page and not a PDF. The site has no page of terms and the papers give no licence. Its robots.txt allows all paths.
 
+The tests of the French olympiad preparation (POFM) work the same way, with the source `maths-olympiques`:
+
+```sh
+om papers -content olymmath maths-olympiques
+om fetch -content olymmath maths-olympiques
+```
+
+The page of past tests of maths-olympiques.fr (?page_id=479) lists the tests of each school year under a heading such as "2024-2025 :". A link belongs to the school year of the last heading before it, and the edition of fr-tst is the second year of the school year, so 2024-2025 is the edition of 2025. From 2020-2021 each school year has five files named Test 1 to Test 5, as Sujet-Test-3-2024-2025.pdf or Énoncé-Web-Test-1.pdf. Test N is the paper testN. Each paper numbers its exercises from 1 across its Junior, Senior and EGMO groups. The earlier years name their files by the month and some months have a file for each group or day, so they are left out. The solutions (Corrigé) are left out. The site has no page of terms and the papers give no licence. The path robots.txt sends the home page, so the site has no robots.txt.
+
 With `-anchor`, `om import` also checks the position that a row gets from the number of its AoPS topic. When the edition has an English official paper, and the paper has another problem at that position, the row is skipped. Some AoPS collections hold the wrong contest: "2017 Australian MO" holds the problems of the Austrian olympiad.
 
 ### Journals
