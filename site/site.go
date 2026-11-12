@@ -1070,7 +1070,7 @@ func (b *builder) sources() error {
 	for _, r := range b.corpus.Sources {
 		count[r.ID] = &sourceView{SourceRecord: r}
 	}
-	for _, p := range append(slices.Clip(b.corpus.All()), b.corpus.Loose...) {
+	for _, p := range b.corpus.All() {
 		for i := range p.Statements {
 			if v := count[p.Statements[i].Source]; v != nil {
 				v.Statements++
