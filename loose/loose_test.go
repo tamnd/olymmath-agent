@@ -266,6 +266,7 @@ func TestStem(t *testing.T) {
 		{"What is the area of the region enclosed by the graph of $x^2+y^2=|x|+|y|?$ $\\textbf{(A)}\\ \\pi \\textbf{(B)}\\ 2$", "What is the area of the region enclosed by the graph of $x^2+y^2=|x|+|y|?$"},
 		{"What is the area of the union of the regions enclosed by the square and the circle?\n\n$(\\text{A})200+25\\pi(\\text{B})100+75\\pi$", "What is the area of the union of the regions enclosed by the square and the circle?"},
 		{"What is the area of the union of the regions enclosed by the square and the circle? $(\\mathrm {A}) 200+25\\pi (\\mathrm {B}) 100+75\\pi$", "What is the area of the union of the regions enclosed by the square and the circle?"},
+		{"What is the probability that he lands less than 1 unit away? $\\mathbf{(A)}\\frac{1}{6}\\mathbf{(B)}\\frac{1}{5}$", "What is the probability that he lands less than 1 unit away?"},
 	}
 	for _, c := range cases {
 		if got := stem(c[0]); got != c[1] {
@@ -278,7 +279,9 @@ func TestMatchText(t *testing.T) {
 	cases := [][2]string{
 		{"In triangle $A B C, A B=2$ and $x_{1} \\geq 2$, radius $2$.", "In triangle $ABC,AB=2$ and $x_1\\ge2$, radius 2."},
 		{"Find $\\left(\\dfrac{1}{2}\\right)$.\n\n*Proposed by John Cuya, Peru*", "Find $(\\frac{1}{2})$.\n"},
-		{"$\\overline{ID} \\perp \\overline{BC}$, $\\angle{BAE} = \\measuredangle ACD$ and $\\triangle{CFE}$", "$ID\\perpBC$, $\\angleBAE=\\angleACD$ and $\\triangleCFE$"},
+		{"$\\overline{ID} \\perp \\overline{BC}$, $\\angle{BAE} = \\measuredangle ACD$ and $\\triangle{CFE}$", "$ID\\perp BC$, $\\angle BAE=\\angle ACD$ and $\\triangle CFE$"},
+		// A command keeps its space before a letter, an empty group is nothing, and \langle is <.
+		{"$0\\le AB\\le 1$, $75_{}^{}$ and $\\langle n\\rangle$", "$0\\le AB\\le1$, 75 and $<n>$"},
 	}
 	for _, c := range cases {
 		if got := matchText(c[0]); got != c[1] {
@@ -340,5 +343,9 @@ func TestShape(t *testing.T) {
 	s := Signals{W: bagJaccard(f.words, g.words), M: bagJaccard(f.formulas, g.formulas), O: bagJaccard(f.order, g.order), Words: min(f.n, g.n), Numbers: f.numbers == g.numbers}
 	if s.byWords() {
 		t.Errorf("two functional equations: the same by the words, %+v", s)
+	}
+	// Two texts with no formulas have the same formulas.
+	if m := bagJaccard(map[string]int{}, map[string]int{}); m != 1 {
+		t.Errorf("two empty multisets: %.2f, want 1", m)
 	}
 }
