@@ -69,8 +69,10 @@ var (
 	gradingRE = regexp.MustCompile(`(?i)\b(?:grading|evaluation|marking|assessment|scoring) (?:criteria|scheme|guidelines|instructions)\b|\bcriteria for (?:evaluation|evaluating|grading)\b|\btranslat(?:or|ion)(?:'s)? notes?\b|\bnote:? the (?:translation|original text)\b`)
 	// leadRE is a problem mark at the start of a text, such as "Problem 4.", "**Problem 3.**", "Task 2:", "P6.", "7.", "11.4.", "2)", "Example 3." or the number of a problem of a book, as "1037.", "18.45*." or "(!) 11.".
 	leadRE = regexp.MustCompile(`(?i)^\s*(?:\(!\)\s*)?(?:\*\*|__)?\s*(?:(?:problem|task|question|exercise|example|задача)\s*-?\s*|[pq]\s*\.?\s*)?([1-9][0-9]{0,3})((?:\.[0-9]{1,3})*)\s*\**\s*(?:\.\)|[.:)])\s*(?:\*\*|__)?(?:\s|$)`)
-	// pairLeadRE is the mark of a problem of a grade or a round, as "3-3." or "3-ча 2.".
-	pairLeadRE = regexp.MustCompile(`(?i)^\s*[1-9][0-9]?-(?:[1-9][0-9]?|(?:ча|cha)\s*[1-9][0-9]?)\.\s+`)
+	// pairLeadRE is the mark of a problem of a grade or a round, as "3-3.", "3-ча 2." or "3-rd 5.", a number of a book that starts with 0, as "0.16.", or the mark of an example of a book with no number or with a note, as "Example." or "Example 1 (to item 2).".
+	pairLeadRE = regexp.MustCompile(`(?i)^\s*(?:[1-9][0-9]?-(?:[1-9][0-9]?|(?:ча|cha)\s*[1-9][0-9]?|(?:st|nd|rd|th)\s+[1-9][0-9]?)|0\.[0-9]{1,3}|example(?:\s+[0-9]{1,3})?\s*\([^()\n]{1,40}\)|example)\s*[.:]\s+`)
+	// wrapRE is a sign that a book repeats at a line break, so the dataset has it twice, as "$y=$ $=\\sqrt{x}$".
+	wrapRE = regexp.MustCompile(`=\$[ \n]*\$[ \n]*=|\+\$[ \n]*\$[ \n]*\+|-\$[ \n]*\$[ \n]*-|<\$[ \n]*\$[ \n]*<|>\$[ \n]*\$[ \n]*>|\\times\$[ \n]*\$[ \n]*\\times`)
 	// tightLeadRE is a problem number glued to the text, as "3-There is" or "1.Let".
 	tightLeadRE = regexp.MustCompile(`^\s*([1-9][0-9]?)[-.]\p{Lu}\p{Ll}`)
 	// markRE is a problem mark inside a text: "Problem 2", "Task 3" or "p2." at the start of a line, or a bold "**3.**" or "**p14.**" anywhere. A row with such a mark after its start holds more than one problem. A post of a whole test often runs its problems on one line, as "... divided by $2024$ .**p14.** A right square pyramid ...".
@@ -124,6 +126,8 @@ var (
 	valueRE = regexp.MustCompile(`=\s*(?:\\quad\s*)?(?:\\ldots|\\cdots|\\_+|_+)?\s*\$+\s*[.,]?\s*$|=\s*\$+\s*,`)
 	// tailRE is a line that a book puts after a problem: a heading of the next section in capitals, as "TILINGS WITH POLYGONS", or a row of stars.
 	tailRE = regexp.MustCompile(`(?:\n\s*(?:\$\$\s*)?\*\s*\*\s*\*(?:\s*\$\$)?|\n\s*\n\s*\p{Lu}{2,}(?:[ \-]+\p{Lu}{2,})+)\s*$`)
+	// olympiadTailRE is the heading of an olympiad and the table of its problems by class and day that a book puts after the last problem of the olympiad, as "17th All-Union Olympiad, 1983 (Kishinev)" and "| Class | 1st day | 2nd day |". The heading has a year and no point, colon or question mark, so a table that a problem gives is kept.
+	olympiadTailRE = regexp.MustCompile(`(?is)\n\s*\n(?:\$\$\s*\\begin\{gathered\}\s*)?[^\n]*\bolympiad\b[^.:?]*?\b(?:19|20)[0-9]{2}\b[^.:?]*?\n\s*\n\s*\|\s*(?:class|racc|pass|grade)\b.*$`)
 	// contextRE is a text that depends on another problem.
 	contextRE = regexp.MustCompile(`(?i)\b(?:previous|preceding|above|last|prior) (?:problem|exercise|question|task)\b|\b(?:problem|exercise|task) [0-9]{1,3} (?:above|before)\b|\bas in (?:problem|exercise|task) [0-9]{1,3}\b|\bfrom (?:problem|exercise|task) [0-9]{1,3}\b|\bof (?:the )?(?:previous|preceding) part\b`)
 	// figureRE is a text that needs a figure that the row does not have.
@@ -142,7 +146,7 @@ func Clean(raw string) (string, string) {
 	plain = variantRE.ReplaceAllString(plain, "")
 	plain = noiseRE.ReplaceAllString(plain, "")
 	plain = strings.TrimSpace(blankRE.ReplaceAllString(hashEndRE.ReplaceAllString(plain, ""), "\n\n"))
-	text := normalize.Statement(plain, "")
+	text := wrapRE.ReplaceAllStringFunc(normalize.Statement(plain, ""), func(m string) string { return m[:strings.IndexByte(m, '$')] })
 	// cut tells if an answer or a solution was cut from the end of the text.
 	cut := len(normalize.CutTail(plain)) < len(strings.TrimSpace(plain))
 	if solutionRE.MatchString(text) {
@@ -174,7 +178,7 @@ func Clean(raw string) (string, string) {
 		text = text[m[4]:]
 	}
 	text = strings.TrimSpace(pointsRE.ReplaceAllString(text, ""))
-	text = strings.TrimSpace(tailRE.ReplaceAllString(firstCopy(text), ""))
+	text = strings.TrimSpace(tailRE.ReplaceAllString(olympiadTailRE.ReplaceAllString(firstCopy(text), ""), ""))
 	// A step of a solution and the mark of the compendium often follow a problem number, as in "5. Since ..." or "27. (BLR) Ten points ...", so they are read after the number is cut.
 	switch {
 	case stepRE.MatchString(text):
