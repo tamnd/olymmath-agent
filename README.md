@@ -144,6 +144,15 @@ Many rows of a licensed source name no position, or no competition at all, such 
 om import -content olymmath -comp ru-allrussian -fill -existing -match -match-out pairs.tsv
 ```
 
+### Fill link-only records from the official pages
+
+Many records of the Russian olympiads hold only a link to problems.ru. `om fill` gives them the text of the official page of the olympiad, at the same position. It reads the official page of each edition into the raw store, cuts it into papers by the headings of the grades ("8 класс", "11 класс (2 день)") and the papers into problems by their numbers, and turns the HTML into Markdown with TeX math. Positions restart in each paper, so a problem gets the position of its grade, day and number, as `ru-moscow/2025/d113`. With `-keys`, the command reads the problems.ru text of each record from the listings of problems.ru, in memory only, and compares the words of the official text at the position with it. A record is filled only when the two agree (a word Jaccard index of 0.5 or more, or 0.35 or more when the shorter text has 80% of its words in the other), when no other official text of the edition comes within 0.1 of that signal, when the official problem has no picture (unless `-figures`) and when the native lane gives it no flag. Each other record goes to `reports/review/fill-<comp>.tsv`, with the signals and the reason and with no problems.ru text. The new statement is official, with the extraction `native/html (om-rutex/1)` and the confidence of the native lane, and it becomes the canonical statement. Without `-keys` the command only counts what the official pages give. `-write` writes the records and the review file:
+
+```sh
+om fill -content olymmath ru-moscow
+om fill -content olymmath -keys -write -from 1999 -to 2008 ru-moscow
+```
+
 ### Read problems.ru
 
 ```sh

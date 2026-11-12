@@ -159,3 +159,37 @@ func TestRetryAfter(t *testing.T) {
 		t.Error("retryAfter")
 	}
 }
+
+func TestRead(t *testing.T) {
+	var fails atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/robots.txt":
+			_, _ = io.WriteString(w, "User-agent: *\nDisallow: /no\n")
+		case "/key":
+			if fails.Add(1) == 1 {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				return
+			}
+			_, _ = io.WriteString(w, "key body")
+		case "/gone":
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+	c := newClient(t)
+	ctx := context.Background()
+	b, err := c.Read(ctx, srv.URL+"/key")
+	if err != nil || string(b) != "key body" || fails.Load() != 2 {
+		t.Fatalf("read: %q %v", b, err)
+	}
+	if _, have, err := c.Store.Latest("test", srv.URL+"/key"); err != nil || have {
+		t.Errorf("Read must not put the body in the store: %v %v", have, err)
+	}
+	if _, err := c.Read(ctx, srv.URL+"/no/x"); !errors.Is(err, ErrRobots) {
+		t.Errorf("want ErrRobots, got %v", err)
+	}
+	if _, err := c.Read(ctx, srv.URL+"/gone"); err == nil || !strings.Contains(err.Error(), "404") {
+		t.Errorf("gone: %v", err)
+	}
+}
