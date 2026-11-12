@@ -30,7 +30,9 @@ type PackIndex struct {
 	// Packs are the keys of the shards of a big folder, for example pack/api-07.3f2a9c1d0b7e.pack. The entry of a file gives its shard.
 	Packs []string `json:"packs,omitempty"`
 	// Files maps the path of a file in its folder, for example 2020/p1.html, to its offset and length in the pack and the hash of its bytes.
-	Files map[string]PackEntry `json:"files"`
+	Files map[string]PackEntry `json:"files,omitempty"`
+	// IndexShards is set in the index of a big folder, which has no Files: the entries are in IndexShards files FOLDER/NN.json, and a file is in the one of its shard (shardOf). The Worker then reads a small part of the index for a page, not the index of the whole folder.
+	IndexShards int `json:"shards,omitempty"`
 }
 
 // PackEntry is the place of one file in a pack. It is a JSON array [offset, length, hash], or [offset, length, hash, shard] in a big folder, to keep the index small.
@@ -198,9 +200,40 @@ func packFolder(out, index, folder string, files []string, read func(f string) (
 			ix.Pack = key
 		}
 	}
-	js, err := json.Marshal(ix)
+	if n > 1 {
+		return writeShards(index, folder, ix)
+	}
+	return writeJSON(filepath.Join(index, folder+".json"), ix)
+}
+
+// writeShards writes the index of a big folder as a head with the packs and one file for the entries of each shard.
+func writeShards(index, folder string, ix PackIndex) error {
+	parts := make([]PackIndex, Shards)
+	for f, e := range ix.Files {
+		if parts[e.Shard].Files == nil {
+			parts[e.Shard].Files = map[string]PackEntry{}
+		}
+		parts[e.Shard].Files[f] = e
+	}
+	dir := filepath.Join(index, folder)
+	if err := os.MkdirAll(dir, 0o755); err != nil { // #nosec G301 -- the site is public.
+		return err
+	}
+	for i, part := range parts {
+		if part.Files == nil {
+			part.Files = map[string]PackEntry{}
+		}
+		if err := writeJSON(filepath.Join(dir, fmt.Sprintf("%02d.json", i)), part); err != nil {
+			return err
+		}
+	}
+	return writeJSON(filepath.Join(index, folder+".json"), PackIndex{Packs: ix.Packs, IndexShards: Shards})
+}
+
+func writeJSON(name string, v any) error {
+	js, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(index, folder+".json"), js, 0o644) // #nosec G306 G703 -- the site is public.
+	return os.WriteFile(name, js, 0o644) // #nosec G306 G703 -- the site is public.
 }

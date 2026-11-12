@@ -84,8 +84,20 @@ func TestBuildPages(t *testing.T) {
 func TestBuildTagsAndRedirects(t *testing.T) {
 	out := build(t, "/")
 	loose := read(t, out, "p/0J8TP3MFS9.html")
-	if !strings.Contains(loose, `<link rel="canonical" href="https://example.org/p/0J8TP3MFS9">`) || !strings.Contains(loose, "Problems with no known competition") {
+	if !strings.Contains(loose, `<link rel="canonical" href="https://example.org/p/0J8TP3MFS9">`) || !strings.Contains(loose, `<a href="/loose/">Problems with no position</a>`) {
 		t.Error("the page of the loose problem is wrong")
+	}
+	if !strings.Contains(loose, `A source gives <a href="/loose/imo/#y-2024">IMO 2024</a> but no problem number`) {
+		t.Error("the page of the loose problem does not show where a source says it was set")
+	}
+	for rel, want := range map[string]string{
+		"loose/index.html":               `<a href="/loose/imo/">International Mathematical Olympiad</a> <span class="muted">1</span>`,
+		"loose/imo/index.html":           `<h2 id="y-2024">2024</h2>`,
+		"loose/source/mathse/index.html": `<a href="/p/0J8TP3MFS9">`,
+	} {
+		if !strings.Contains(read(t, out, rel), want) {
+			t.Errorf("%s has no %q", rel, want)
+		}
 	}
 	for rel, want := range map[string]string{
 		"p/0HVHSDNNMY.html": `content="0; url=/imo/2024/p1"`,
@@ -98,12 +110,28 @@ func TestBuildTagsAndRedirects(t *testing.T) {
 	if strings.Contains(read(t, out, "sitemap.xml"), "/p/0HVHSDNNMY") {
 		t.Error("the sitemap has a redirect page")
 	}
-	if !strings.Contains(read(t, out, "search.json"), `"u":"/p/0J8TP3MFS9"`) {
-		t.Error("the search index has no loose problem")
+	if !strings.Contains(read(t, out, "search/loose-00.json"), `"u":"/p/0J8TP3MFS9"`) || strings.Contains(read(t, out, "search.json"), `"u":"/p/0J8TP3MFS9"`) {
+		t.Error("the loose problem is not in the loose part of the search index")
+	}
+	if !strings.Contains(read(t, out, "search/index.html"), `data-more="/search/loose-00.json"`) {
+		t.Error("the search page does not read the loose part of the index")
 	}
 	p1 := read(t, out, "imo/2024/p1.html")
 	if !strings.Contains(p1, "Human solution") || strings.Contains(p1, "No solution is on olymmath yet") {
 		t.Error("the solution of imo/2024/p1 is not on its page")
+	}
+}
+
+func TestBuildSitemapIndex(t *testing.T) {
+	defer func(n int) { SitemapURLs = n }(SitemapURLs)
+	SitemapURLs = 3
+	out := build(t, "/")
+	ix := read(t, out, "sitemap.xml")
+	if !strings.Contains(ix, "<sitemapindex") || !strings.Contains(ix, "<loc>https://example.org/sitemap-2.xml</loc>") {
+		t.Fatalf("sitemap.xml is not an index:\n%s", ix)
+	}
+	if one := read(t, out, "sitemap-1.xml"); strings.Count(one, "<url>") != 3 {
+		t.Errorf("sitemap-1.xml has %d URLs, want 3", strings.Count(one, "<url>"))
 	}
 }
 
@@ -177,7 +205,7 @@ func TestFacets(t *testing.T) {
 			t.Errorf("problems/index.html has no %q", want)
 		}
 	}
-	if !strings.Contains(read(t, out, "search.json"), `"k":"proof"`) {
+	if !strings.Contains(read(t, out, "search.json")+read(t, out, "search/loose-00.json"), `"k":"proof"`) {
 		t.Error("the search index has no type")
 	}
 }

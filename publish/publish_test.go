@@ -364,10 +364,19 @@ func TestPackShards(t *testing.T) {
 		return ix
 	}
 	ix := read()
-	if ix.Pack != "" || len(ix.Packs) != Shards {
-		t.Fatalf("pack %q, %d shards", ix.Pack, len(ix.Packs))
+	if ix.Pack != "" || len(ix.Packs) != Shards || ix.IndexShards != Shards || ix.Files != nil {
+		t.Fatalf("pack %q, %d shards, %d index shards, %d files in the head", ix.Pack, len(ix.Packs), ix.IndexShards, len(ix.Files))
 	}
-	e := ix.Files["problem/7.json"]
+	// The entry of a file is in the index shard of its hash, which is the shard of its pack.
+	var part PackIndex
+	b, err := os.ReadFile(filepath.Join(index, "api", fmt.Sprintf("%02d.json", shardOf("problem/7.json"))))
+	if err != nil || json.Unmarshal(b, &part) != nil {
+		t.Fatal(err)
+	}
+	e, ok := part.Files["problem/7.json"]
+	if !ok || e.Shard != shardOf("problem/7.json") {
+		t.Fatalf("the shard has no entry for problem/7.json: %+v", e)
+	}
 	pack, err := os.ReadFile(filepath.Join(out, filepath.FromSlash(ix.Packs[e.Shard])))
 	if err != nil || string(pack[e.Offset:e.Offset+e.Length]) != "{7}" {
 		t.Fatalf("problem/7.json gives %q, %v", pack[e.Offset:e.Offset+e.Length], err)
