@@ -261,6 +261,9 @@ type fillText struct {
 	Text   string `json:"text"`
 	URL    string `json:"url"`
 	Page   int    `json:"page"`
+	// Extraction and Name, when they are set, take the place of the extraction field and of the name of the new statement.
+	Extraction string `json:"extraction,omitempty"`
+	Name       string `json:"name,omitempty"`
 }
 
 // withFillTexts puts the texts of -texts in the place of the texts of the problems of edition ed of comp, with no flags. A text with a URL for a position that probs do not have is added as a new problem.
@@ -270,6 +273,7 @@ func withFillTexts(probs []official.RuProblem, texts map[string]fillText, comp, 
 		have[p.Position] = true
 		if t, ok := texts[p.At(comp)]; ok {
 			probs[i].Text, probs[i].Figure, probs[i].Flags, probs[i].Model = t.Text, t.Figure, nil, model
+			probs[i].Extraction, probs[i].Name = t.Extraction, t.Name
 		}
 	}
 	var add []string
@@ -283,7 +287,7 @@ func withFillTexts(probs []official.RuProblem, texts map[string]fillText, comp, 
 	slices.Sort(add)
 	for _, at := range add {
 		t := texts[at]
-		probs = append(probs, official.RuProblem{Edition: ed, Position: strings.TrimPrefix(at, prefix), Text: t.Text, Figure: t.Figure, URL: t.URL, Page: t.Page, Model: model})
+		probs = append(probs, official.RuProblem{Edition: ed, Position: strings.TrimPrefix(at, prefix), Text: t.Text, Figure: t.Figure, URL: t.URL, Page: t.Page, Model: model, Extraction: t.Extraction, Name: t.Name})
 	}
 	return probs
 }
@@ -362,7 +366,8 @@ func fillOne(root string, p *content.Problem, at string, comp *content.Competiti
 	if o.Page > 0 {
 		kind = "official paper"
 	}
-	c := canon.Candidate{At: at, Source: src.ID, Origin: src.Origin, Zone: src.Zone.Statement, Lang: "ru", Name: fmt.Sprintf("%s %s %s", comp.Name, o.Edition, kind), URL: o.URL, Text: o.Text}
+	name := cmp.Or(o.Name, fmt.Sprintf("%s %s %s", comp.Name, o.Edition, kind))
+	c := canon.Candidate{At: at, Source: src.ID, Origin: src.Origin, Zone: src.Zone.Statement, Lang: "ru", Name: name, URL: o.URL, Text: o.Text}
 	add := canon.AddLink(p, &c, o.Page)
 	add.Statements[0].Extraction = official.RuExtraction(o)
 	add.Statements[0].Confidence = conf

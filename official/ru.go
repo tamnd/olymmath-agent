@@ -27,6 +27,10 @@ type RuProblem struct {
 	Flags []string
 	// Model is the model that read the text from the image of the page, when the text layer was not good enough, or "" for the text of this package.
 	Model string
+	// Extraction is the full extraction field, as vision/claude@2.1.322 (claude-opus-5-5) for a scan, when it is not the native field that RuExtraction makes. It is usually empty.
+	Extraction string
+	// Name is the name of the statement, when the text comes from a book and not from the official page or paper of the edition. It is usually empty.
+	Name string
 }
 
 // At gives the locator of the problem in the competition comp.
@@ -516,8 +520,11 @@ func RuDecode(b []byte) (string, error) {
 // RuVersion names the rules of RuHTML and RuTeX. It goes into the extraction field of a text that they read.
 const RuVersion = "om-rutex/1"
 
-// RuExtraction gives the extraction field of an official text: the tool in Tool, or native/html for a web page and native/pdftotext for a page of a PDF, with the rules of this package in brackets, or the model that read the text from the image of the page.
+// RuExtraction gives the extraction field of an official text: the field in Extraction when it is set, else the tool in Tool, or native/html for a web page and native/pdftotext for a page of a PDF, with the rules of this package in brackets, or the model that read the text from the image of the page.
 func RuExtraction(p RuProblem) string {
+	if p.Extraction != "" {
+		return p.Extraction
+	}
 	rules := RuVersion
 	if p.Model != "" {
 		rules = p.Model
