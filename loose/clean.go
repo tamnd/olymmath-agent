@@ -66,7 +66,7 @@ var (
 	// gradeLeadRE is the grade of a problem before its text, as "(8th grade) Prove" or "(10-11 grades) Find".
 	gradeLeadRE = regexp.MustCompile(`(?i)^\s*\(\s*(?:[0-9]{1,2}\s*-\s*)?[0-9]{1,2}\s*(?:th|st|nd|rd)?\s*(?:grades?|class(?:es)?|form)\s*\)[\s.:]*`)
 	// sectionRE is a problem number of a section with no point after it, as "10.2 Plot the set of points".
-	sectionRE = regexp.MustCompile(`^\s*([1-9][0-9]?)(?:\.[0-9]{1,3})+\s+(\p{Lu}\p{Ll})`)
+	sectionRE = regexp.MustCompile(`^\s*(?:#{1,6}\s*)?([1-9][0-9]?)(?:\.[0-9]{1,3})+\s+(\p{Lu}(?:\p{Ll}|\s+\p{Ll}))`)
 	// gradingRE is a scheme of the points of a solution, or a note of a translator about the text. Neither is a problem.
 	gradingRE = regexp.MustCompile(`(?i)\b(?:grading|evaluation|marking|assessment|scoring) (?:criteria|scheme|guidelines|instructions)\b|\bcriteria for (?:evaluation|evaluating|grading)\b|\btranslat(?:or|ion)(?:'s)? notes?\b|\bnote:? the (?:translation|original text)\b`)
 	// leadRE is a problem mark at the start of a text, such as "Problem 4.", "**Problem 3.**", "Task 2:", "P6.", "7.", "11.4.", "2)", "Example 3.", "Ex. 119." or the number of a problem of a book, as "1037.", "18.45*." or "(!) 11.".
@@ -138,6 +138,33 @@ var (
 	gradeSkipRE = regexp.MustCompile(`\$|\\text|[{}\s]`)
 	// contextRE is a text that depends on another problem.
 	contextRE = regexp.MustCompile(`(?i)\b(?:previous|preceding|above|last|prior) (?:problem|exercise|question|task)\b|\b(?:problem|exercise|task) [0-9]{1,3} (?:above|before)\b|\bas in (?:problem|exercise|task) [0-9]{1,3}\b|\bfrom (?:problem|exercise|task) [0-9]{1,3}\b|\bof (?:the )?(?:previous|preceding) part\b`)
+	// texTagRE is the TeX that a Russian problem book wraps around its topic tags, as in "$\left[\begin{array}{l}\text { Invariants }\end{array}\right]$". It is removed only to read the line.
+	texTagRE = regexp.MustCompile(`\\(?:begin|end)\{(?:array|aligned|gathered)\}(?:\{[lcr]*\})?|\\(?:text|underline|mathrm|mathbf|textbf|frac)\b|\\(?:left|right)(?:\\[{}]|[.\[\]()|])?|\\\\|[&${}]`)
+	// tagLineRE is a line of topic tags, as "[ Sine theorem ] [ Auxiliary circle ]" or "[Mathematical logic (miscellaneous).] Complex".
+	tagLineRE = regexp.MustCompile(`^\[\s*(?:\p{Lu}|\[)|^\[\s*\p{L}.*\s.*\]$`)
+	// leadTagsRE is topic tags in brackets on the first line of the problem, as "[Equilateral Triangle] Prove that".
+	leadTagsRE = regexp.MustCompile(`^(?:\[\s*\p{Lu}[^\[\]\n?=]{0,150}\]\s*)+`)
+	// lettersRE is a word of three letters or more, and lowerRE one of three small letters, which a tag has and "[x]" or "[ABC]" has not.
+	lettersRE = regexp.MustCompile(`\p{L}{3}`)
+	lowerRE   = regexp.MustCompile(`\p{Ll}{3}`)
+	// taskWordRE is a word that asks for something, which a topic tag does not have.
+	taskWordRE = regexp.MustCompile(`(?i)\b(?:solve|find|calculate|compute|evaluate|simplify|prove|show|determine)\b`)
+	// helpsRE is the end of a tag such as "Symmetry helps solve the problem".
+	helpsRE = regexp.MustCompile(`(?i)\bhelps? (?:to )?solve\b`)
+	// tableMarkRE is the difficulty or the number of the problem in a table of tags, as "Difficulty: 3" or "Problem 109870 Topics".
+	tableMarkRE = regexp.MustCompile(`(?i)\bdifficulty\s*:\s*[0-9+-]+|\bproblem\s+[0-9]+\s+(?:topics|themes)\b`)
+	// groupRE is a group in brackets.
+	groupRE = regexp.MustCompile(`\[[^\[\]]*\]`)
+	// leadTexTagRE is topic tags wrapped in TeX on the first line of the problem, as "$\left.\begin{array}{l}\text { Cone }\end{array}\right]$ Three cones".
+	leadTexTagRE = regexp.MustCompile(`^\$[^$?=]*\\text[^$?=]*\$\s*`)
+	// tableLineRE is a line of a table of topic tags, with the grades before it, as "10,11 |" and "| :---: | :---: |".
+	tableLineRE = regexp.MustCompile(`^(?:[0-9]{1,2}\s*,\s*)*(?:[0-9]{1,2}\s*,?\s*)?\|`)
+	// gradeLineRE is the grades or the mark of difficulty of a problem on a line of its own, as "8,9", "9,10,11" or "$3+$".
+	gradeLineRE = regexp.MustCompile(`^(?:[0-9]{1,2}\s*,\s*)*[0-9]{1,2}\s*[,+-]?$`)
+	// authorLineRE is a line of the authors, as "Shapovalov A.V.", "Kanel-Belov A.Ya.", "X. Khanov" or "Authors: Netay I.V., Baranov D.V.", or the mark "Folklore".
+	authorLineRE = regexp.MustCompile(`^(?:(?i:authors?)\s*:.*|(?i:folklore|folkior|folklor)\.?|(?:(?:\p{Lu}[\p{Ll}'-]+|\p{L}{1,2}\.|von|der|and)[\s,.:;]*)+)$`)
+	// initialRE is an initial of a name, as "A." in "Shapovalov A.V.".
+	initialRE = regexp.MustCompile(`(?:^|[\s.])\p{L}{1,2}\.`)
 	// figureRE is a text that needs a figure that the row does not have.
 	figureRE = regexp.MustCompile(`(?i)\[asy\]|\bfigure shown\b|\bas shown\b|\bthe (?:diagram|picture|photo)\b|\bphoto\b|\(see (?:the )?fig|\bfig\.\s*[0-9]|\[img\]|!\[|<img|\\includegraphics|https?://\S+\.(?:png|jpe?g|gif|svg)\b|\b(?:see|in|on) (?:the )?(?:figure|picture|diagram|drawing|image)\b|\b(?:figure|picture|diagram|drawing) (?:below|above|shows|on the right|on the left)\b|\bshown (?:below|above|in the (?:figure|picture|diagram))\b|\bpictured\b|\b(?:рисун\p{L}*|рис\.)`)
 )
@@ -157,6 +184,7 @@ func Clean(raw string) (string, string) {
 	text := wrapRE.ReplaceAllStringFunc(normalize.Statement(plain, ""), func(m string) string { return m[:strings.IndexByte(m, '$')] })
 	// cut tells if an answer or a solution was cut from the end of the text.
 	cut := len(normalize.CutTail(plain)) < len(strings.TrimSpace(plain))
+	text = bookHead(text)
 	if solutionRE.MatchString(text) {
 		return "", Solution
 	}
@@ -268,6 +296,75 @@ func bookTail(text string) string {
 		}
 		text = head
 	}
+}
+
+// bookHead cuts the lines that a Russian problem book prints before a problem: its topic tags, in brackets or in a table and often wrapped in TeX, its grades, its authors and the mark "Folklore". A line is cut only when it has no question mark and no equals sign and a line of the problem comes after it. A table is cut whole or not at all, and only when it has no digits, so a table of the problem itself is kept.
+func bookHead(text string) string {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	i := 0
+	for i < len(lines) {
+		line := strings.TrimSpace(lines[i])
+		n := 1
+		switch {
+		case line == "":
+		case tableLineRE.MatchString(texTagRE.ReplaceAllString(line, " ")):
+			for i+n < len(lines) && strings.Contains(lines[i+n], "|") {
+				n++
+			}
+			if !tagTable(lines[i : i+n]) {
+				n = 0
+			}
+		case !headLine(line):
+			n = 0
+		}
+		if n == 0 || strings.TrimSpace(strings.Join(lines[i+n:], "\n")) == "" {
+			break
+		}
+		i += n
+	}
+	rest := strings.TrimSpace(strings.Join(lines[i:], "\n"))
+	m := leadTagsRE.FindString(rest)
+	if m == "" || !lowerRE.MatchString(m) {
+		m = leadTexTagRE.FindString(rest)
+		if !strings.ContainsAny(m, "[]") {
+			m = ""
+		}
+	}
+	if line, _, _ := strings.Cut(rest, "\n"); m == "" && strings.Count(line, "|") == 1 && strings.HasPrefix(line, "|") {
+		m = "|"
+	}
+	if r, _ := utf8.DecodeRuneInString(strings.TrimSpace(rest[len(m):])); m != "" && (r == '$' || unicode.IsUpper(r)) {
+		rest = strings.TrimSpace(rest[len(m):])
+	}
+	return rest
+}
+
+// tagTable tells if the lines of a table at the start of a text are a table of topic tags: it has no digits but the grades before it, no question mark and no equals sign.
+func tagTable(lines []string) bool {
+	all := tableMarkRE.ReplaceAllString(tableLineRE.ReplaceAllString(texTagRE.ReplaceAllString(strings.Join(lines, "\n"), " "), "|"), "")
+	return !strings.ContainsAny(all, "0123456789?=")
+}
+
+// headLine tells if a line before the text of a problem is a line of a book that is not the problem: a topic tag, the grades, an author or "Folklore".
+func headLine(line string) bool {
+	if strings.ContainsAny(line, "?=") || utf8.RuneCountInString(line) > 300 || strings.Contains(line, "](") {
+		return false
+	}
+	plain := strings.TrimSpace(texTagRE.ReplaceAllString(line, " "))
+	switch {
+	case tagLineRE.MatchString(plain) && lettersRE.MatchString(plain):
+		// The words out of the brackets are a tag that lost its bracket or a mark such as "Complex", and not a sentence of the problem.
+		left := groupRE.ReplaceAllString(plain, "")
+		return !taskWordRE.MatchString(helpsRE.ReplaceAllString(left, "")) && (utf8.RuneCountInString(left) <= 80 || !strings.ContainsAny(left, "0123456789"))
+	case line == "[", strings.HasPrefix(line, "$") && strings.Contains(line, "\\text") && strings.ContainsAny(line, "[]"):
+		return true
+	case gradeLineRE.MatchString(plain):
+		return true
+	case authorLineRE.MatchString(plain) && utf8.RuneCountInString(plain) <= 120:
+		low := strings.ToLower(plain)
+		return strings.HasPrefix(low, "author") || strings.HasPrefix(low, "folk") || initialRE.MatchString(plain) && !taskHeadRE.MatchString(plain)
+	}
+	return false
 }
 
 // bare tells if a text is only a formula, with fewer than three words around it and none that asks for something, as "$f(x)=\\frac{x^{3}}{x^{2}-2}$.": the task was in a heading that the dataset left out. A formula that ends in "=" or "=?" asks for its value, and a list of choices makes a question, so neither is bare.
