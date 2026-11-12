@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"sort"
@@ -437,12 +438,25 @@ func (r *looseReader) check(pr pendingLoose, accept func(string) bool) (*looseRo
 		Source: row.Source, Origin: src.Origin, Zone: src.Zone.Statement, Lang: lang, Name: name, URL: url,
 		Ref: row.File + "#" + strconv.Itoa(row.Row), Capture: capture, Text: text, Answer: answer, Reworded: src.Reworded,
 	}}
-	if comp != nil {
+	if comp != nil && !wrongList(comp, label) {
 		at := comp.Code
-		if (comp.EditionForm == "" || comp.EditionForm == "year") && row.Year > 0 && row.Year >= comp.FirstYear && row.Year <= r.thisYear {
+		if (comp.EditionForm == "" || comp.EditionForm == "year") && row.Year > 0 && row.Year >= comp.FirstYear && row.Year <= r.thisYear && !yearRangeRE.MatchString(label) {
 			at += "/" + strconv.Itoa(row.Year)
 		}
 		x.unplaced = []content.Unplaced{{At: at, Source: row.Source, Label: label}}
 	}
 	return &x, ""
+}
+
+// yearRangeRE finds a range of years in a label, as in "Shortlist 1992 - 2010". The year of such a row is the first year of the range, not the year of the problem.
+var yearRangeRE = regexp.MustCompile(`\b(?:19|20)[0-9]{2}\s*[-–]\s*(?:(?:19|20)[0-9]{2}\b|$)|\b(?:19|20)[0-9]{2}\+`)
+
+// wrongList tells if the label names a shortlist or a longlist and the competition is not one. The problems of the Iberoamerican shortlist were not set at the Iberoamerican olympiad, for example, so the row says nothing about where the problem was set.
+func wrongList(comp *content.Competition, label string) bool {
+	l := strings.ToLower(label)
+	if !strings.Contains(l, "shortlist") && !strings.Contains(l, "longlist") {
+		return false
+	}
+	n := strings.ToLower(comp.Name)
+	return !strings.Contains(n, "shortlist") && !strings.Contains(n, "longlist")
 }
