@@ -152,12 +152,19 @@ func TestDecideChoices(t *testing.T) {
 	problems = append(problems, Doc{Text: area + "\n\n\\textbf{(A)}\\ \\pi+\\sqrt{2} \\textbf{(B)}\\ \\pi+2 \\textbf{(C)}\\ \\pi+2\\sqrt{2} \\textbf{(D)}\\ 2\\pi+\\sqrt{2} \\textbf{(E)}\\ 2\\pi+2\\sqrt{2}"})
 	// 2: the same problem with its choices in a formula
 	rows = append(rows, Doc{Text: area + " $\\textbf{(A)}\\ \\pi+\\sqrt{2} \\textbf{(B)}\\ \\pi+2 \\textbf{(C)}\\ \\pi+2\\sqrt{2} \\textbf{(D)}\\ 2\\pi+\\sqrt{2} \\textbf{(E)}\\ 2\\pi+2\\sqrt{2}$"})
+	// 3: a short stem that many problems share, with other choices
+	largest := "Find the largest number among the following numbers: "
+	problems = append(problems, Doc{Text: largest + "$ \\textbf{(A) }30^{30} \\textbf{(B) }50^{10} \\textbf{(C) }40^{20} \\textbf{(D) }45^{15} \\textbf{(E) }5^{60}$"})
+	rows = append(rows, Doc{Text: largest + "$ \\textbf{(A) }\\tan47^{\\circ}+\\cos47^{\\circ} \\textbf{(B) }\\cot 47^{\\circ}+\\sqrt{2}\\sin 47^{\\circ} \\textbf{(C) }\\sqrt{2}\\cos47^{\\circ}+\\sin47^{\\circ} \\textbf{(D) }\\tan47^{\\circ}+\\cot47^{\\circ} \\textbf{(E) }\\cos47^{\\circ}+\\sqrt{2}\\sin47^{\\circ}$"})
 	ds := Decide(problems, rows, Options{Neighbors: 8})
+	if ds[3].Kind == Link || ds[3].Kind == Join {
+		t.Errorf("row 3 is placed on its stem alone: %v %d (%+v)", ds[3].Kind, ds[3].Target, ds[3].Signals)
+	}
 	if ds[0].Kind == Link {
 		t.Errorf("row 0 links on its choices: %+v", ds[0])
 	}
-	if ds[2].Kind != Link || ds[2].Target != len(problems)-1 {
-		t.Errorf("row 2: %v %d (%+v), want a link to %d", ds[2].Kind, ds[2].Target, ds[2].Signals, len(problems)-1)
+	if ds[2].Kind != Link || ds[2].Target != len(problems)-2 {
+		t.Errorf("row 2: %v %d (%+v), want a link to %d", ds[2].Kind, ds[2].Target, ds[2].Signals, len(problems)-2)
 	}
 	if ds[1].Kind != Link || ds[1].Target != 0 {
 		t.Errorf("row 1: %v %d (%+v), want a link to 0", ds[1].Kind, ds[1].Target, ds[1].Signals)
