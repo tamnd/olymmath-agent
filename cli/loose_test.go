@@ -167,3 +167,22 @@ func TestImportLoosePolish(t *testing.T) {
 		t.Errorf("unplaced: %+v", p.Unplaced)
 	}
 }
+
+func TestImportLooseBlockLink(t *testing.T) {
+	floor := "Determine all real numbers $\\alpha$ such that, for every positive integer $n$, the integer\n$$\\lfloor \\alpha \\rfloor + \\lfloor 2\\alpha \\rfloor + \\cdots + \\lfloor n\\alpha \\rfloor$$\nis a multiple of $n$."
+	root, dir := looseFixture(t, []seed.Row{{Labels: []string{"Some forum"}, Statement: "Problem 3. " + floor}})
+	code, _, errs := run("import", "-loose", "-content", root, "-seed", dir, "-sources", "hf-test", "-block", "imo")
+	if code != ExitOK {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	if !strings.Contains(errs, "dropped, same as a problem of a link-only competition: 1") || !strings.Contains(errs, "0 rows link 0 problems") {
+		t.Errorf("the counts:\n%s", errs)
+	}
+	c, fs := content.Load(root)
+	if fs.Errors() > 0 {
+		t.Fatalf("findings:\n%v", fs)
+	}
+	if p := c.ByTag("0HVHSDNNMY"); p == nil || len(p.Statements) != 1 {
+		t.Errorf("imo/2024/p1 got a statement: %+v", p)
+	}
+}

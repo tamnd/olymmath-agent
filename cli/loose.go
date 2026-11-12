@@ -28,7 +28,7 @@ import (
 // LooseSources are the seed sources of om import -loose, in the order of the import (spec 06.8).
 var LooseSources = []string{"hf-ai-mo-aops", "hf-numina-olympiads", "hf-numinamath-1-5", "hf-mathnet"}
 
-// LinkOnly are the competitions whose texts the project only links (document 11). The loose import takes no row of them.
+// LinkOnly are the competitions whose texts the project only links (document 11). The loose import takes no row of them, and adds no row to a problem of them.
 var LinkOnly = []string{"au-amo", "in-rmo", "in-inmo", "uk-bmo1", "uk-bmo2", "kr-kmo", "kr-fkmo", "de-mo", "ca-cmo", "ca-cjmo", "bg-mo"}
 
 // NuminaLabels are the labels of the olympiad rows of hf-numinamath-1-5. Its other rows come from school sets and synthetic sets.
@@ -155,6 +155,13 @@ func runImportLoose(env Env, args []string) int {
 			groups[d.Target] = append(groups[d.Target], i)
 		case loose.Link:
 			p := owners[d.Target]
+			if inBlock(p, r.block) {
+				// The import adds nothing to a problem of a link-only competition, not even a second statement.
+				r.dropped["same as a problem of a link-only competition"]++
+				r.droppedN++
+				counts[d.Kind]--
+				continue
+			}
 			if links[p] == nil {
 				linked = append(linked, p)
 			}
@@ -516,4 +523,14 @@ func wrongList(comp *content.Competition, label string) bool {
 	}
 	n := strings.ToLower(comp.Name)
 	return !strings.Contains(n, "shortlist") && !strings.Contains(n, "longlist")
+}
+
+// inBlock reports whether a problem appears in one of the link-only competitions.
+func inBlock(p *content.Problem, block []string) bool {
+	if slices.Contains(block, p.Competition) && p.Competition != "" {
+		return true
+	}
+	return slices.ContainsFunc(p.Appearances, func(a content.Appearance) bool {
+		return a.Locator.Comp != "" && slices.Contains(block, a.Locator.Comp)
+	})
 }
