@@ -1149,22 +1149,25 @@ var bmtYearRE = regexp.MustCompile(`<link rel="canonical" href="(https://berkele
 // bmtRowRE matches one row of the table of rounds: the name of the round and the link in the column of the problems, if there is one.
 var bmtRowRE = regexp.MustCompile(`(?s)<tr>\s*<td>([^<]*)</td>\s*<td class="text-center">\s*(?:<a href="([^"]*)")?`)
 
-// BMTPapers gives the papers of the Berkeley Math Tournament (bmt) on one archive page. The page has a table with one row for each round: its name, the file of the problems and the file of the solutions. The links are relative to the page. The paper of a round is its name in lower case with hyphens, such as individual, team, general, guts or number-theory. The tiebreakers and the power round are left out: a tiebreaker is not a part of the score of the round, and the problems of a power round have parts with no fixed numbering. A row with no file of the problems gives no paper.
+// BMTPapers gives the papers of the Berkeley Math Tournament (bmt) on its archive pages. om papers joins the pages of all the years into one text, so the text is cut at each canonical link, and each part is the page of one year. The page has a table with one row for each round: its name, the file of the problems and the file of the solutions. The links are relative to the page. The paper of a round is its name in lower case with hyphens, such as individual, team, general, guts or number-theory. The tiebreakers and the power round are left out: a tiebreaker is not a part of the score of the round, and the problems of a power round have parts with no fixed numbering. A row with no file of the problems gives no paper.
 func BMTPapers(page string) []National {
-	m := bmtYearRE.FindStringSubmatch(page)
-	if m == nil {
-		return nil
-	}
-	base := m[1]
-	y, _ := strconv.Atoi(m[2])
+	locs := bmtYearRE.FindAllStringSubmatchIndex(page, -1)
 	var out []National
-	for _, r := range bmtRowRE.FindAllStringSubmatch(page, -1) {
-		name := strings.TrimSpace(html.UnescapeString(r[1]))
-		if r[2] == "" || name == "Power" || strings.Contains(name, "Tiebreaker") {
-			continue
+	for i, l := range locs {
+		end := len(page)
+		if i+1 < len(locs) {
+			end = locs[i+1][0]
 		}
-		paper := strings.ReplaceAll(strings.ToLower(name), " ", "-")
-		out = append(out, National{Competition: "bmt", Year: y, Paper: paper, URL: base + r[2]})
+		base := page[l[2]:l[3]]
+		y, _ := strconv.Atoi(page[l[4]:l[5]])
+		for _, r := range bmtRowRE.FindAllStringSubmatch(page[l[0]:end], -1) {
+			name := strings.TrimSpace(html.UnescapeString(r[1]))
+			if r[2] == "" || name == "Power" || strings.Contains(name, "Tiebreaker") {
+				continue
+			}
+			paper := strings.ReplaceAll(strings.ToLower(name), " ", "-")
+			out = append(out, National{Competition: "bmt", Year: y, Paper: paper, URL: base + r[2]})
+		}
 	}
 	return out
 }
