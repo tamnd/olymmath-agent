@@ -208,3 +208,29 @@ func TestImportLooseRemoved(t *testing.T) {
 		t.Errorf("a line with no reason: exit %d: %s", code, errs)
 	}
 }
+
+func TestNamesBlock(t *testing.T) {
+	cases := []struct {
+		text  string
+		block bool
+	}{
+		{"Find all n with n^2 | 2^n + 1. (British Mathematical Olympiad, 1991)", true},
+		{"(1997 Canadian Mathematical Olympiad) Prove that the sum is less than 1.", true},
+		{"(1984, 16th Canadian Mathematical Competition) Find all x.", true},
+		{"Example 3 (1994 Bulgarian Mathematical Olympiad) Let a, b, c be reals.", true},
+		{"(2003 German National Mathematical Olympiad) Prove the claim.", true},
+		{"(2016, Korean Mathematical Olympiad) Find the minimum.", true},
+		{"(1988 Federal German Mathematical Olympiad Problem) Starting from the given set, prove it.", false},
+		{"(2010 Canadian Mathematical Olympiad Qualifying Repêchage) Find all x.", false},
+		{"(2005 Balkan Mathematical Olympiad) Find all primes p.", false},
+		{"(BMO 2005) Find all primes p.", false},
+	}
+	for _, c := range cases {
+		if got := namesBlock(c.text, LinkOnly); got != c.block {
+			t.Errorf("namesBlock(%q) = %v", c.text, got)
+		}
+	}
+	if namesBlock(cases[0].text, []string{"bg-mo"}) {
+		t.Errorf("a name of a competition that is not in the block was read")
+	}
+}

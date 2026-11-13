@@ -82,6 +82,8 @@ var (
 	theoremRE = regexp.MustCompile(`^(?:Theorem|Lemma|Proposition|Corollary)\s+[0-9]{1,2}(?:\.[0-9]{1,3}){0,2}\b`)
 	// replyRE is a message of the translator at the end of a text, as "If you need the entire text in English, please let me know." or "(Note: The last sentence was a mix of French and English. I have corrected it.)".
 	replyRE = regexp.MustCompile(`(?i)\bplease let me know\b|\bif you need (?:the )?(?:entire|full|complete|whole) (?:text|translation)\b|\bI have (?:corrected|translated|kept)\b|\bI will provide the (?:English )?translation\b|\boutput the translation result\b|\bkeeping the original text's line breaks\b|\bis the original (?:French|Spanish|German|Chinese|Russian|Croatian|Dutch) text\b`)
+	// wordLeadRE is the mark of an example or a problem of a book with no point after its number, as "Example 3 Let", "Exercise 2.4 Find" or "Problem 5 (1994 Shortlist) Prove". A capital letter, a bracket or a formula must follow, so that "Example 5 asks" is kept.
+	wordLeadRE = regexp.MustCompile(`^\s*(?:\*\*)?(?i:example|exercise|problem)\s+([1-9][0-9]{0,3})(?:[.-][0-9]{1,3})*(?:\*\*)?\s+(\p{Lu}|\(|\$)`)
 	// tightLeadRE is a problem number glued to the text, as "3-There is" or "1.Let".
 	tightLeadRE = regexp.MustCompile(`^\s*([1-9][0-9]?)[-.]\p{Lu}\p{Ll}`)
 	// markRE is a problem mark inside a text: "Problem 2", "Task 3" or "p2." at the start of a line, or a bold "**3.**" or "**p14.**" anywhere. A row with such a mark after its start holds more than one problem. A post of a whole test often runs its problems on one line, as "... divided by $2024$ .**p14.** A right square pyramid ...".
@@ -247,6 +249,9 @@ func Clean(raw string) (string, string) {
 	} else if m := tightLeadRE.FindStringSubmatchIndex(text); m != nil {
 		lead, _ = strconv.Atoi(text[m[2]:m[3]])
 		text = strings.TrimSpace(text[m[3]+1:])
+	} else if m := wordLeadRE.FindStringSubmatchIndex(text); m != nil {
+		lead, _ = strconv.Atoi(text[m[2]:m[3]])
+		text = text[m[4]:]
 	} else if m := sectionRE.FindStringSubmatchIndex(text); m != nil {
 		lead, _ = strconv.Atoi(text[m[2]:m[3]])
 		text = text[m[4]:]
