@@ -31,6 +31,34 @@ var LooseSources = []string{"hf-ai-mo-aops", "hf-numina-olympiads", "hf-numinama
 // LinkOnly are the competitions whose texts the project only links (document 11). The loose import takes no row of them, and adds no row to a problem of them.
 var LinkOnly = []string{"au-amo", "in-rmo", "in-inmo", "uk-bmo1", "uk-bmo2", "kr-kmo", "kr-fkmo", "de-mo", "ca-cmo", "ca-cjmo", "bg-mo"}
 
+// linkOnlyName is the name of a link-only competition in a text, with the codes it stands for. A row of a derived dataset often names its competition only in a note of the source, as "(1994 British Mathematical Olympiad)", and its metadata names none, so the block of the codes does not see it. not is a name of another competition that the name is part of, as the Federal German olympiad or the qualifying round of the Canadian one.
+type linkOnlyName struct {
+	codes []string
+	name  *regexp.Regexp
+	not   *regexp.Regexp
+}
+
+// linkOnlyNames are the names of the competitions of LinkOnly. The short names, as BMO or CMO, are not read: they also stand for the Balkan olympiad and the Chinese one.
+var linkOnlyNames = []linkOnlyName{
+	{[]string{"uk-bmo1", "uk-bmo2"}, regexp.MustCompile(`(?i)\b(?:British|UK|United Kingdom) (?:Math(?:ematical|ematics)? )?Olympiad\b`), regexp.MustCompile(`(?i)Olympiad for Girls`)},
+	{[]string{"ca-cmo", "ca-cjmo"}, regexp.MustCompile(`(?i)\bCanadian (?:Junior )?(?:Math(?:ematical|ematics)? )?(?:Olympiad|Competition)\b`), regexp.MustCompile(`(?i)Qualifying|Repêchage`)},
+	{[]string{"bg-mo"}, regexp.MustCompile(`(?i)\bBulgarian? (?:National )?(?:Math(?:ematical|ematics)? )?Olympiad\b|\bBulgarian Mathematical Competition\b`), nil},
+	{[]string{"au-amo"}, regexp.MustCompile(`(?i)\bAustralian (?:Math(?:ematical|ematics)? )?Olympiad\b`), nil},
+	{[]string{"de-mo"}, regexp.MustCompile(`(?i)\bGerman (?:National )?(?:Math(?:ematical|ematics)? )?Olympiad\b`), regexp.MustCompile(`(?i)\b(?:Federal|West) German`)},
+	{[]string{"in-inmo", "in-rmo"}, regexp.MustCompile(`(?i)\bIndian? (?:National|Regional) (?:Math(?:ematical|ematics)? )?Olympiad\b`), nil},
+	{[]string{"kr-kmo", "kr-fkmo"}, regexp.MustCompile(`(?i)\bKorean? (?:National )?(?:Math(?:ematical|ematics)? )?Olympiad\b`), nil},
+}
+
+// namesBlock reports whether a text names a competition of block.
+func namesBlock(text string, block []string) bool {
+	for _, n := range linkOnlyNames {
+		if slices.ContainsFunc(n.codes, func(c string) bool { return slices.Contains(block, c) }) && n.name.MatchString(text) && (n.not == nil || !n.not.MatchString(text)) {
+			return true
+		}
+	}
+	return false
+}
+
 // NuminaLabels are the labels of the olympiad rows of hf-numinamath-1-5. Its other rows come from school sets and synthetic sets.
 var NuminaLabels = []string{"numina:olympiads", "numina:aops_forum", "numina:amc_aime"}
 
@@ -484,6 +512,9 @@ func (r *looseReader) finish(newAccept func() func(string) bool) {
 // check reads the text of a pending row. It gives the row, or nil and the reason why the text is not one clear problem.
 func (r *looseReader) check(pr pendingLoose, accept func(string) bool) (*looseRow, string) {
 	row, comp, src, capture := pr.row, pr.comp, pr.src, pr.capture
+	if namesBlock(row.Statement, r.block) {
+		return nil, "names a link-only competition"
+	}
 	text, why := loose.Clean(row.Statement)
 	if why != "" {
 		return nil, why
