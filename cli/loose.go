@@ -106,29 +106,10 @@ func runImportLoose(env Env, args []string) int {
 	if _, err := site.NewMarkup(nil); err != nil {
 		return fail(err)
 	}
-	newAccept := func() func(string) bool {
-		mk, _ := site.NewMarkup(nil)
-		return func(t string) bool {
-			_, errs := mk.HTML(t)
-			for _, e := range errs {
-				if !errors.Is(e, site.ErrFigure) {
-					return false
-				}
-			}
-			return true
-		}
-	}
-	r := &looseReader{corpus: corpus, al: al, located: *located, labels: strings.Split(*labels, ","), block: strings.Split(*block, ","), thisYear: time.Now().Year(), dropped: map[string]int{}}
-	r.used = map[string]bool{}
-	if r.removed, err = loadRemoved(*root); err != nil {
+	newAccept := newTeXCheck
+	r, err := newLooseReader(*root, corpus, al, *located, strings.Split(*labels, ","), strings.Split(*block, ","))
+	if err != nil {
 		return fail(err)
-	}
-	for _, p := range corpus.All() {
-		for _, s := range p.Statements {
-			if s.Capture != "" {
-				r.used[s.Capture] = true
-			}
-		}
 	}
 	for _, src := range strings.Split(*sources, ",") {
 		if err := seed.Read(*dir, src, r.add); err != nil {
@@ -394,10 +375,44 @@ type looseReader struct {
 	// removed are the rows that a review took out of the content (registers/loose-removed.tsv).
 	removed map[string]bool
 
+	// last is the reason of the last row that the reader dropped.
+	last string
+
 	pending                 []pendingLoose
 	rows                    []looseRow
 	read, already, droppedN int
 	dropped                 map[string]int
+}
+
+// newTeXCheck gives a check that the TeX of a text renders, with no error but a lost figure. Each check has its own markup, because a markup is not safe for two workers at once.
+func newTeXCheck() func(string) bool {
+	mk, _ := site.NewMarkup(nil)
+	return func(t string) bool {
+		_, errs := mk.HTML(t)
+		for _, e := range errs {
+			if !errors.Is(e, site.ErrFigure) {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+// newLooseReader gives a reader for the loose import. It knows the rows that a record already holds (by the capture of a statement) and the rows that a review removed.
+func newLooseReader(root string, corpus *content.Corpus, al *seed.Aliases, located bool, labels, block []string) (*looseReader, error) {
+	r := &looseReader{corpus: corpus, al: al, located: located, labels: labels, block: block, thisYear: time.Now().Year(), dropped: map[string]int{}, used: map[string]bool{}}
+	var err error
+	if r.removed, err = loadRemoved(root); err != nil {
+		return nil, err
+	}
+	for _, p := range corpus.All() {
+		for _, s := range p.Statements {
+			if s.Capture != "" {
+				r.used[s.Capture] = true
+			}
+		}
+	}
+	return r, nil
 }
 
 // RemovedFile lists the rows that a review took out of the content: the capture and the reason, separated by a tab. A loose problem that is removed leaves no capture, so without this file the next batch would bring its row back.
@@ -427,6 +442,7 @@ func loadRemoved(root string) (map[string]bool, error) {
 }
 
 func (r *looseReader) drop(reason string) error {
+	r.last = reason
 	r.dropped[reason]++
 	r.droppedN++
 	return nil
