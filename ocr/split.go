@@ -23,8 +23,8 @@ const words = `Problem|Problema|Problème|Probleme|Aufgabe|Zadanie|Zadatak|За�
 // num is the number of a problem: one or two digits. The digits can be Western, Eastern Arabic or Persian, as in the Iranian papers, where the problems are **۱.** to **۶.**
 const num = `([0-9\x{0660}-\x{0669}\x{06F0}-\x{06F9}]{1,2})`
 
-// boldRE is a problem number in bold at the start of a line, as the prompt asks: **1.** or **Problem 1.** The label before the number can be any words, as in **IMO TST 4.**, because the number is in bold and the bold ends after it. A dash can follow the point, as in **1.-**, the mark of the Spanish papers.
-var boldRE = regexp.MustCompile(`^\*\*\s*(?:\pL[\pL ]{0,23}\s)?` + num + `\s*(?:[.:)]-?)?\s*\*\*\s*(?:[.:]-?)?\s*`)
+// boldRE is a problem number in bold at the start of a line, as the prompt asks: **1.** or **Problem 1.** The label before the number can be any words, as in **IMO TST 4.**, because the number is in bold and the bold ends after it. A dash can follow the point, as in **1.-**, the mark of the Spanish papers, or take its place, as in **۱-** in some Iranian papers.
+var boldRE = regexp.MustCompile(`^\*\*\s*(?:\pL[\pL ]{0,23}\s)?` + num + `\s*(?:[.:)]-?|-)?\s*\*\*\s*(?:[.:]-?)?\s*`)
 
 // wordRE is a problem number with a word and no bold: Problem 1. or Zadanie 1, or Problem 1 with the text after a space. The number can have the letter of its paper before it, as Problem T–1 or Problem I-2, or the sign №, as №1.
 var wordRE = regexp.MustCompile(`^(?:(?:` + words + `)\s+(?:\p{Lu}\s*[-–]\s*)?|№\s*)` + num + `(?:\s*[.:)]\s*|\s+|\s*$)`)
