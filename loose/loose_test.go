@@ -583,3 +583,24 @@ func TestDecideNeighbours(t *testing.T) {
 		}
 	}
 }
+
+func TestHasPosition(t *testing.T) {
+	cases := []struct {
+		in   string
+		want bool
+	}{
+		{"13th Putnam 1953 Problem A4 Using the power series for sin x and cos x, show that sin x > x - x 3 /6 for x > 0.", true},
+		{"IMO 1973 Problem B1 Determine all positive integers n.", true},
+		{"2nd Australian 1981 Problem A2 Find all triangles.", true},
+		{"41st IMO 2000 shortlist Problem A4 The function f on the non-negative integers takes non-negative values.", true},
+		{"VMO 1990 Question 3 Find all reals x.", true},
+		{"In 1953 Problem solvers met in a room. Find the number of handshakes.", false},
+		{"Find all n such that n^2 + 1953 is a square.", false},
+		{"(2004 China Western Mathematical Olympiad) Prove that $a+b>c$.", false},
+	}
+	for _, c := range cases {
+		if got := HasPosition(c.in); got != c.want {
+			t.Errorf("HasPosition(%q) = %v, want %v", c.in, got, c.want)
+		}
+	}
+}

@@ -519,6 +519,10 @@ func (r *looseReader) check(pr pendingLoose, accept func(string) bool) (*looseRo
 	if why != "" {
 		return nil, why
 	}
+	if loose.HasPosition(text) {
+		// The text names its competition, its year and its number, so the problem has a position. The number often restarts each day, and the formulas of these rows are often lost, so the row is left to the import by position.
+		return nil, loose.NamesPosition
+	}
 	mark := ""
 	if m, rest, ok := loose.PolishMark(text); ok {
 		// The text names its olympiad, round and number. The content has the final, round III, by position, so a problem of the final is left to the import by position. A problem of round I or II has no position, and the mark gives its competition and year.

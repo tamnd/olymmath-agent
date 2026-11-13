@@ -9,6 +9,15 @@ import (
 // polishRE is the mark of a problem of the Polish olympiad at the start of a text, as in "XXXVIII OM - I - Problem 11", "XXV - I - Problem 3", "LIX OM - III -Zadanie 2" or "I OM - B - Task 4": the olympiad in Roman numerals, the round and the number of the problem in the round.
 var polishRE = regexp.MustCompile(`^\s*([IVXLC]{1,8})\s+(?:OM\s+)?-\s*(III|II|I|B)\s*-\s*(?:Problem|Task|Zadanie)\s+([0-9]{1,2})\b\s*[.:]?`)
 
+// NamesPosition is the reason for a row whose text starts with its competition, its year and its number.
+const NamesPosition = "names its position"
+
+// positionRE is the heading of a problem in a compendium of olympiads at the start of a text, as in "13th Putnam 1953 Problem A4", "IMO 1973 Problem B1", "2nd Australian 1981 Problem A2" or "41st IMO 2000 shortlist Problem A4": an ordinal, the name of the competition, the year and the number of the problem. In such a compendium the number restarts each day, as A1 to A3 and B1 to B3 for the two days of the IMO.
+var positionRE = regexp.MustCompile(`^(?:[0-9]{1,2}(?:st|nd|rd|th)\s+)?[A-Z][A-Za-z.\- ]{1,40}?\s+(?:19|20)[0-9]{2}(?:\s+(?:shortlist|longlist))?\s+(?:Problem|Question)\s+[A-C]?[0-9]{1,2}\b`)
+
+// HasPosition tells if a text starts with the heading of a problem of a compendium, which names the competition, the year and the number of the problem.
+func HasPosition(text string) bool { return positionRE.MatchString(text) }
+
 // Mark is the mark of a problem of the Polish olympiad (spec 06.8).
 type Mark struct {
 	// Olympiad is the number of the olympiad, 1 for the olympiad of 1949/50.
