@@ -3,7 +3,6 @@ package ocr
 import (
 	"regexp"
 	"slices"
-	"strconv"
 	"strings"
 )
 
@@ -21,17 +20,20 @@ type Problem struct {
 // words are the words that can come before the number of a problem, in the languages of the papers.
 const words = `Problem|Problema|Problème|Probleme|Aufgabe|Zadanie|Zadatak|Задатак|Opgave|Uppgift|Oppgave|Úloha|Uloha|Задача|Feladat|Exercice|Question|Bài|Soru`
 
+// num is the number of a problem: one or two digits. The digits can be Western, Eastern Arabic or Persian, as in the Iranian papers, where the problems are **۱.** to **۶.**
+const num = `([0-9\x{0660}-\x{0669}\x{06F0}-\x{06F9}]{1,2})`
+
 // boldRE is a problem number in bold at the start of a line, as the prompt asks: **1.** or **Problem 1.** The label before the number can be any words, as in **IMO TST 4.**, because the number is in bold and the bold ends after it. A dash can follow the point, as in **1.-**, the mark of the Spanish papers.
-var boldRE = regexp.MustCompile(`^\*\*\s*(?:\pL[\pL ]{0,23}\s)?([0-9]{1,2})\s*(?:[.:)]-?)?\s*\*\*\s*(?:[.:]-?)?\s*`)
+var boldRE = regexp.MustCompile(`^\*\*\s*(?:\pL[\pL ]{0,23}\s)?` + num + `\s*(?:[.:)]-?)?\s*\*\*\s*(?:[.:]-?)?\s*`)
 
 // wordRE is a problem number with a word and no bold: Problem 1. or Zadanie 1, or Problem 1 with the text after a space. The number can have the letter of its paper before it, as Problem T–1 or Problem I-2, or the sign №, as №1.
-var wordRE = regexp.MustCompile(`^(?:(?:` + words + `)\s+(?:\p{Lu}\s*[-–]\s*)?|№\s*)([0-9]{1,2})(?:\s*[.:)]\s*|\s+|\s*$)`)
+var wordRE = regexp.MustCompile(`^(?:(?:` + words + `)\s+(?:\p{Lu}\s*[-–]\s*)?|№\s*)` + num + `(?:\s*[.:)]\s*|\s+|\s*$)`)
 
 // bareRE is a bare number at the start of a line: 1. or 1.- as in the Spanish papers.
-var bareRE = regexp.MustCompile(`^([0-9]{1,2})[.)]-?\s+`)
+var bareRE = regexp.MustCompile(`^` + num + `[.)]-?\s+`)
 
 // letterRE is a number with a capital letter before it, at the start of a line, as A1. or **B2.** in a paper whose problems are A1 to A4 and B1 to B4. The letter names the paper, so -paper gives the positions.
-var letterRE = regexp.MustCompile(`^(?:\*\*)?\s*\p{Lu}([0-9]{1,2})(?:\s*[.:)]\s*(?:\*\*)?|\s*\*\*\s*[.:]?)\s*`)
+var letterRE = regexp.MustCompile(`^(?:\*\*)?\s*\p{Lu}` + num + `(?:\s*[.:)]\s*(?:\*\*)?|\s*\*\*\s*[.:]?)\s*`)
 
 // endRE is a line that ends the problem before it: a solution, an answer, a hint or a note to the marker. The prompt asks for a heading there, and this catches the answers that do not obey.
 var endRE = regexp.MustCompile(`(?i)^(?:\*\*|\*|_)?\s*(?:solution|answer|hint|rozwiązanie|odpowiedź|lösung|antwort|řešení|riešenie|решение|ответ|rješenje|решење|megoldás|soluzione|solución|solução|lời giải|çözüm)\b`)
@@ -70,7 +72,7 @@ func split(pages []Page, sequence bool) []Problem {
 				continue
 			}
 			if m := re.FindStringSubmatchIndex(t); m != nil {
-				n, _ := strconv.Atoi(t[m[2]:m[3]])
+				n := atoi(t[m[2]:m[3]])
 				end()
 				if sequence {
 					n = len(out) + 1
@@ -90,6 +92,22 @@ func split(pages []Page, sequence bool) []Problem {
 	end()
 	slices.SortStableFunc(out, func(a, b Problem) int { return a.Number - b.Number })
 	return out
+}
+
+// atoi reads a number of Western, Eastern Arabic or Persian digits.
+func atoi(s string) int {
+	n := 0
+	for _, r := range s {
+		switch {
+		case r >= '0' && r <= '9':
+			n = 10*n + int(r-'0')
+		case r >= '\u0660' && r <= '\u0669':
+			n = 10*n + int(r-'\u0660')
+		case r >= '\u06F0' && r <= '\u06F9':
+			n = 10*n + int(r-'\u06F0')
+		}
+	}
+	return n
 }
 
 // pick gives the marker of the text: bold numbers when the text has them, or else numbers with a word, or else bare numbers, or else numbers with a letter.

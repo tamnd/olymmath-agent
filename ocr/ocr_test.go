@@ -94,6 +94,14 @@ func TestSplit(t *testing.T) {
 		t.Errorf("bare numbers with a dash: %+v", got)
 	}
 
+	persian := []Page{{N: 1, Text: "# روز دوم\n**۴.** فرض کنید $C$ یک دایره باشد.\n\n**۵.** در خانه\u200cهای یک جدول $n\\times m$ اعداد نوشته شده است.\n**۱۲.** مسئلهٔ دوازدهم."}}
+	if got := Split(persian); len(got) != 3 || got[0].Number != 4 || got[0].Text != "فرض کنید $C$ یک دایره باشد." || got[1].Number != 5 || got[2].Number != 12 {
+		t.Errorf("Persian digits: %+v", got)
+	}
+	if got := Split([]Page{{N: 1, Text: "٣. أثبت أن $a<b$.\n٤. أوجد $n$."}}); len(got) != 2 || got[0].Number != 3 || got[1].Text != "أوجد $n$." {
+		t.Errorf("Eastern Arabic digits: %+v", got)
+	}
+
 	letters := []Page{{N: 2, Text: "# 2022 PAPER A: PROBLEMS\n**A1.** Let $ABCD$ be a unit square here.\n\nA2. Let $n$ be a positive integer there.\n**A3**. Show that $f$ has two roots."}}
 	if got := Split(letters); len(got) != 3 || got[0].Number != 1 || got[0].Text != "Let $ABCD$ be a unit square here." || got[1].Text != "Let $n$ be a positive integer there." || got[2].Number != 3 {
 		t.Errorf("letters: %+v", got)
