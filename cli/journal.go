@@ -48,7 +48,7 @@ func runJournal(env Env, args []string) int {
 	from := fs.Int("from", 0, "the first year")
 	to := fs.Int("to", time.Now().Year(), "the last year")
 	dry := fs.Bool("dry", false, "print the plan and write no file")
-	scans := fs.String("scans", "", "get the PDF of each issue that the text lane cannot read (a scan, or a text with no number) and write a TSV line for it to this file: year, volume, number, month, PDF link and the hash of the PDF in the store. It writes no record")
+	scans := fs.String("scans", "", "get the PDF of each issue that the text lane cannot read (a scan, a text layer that is not readable, or a text with no number) and write a TSV line for it to this file: year, volume, number, month, PDF link and the hash of the PDF in the store. It writes no record")
 	marks := fs.String("marks", "", "add the problems of this TSV file of numbers that a model read from the page images: year, volume, number, month, PDF link, problem number and page. It needs no network")
 	extraction := fs.String("extraction", "", "the model that read the numbers of -marks, as vision/claude@2.1.323 (claude-opus-5-5)")
 	pos, err := parseMixed(fs, args)
@@ -192,7 +192,7 @@ func journalIssue(ctx context.Context, fc *fetch.Client, id string, j archive.Jo
 	return marks, pdf, hash, nil
 }
 
-// journalScan gets the PDF of an issue that the text lane cannot read: a scan, or a PDF whose text layer gives no number. It gives the TSV line of the issue for the vision lane, or "" when the text lane reads the issue.
+// journalScan gets the PDF of an issue that the text lane cannot read: a scan, a PDF whose text layer is not readable, or a PDF whose text gives no number. It gives the TSV line of the issue for the vision lane, or "" when the text lane reads the issue.
 func journalScan(ctx context.Context, fc *fetch.Client, id string, j archive.Journal, is *archive.Issue) (string, error) {
 	var pdf, hash string
 	var err error
@@ -203,7 +203,7 @@ func journalScan(ctx context.Context, fc *fetch.Client, id string, j archive.Jou
 		switch {
 		case err == nil:
 			return "", nil
-		case errors.Is(err, errNoNumbers):
+		case errors.Is(err, errNoNumbers), errors.Is(err, official.ErrNoText):
 			err = nil
 		}
 	}
