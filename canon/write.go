@@ -33,7 +33,7 @@ type outStatement struct {
 	Origin  string `yaml:"origin"`
 	Zone    string `yaml:"zone"`
 	Kind    string `yaml:"kind"`
-	// Extraction and Confidence are set for a text that a model read from a scan.
+	// Extraction and Confidence are set for a text that a model read from a scan. A link with no text can have an extraction too: it tells which model read the number and the page from the scan.
 	Extraction string  `yaml:"extraction,omitempty"`
 	Confidence float64 `yaml:"confidence,omitempty"`
 }
@@ -462,6 +462,18 @@ func Trace(file []byte, id, official, rule string) ([]byte, error) {
 
 // RenderLink writes the file of a new problem whose only statement is a link with no text to page of the official paper of c. rule is the rule that makes the link canonical. A problem such as this comes from a paper whose text the content may not hold. The problem appears at at, its primary appearance, and at each locator of also.
 func RenderLink(at, tag string, c *Candidate, page int, rule string, also ...string) ([]byte, error) {
+	return renderLink(at, tag, c, page, rule, "", also)
+}
+
+// RenderReadLink is RenderLink for a link whose number and page a model read from the page image of a scan. The statement keeps the extraction, as vision/claude@2.1.323 (claude-opus-5-5), and it has no text.
+func RenderReadLink(at, tag string, c *Candidate, page int, rule, extraction string, also ...string) ([]byte, error) {
+	if extraction == "" {
+		return nil, fmt.Errorf("%s: a number read from a scan needs its extraction", at)
+	}
+	return renderLink(at, tag, c, page, rule, extraction, also)
+}
+
+func renderLink(at, tag string, c *Candidate, page int, rule, extraction string, also []string) ([]byte, error) {
 	p := outProblem{Tag: tag, Kind: "problem"}
 	p.Appearances = []outAppearance{{At: at, Primary: true}}
 	for _, a := range also {
@@ -472,6 +484,7 @@ func RenderLink(at, tag string, c *Candidate, page int, rule string, also ...str
 	p.Status.Statement = "sourced"
 	s := statementOf("S1", c)
 	s.Page = page
+	s.Extraction = extraction
 	p.Statements = []outStatement{s}
 	var buf bytes.Buffer
 	buf.WriteString("---\n")
