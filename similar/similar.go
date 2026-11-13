@@ -182,59 +182,10 @@ func best(i int, words []string, vec map[string]float64, index map[string][]post
 
 // Nearest gives, for each query, the doc with the best score, or a Match with Doc -1 when no doc shares a word with the query. The weights of the words come from the docs only, so that a large set of queries does not change them, and only the docs are indexed.
 func Nearest(docs, queries []string) []Match {
-	df := map[string]int{}
-	tfs := make([]map[string]float64, len(docs))
-	for i, t := range docs {
-		tfs[i] = termFreq(t)
-		for w := range tfs[i] {
-			df[w]++
-		}
-	}
-	limit := max(len(docs)/10, 2)
-	weigh := func(tf map[string]float64, least int) map[string]float64 {
-		v := map[string]float64{}
-		var norm float64
-		for w, c := range tf {
-			if df[w] < least || df[w] > limit {
-				continue
-			}
-			x := (1 + math.Log(c)) * math.Log(float64(len(docs))/float64(df[w]))
-			v[w] = x
-			norm += x * x
-		}
-		norm = math.Sqrt(norm)
-		for w := range v {
-			v[w] /= norm
-		}
-		return v
-	}
-	index := map[string][]posting{}
-	for i, tf := range tfs {
-		v := weigh(tf, 1)
-		ws := make([]string, 0, len(v))
-		for w := range v {
-			ws = append(ws, w)
-		}
-		sort.Strings(ws)
-		for _, w := range ws {
-			index[w] = append(index[w], posting{i, v[w]})
-		}
-	}
+	s := NewIndex(docs, 1).Searcher()
 	out := make([]Match, len(queries))
 	for i, q := range queries {
-		score := map[int]float64{}
-		for w, x := range weigh(termFreq(q), 1) {
-			for _, p := range index[w] {
-				score[p.doc] += x * p.w
-			}
-		}
-		best := Match{Doc: -1}
-		for d, s := range score {
-			if s > best.Score || (s == best.Score && d < best.Doc) {
-				best = Match{d, s}
-			}
-		}
-		out[i] = best
+		out[i], _ = s.Nearest(q, 0)
 	}
 	return out
 }
