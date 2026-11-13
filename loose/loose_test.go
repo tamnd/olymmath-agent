@@ -149,6 +149,13 @@ func TestClean(t *testing.T) {
 		{"the next round with a comma", "Find all real $x$ with $x^2 = 2x + 3$ and $x > 0$.\n\nSchool - written part of the 1st round, category B is held", "Find all real $x$ with $x^2 = 2x + 3$ and $x > 0$.", ""},
 		{"a category in the problem", "Each of the 30 students takes place in one category of a contest: A, B or C.\n\nIn category A each student is held to solve 3 problems. Prove that some category has at least 10 students.", "Each of the 30 students takes place in one category of a contest: A, B or C.\n\nIn category A each student is held to solve 3 problems. Prove that some category has at least 10 students.", ""},
 		{"a slash fraction", "How many solutions in natural numbers does the equation $\\left[{ }^{x} /{ }_{10}\\right]=\\left[{ }^{x} / 11\\right]+1$ have?", "How many solutions in natural numbers does the equation $\\left[x / 10\\right]=\\left[x / 11\\right]+1$ have?", ""},
+		{"a round label", "B3. Inside a square $ABCD$ lies a point $P$, and $E$ is the midpoint of the side $CD$. Given $AP=BP=EP=10$, what is the area of the square $ABCD$?", "Inside a square $ABCD$ lies a point $P$, and $E$ is the midpoint of the side $CD$. Given $AP=BP=EP=10$, what is the area of the square $ABCD$?", ""},
+		{"a round label with a bracket", "Z2) In a class, there are 23 students, each of whom has chosen German or French. How many girls have chosen French if 10 of the students are girls?", "In a class, there are 23 students, each of whom has chosen German or French. How many girls have chosen French if 10 of the students are girls?", ""},
+		{"a point named A1", "A1 B1 C1 is the triangle of the feet of the altitudes of $ABC$. Prove that the altitudes of $ABC$ bisect its angles.", "A1 B1 C1 is the triangle of the feet of the altitudes of $ABC$. Prove that the altitudes of $ABC$ bisect its angles.", ""},
+		{"a theorem of a book", "Theorem 5.1.2 (Five Color Theorem) Every planar graph is 5-colorable, that is, its vertices can be colored with five colors so that adjacent vertices differ.", "", Theorem},
+		{"a lemma of a book", "Lemma 12.4.10 If $H$ is planar, then $\\mathcal{H}$ has the Erdos-Posa property for every finite family of graphs that we consider here.", "", Theorem},
+		{"a problem about a theorem", "Prove Theorem 2 of Euler: for a convex polyhedron with $V$ vertices, $E$ edges and $F$ faces, $V-E+F=2$.", "Prove Theorem 2 of Euler: for a convex polyhedron with $V$ vertices, $E$ edges and $F$ faces, $V-E+F=2$.", ""},
+		{"a message of the translator", "Let $ABC$ be a triangle. Let $M$ be a point on $[BC]$ and $N$ a point on the circumcircle of $ABC$ such that $(AM)$ and $(AN)$ are isogonal. Show that $AM \\cdot AN = bc$.\n\n(Note: The second part is the original French text, which is kept as requested. If you need the entire text in English, please let me know.)", "Let $ABC$ be a triangle. Let $M$ be a point on $[BC]$ and $N$ a point on the circumcircle of $ABC$ such that $(AM)$ and $(AN)$ are isogonal. Show that $AM \\cdot AN = bc$.", ""},
 		{"bbcode", "Find all [i]good[/i] numbers $n$ such that <u>every</u> divisor $d$ of $n$ has $d+1$ prime.[list][*]$n$ is odd.[/list]", "Find all *good* numbers $n$ such that every divisor $d$ of $n$ has $d+1$ prime.\n\n- $n$ is odd.", ""},
 	}
 	for _, c := range cases {
@@ -171,6 +178,11 @@ func TestLang(t *testing.T) {
 		{"求所有正整数 $n$，使得 $n^2+1$ 整除 $n!$。", "Chinese", "zh"},
 		{"$x^2+y^2=z^2$, $x,y,z \\in \\mathbb{Z}$?", "en", "en"},
 		{"Let $ABC$ be a triangle and let $M$ be the midpoint of $BC$. Prove that the lines are concurrent.", "Spanish", "en"},
+		{"Se considera la inecuación $$ |x-1|<a x $$ donde $a$ es un parámetro real. a) Discutir la inecuación según los valores de $a$. b) Caracterizar los valores de $a$ para los cuales la inecuación tiene exactamente DOS soluciones enteras.", "English", ""},
+		{"Binnen een vierkant $A B C D$ ligt een punt $P$. $E$ is het midden van de zijde $C D$. Gegeven is: $A P=B P=E P=10$. Wat is de oppervlakte van vierkant $A B C D$?", "English", ""},
+		{"Neka je $n$ prirodan broj. Odredi sve prirodne brojeve $k$ za koje je broj $n^2+k$ djeljiv s $n+1$ i koji su manji od $n$.", "English", ""},
+		{"Neka je $n$ prirodan broj. Odredi sve prirodne brojeve $k$ za koje je broj $n^2+k$ djeljiv s $n+1$ i koji su manji od $n$.", "", ""},
+		{"Find $x$ if $\\frac{x^2-1}{x+1} = 3$ and $x \\neq -1$ in $\\mathbb{R}$.", "English", "en"},
 	}
 	for _, c := range cases {
 		if got := Lang(c.text, c.named); got != c.want {
