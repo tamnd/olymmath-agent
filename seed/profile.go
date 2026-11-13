@@ -225,6 +225,25 @@ var Profiles = map[string]Profile{
 			}, text != ""
 		},
 	},
+	// AoPS-Instruct has two configs. The rows of 2024_not_decontaminated keep the AoPS post as original_question, and a model rewrote it as rewritten_question. The rows of the default config hold only the chat messages, whose first user message is the rewritten question. The seed row takes the post when there is one.
+	"hf-aops-instruct": {
+		Columns: []string{"original_question", "rewritten_question", "messages.content", "messages.role"},
+		Map: func(r Record) (Row, bool) {
+			st := strings.TrimSpace(r.Get("original_question"))
+			if st == "" {
+				st = strings.TrimSpace(r.Get("rewritten_question"))
+			}
+			if st == "" {
+				for i, role := range r["messages.role"] {
+					if role == "user" && i < len(r["messages.content"]) {
+						st = strings.TrimSpace(r["messages.content"][i])
+						break
+					}
+				}
+			}
+			return Row{Lang: "en", Statement: st}, st != ""
+		},
+	},
 	"hf-omni-math": {
 		Columns: []string{"problem", "answer", "solution", "source", "difficulty"},
 		Map: func(r Record) (Row, bool) {

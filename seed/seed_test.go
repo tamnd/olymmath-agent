@@ -200,6 +200,16 @@ func TestGenericYearPaper(t *testing.T) {
 
 func TestProfiles(t *testing.T) {
 	r := Record{"metadata.path": {"Contest Collections/2023 Contests/2023 Germany Team Selection Test/3107329.json"}, "problem": {"x"}}
+	ai := Profiles["hf-aops-instruct"]
+	if row, ok := ai.Map(Record{"original_question": {"The post."}, "rewritten_question": {"The rewritten post."}}); !ok || row.Statement != "The post." {
+		t.Errorf("aops-instruct 2024: %+v %v", row, ok)
+	}
+	if row, ok := ai.Map(Record{"messages.role": {"system", "user", "assistant"}, "messages.content": {"Be brief.", "The question.", "The answer."}}); !ok || row.Statement != "The question." {
+		t.Errorf("aops-instruct default: %+v %v", row, ok)
+	}
+	if _, ok := ai.Map(Record{"messages.role": {"assistant"}, "messages.content": {"x"}}); ok {
+		t.Error("aops-instruct: a row with no user message")
+	}
 	row, ok := Profiles["hf-ai-mo-aops"].Map(r)
 	if !ok || row.Year != 2023 || row.Labels[0] != "Germany Team Selection Test" || row.Ref != "aops-topic:3107329" {
 		t.Errorf("aops row %+v", row)
