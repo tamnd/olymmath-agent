@@ -1,18 +1,24 @@
 package cli
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/tamnd/olymmath-agent/archive"
 	"github.com/tamnd/olymmath-agent/canon"
 	"github.com/tamnd/olymmath-agent/content"
+	"github.com/tamnd/olymmath-agent/fetch"
 	"github.com/tamnd/olymmath-agent/official"
 	"github.com/tamnd/olymmath-agent/review"
 	"github.com/tamnd/olymmath-agent/seed"
+	"github.com/tamnd/olymmath-agent/store"
 )
 
 func TestWriteJournal(t *testing.T) {
@@ -45,6 +51,79 @@ func TestWriteJournal(t *testing.T) {
 	}
 	if code, _, _ := run("journal", "-content", root, "nojournal"); code != ExitUsage {
 		t.Errorf("an unknown journal gave %d", code)
+	}
+}
+
+func TestJournalMarks(t *testing.T) {
+	root := copyContent(t)
+	corpus, f := content.Load(root)
+	if f.Errors() > 0 {
+		t.Fatalf("the test content has %d errors", f.Errors())
+	}
+	j := archive.Journal{Comp: "imo", Name: func(i archive.Issue, m archive.Mark) string {
+		return fmt.Sprintf("A journal Vol. %d, No. %d (%s %d), problem %s", i.Volume, i.Number, i.Month, i.Year, m.Label)
+	}}
+	dir := t.TempDir()
+	write := func(name, body string) string {
+		file := filepath.Join(dir, name)
+		if err := os.WriteFile(file, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return file
+	}
+	pdf := "https://example.org/v1n2.pdf"
+	// Problem 14 is not there, so the run has a gap. The numbers of an issue need not be in order.
+	good := write("good.tsv", "# year, volume, number, month, PDF, problem, page\n"+
+		"2031\t1\t1\tJan\thttps://example.org/v1n1.pdf\t11\t3\n"+
+		"2031\t1\t1\tJan\thttps://example.org/v1n1.pdf\t12\t3\n"+
+		"2031\t1\t2\tFeb\t"+pdf+"\t15\t5\n"+
+		"2031\t1\t2\tFeb\t"+pdf+"\t13\t4\n")
+	var out, errs strings.Builder
+	env := Env{Stdout: &out, Stderr: &errs}
+	if code := journalMarks(env, root, corpus, "evanchen", j, good, "vision/claude@2.1.323 (claude-opus-5-5)", false); code != ExitOK {
+		t.Fatalf("om journal -marks gave %d: %s", code, errs.String())
+	}
+	if !strings.Contains(errs.String(), "vol. 1 no. 2: no number from 14 to 14") || !strings.Contains(out.String(), "4 numbers, 0 already in the content, 1 gaps, 4 new problems") {
+		t.Errorf("the run told:\n%s%s", out.String(), errs.String())
+	}
+	b, err := os.ReadFile(filepath.Join(root, "problems", "imo", "2031", "p15.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{pdf, "page: 5", "A journal Vol. 1, No. 2 (Feb 2031), problem 15", "extraction: vision/claude@2.1.323 (claude-opus-5-5)", "zone: Z3", "statement: sourced"} {
+		if !strings.Contains(string(b), want) {
+			t.Errorf("the record has no %q:\n%s", want, b)
+		}
+	}
+	corpus, f = content.Load(root)
+	if f.Errors() > 0 {
+		t.Fatalf("the content has %d errors after om journal -marks: %v", f.Errors(), f)
+	}
+	if p := official.Owners(corpus)["imo/2031/p15"]; p == nil || strings.TrimSpace(p.Statement) != "" {
+		t.Errorf("the link-only record is missing or has a text: %+v", p)
+	}
+	// A second run finds the records and adds nothing.
+	out.Reset()
+	if code := journalMarks(env, root, corpus, "evanchen", j, good, "vision/claude@2.1.323 (claude-opus-5-5)", false); code != ExitOK || !strings.Contains(out.String(), "4 already in the content") {
+		t.Errorf("the second run gave %d: %s", code, out.String())
+	}
+	// A number on two pages, or a number below the numbers of an earlier issue, stops the run.
+	for _, body := range []string{
+		"2032\t2\t1\tJan\t" + pdf + "\t21\t3\n2032\t2\t1\tJan\t" + pdf + "\t21\t4\n",
+		"2032\t2\t1\tJan\t" + pdf + "\t21\t3\n2032\t2\t2\tFeb\t" + pdf + "\t20\t4\n",
+	} {
+		errs.Reset()
+		if code := journalMarks(env, root, corpus, "evanchen", j, write("dup.tsv", body), "vision/x@1", false); code != ExitFindings || !strings.Contains(errs.String(), "duplicate") {
+			t.Errorf("a duplicate gave %d: %s", code, errs.String())
+		}
+	}
+	for _, body := range []string{"2032\t2\t1\tJan\t" + pdf + "\t21\n", "2032\t2\t1\tJan\t" + pdf + "\t21\t0\n", "2032\t2\t1\tJan\tftp://x\t21\t3\n", "2032\t2\t1\tJan\t" + pdf + "\t2a\t3\n"} {
+		if code := journalMarks(env, root, corpus, "evanchen", j, write("bad.tsv", body), "vision/x@1", false); code != ExitUsage {
+			t.Errorf("the bad line %q gave %d", body, code)
+		}
+	}
+	if code, _, _ := run("journal", "-content", root, "-marks", good, "crux"); code != ExitUsage {
+		t.Errorf("-marks with no -extraction gave %d", code)
 	}
 }
 
@@ -135,5 +214,52 @@ func TestLinks(t *testing.T) {
 	}
 	if code, out, _ := run("links", "-content", root, "-seed", dir, "-appear", "evanchen"); code != ExitOK || !strings.Contains(out, "0 appearances added") {
 		t.Errorf("a second run of -appear gave %d %q", code, out)
+	}
+}
+
+func TestJournalScan(t *testing.T) {
+	pages := map[string]string{
+		"/issue/1":    `<a class='crux-download-link' href='https://example.org/v1n1.pdf'>Download</a>`,
+		"/v1n1.pdf":   "%PDF-1.4 a scan",
+		"/issue/2":    `<p>no link</p>`,
+		"/robots.txt": "User-agent: *\nAllow: /\n",
+	}
+	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p, ok := pages[r.URL.Path]
+		if !ok {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		_, _ = io.WriteString(w, p)
+	})
+	st, err := store.Open(t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fc := fetch.New(st)
+	fc.Delay = 0
+	fc.HTTP = &http.Client{Transport: prSite{h}}
+	j := archive.Journals["crux"]
+	is := archive.Issue{Year: 1975, Volume: 1, Number: 1, Month: "Mar", Page: "https://example.org/issue/1"}
+	row, err := journalScan(context.Background(), fc, "crux", j, &is)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := strings.Split(strings.TrimSuffix(row, "\n"), "\t")
+	if len(f) != 6 || strings.Join(f[:5], " ") != "1975 1 1 Mar https://example.org/v1n1.pdf" || len(f[5]) != 64 {
+		t.Fatalf("row %q", row)
+	}
+	rc, err := st.Get(context.Background(), f[5])
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := io.ReadAll(rc)
+	_ = rc.Close()
+	if string(b) != "%PDF-1.4 a scan" {
+		t.Errorf("the store has %q", b)
+	}
+	is = archive.Issue{Year: 1975, Volume: 1, Number: 2, Month: "Apr", Page: "https://example.org/issue/2"}
+	if _, err := journalScan(context.Background(), fc, "crux", j, &is); err == nil {
+		t.Error("an issue page with no PDF link gave no error")
 	}
 }
