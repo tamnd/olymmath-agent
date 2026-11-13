@@ -15,6 +15,7 @@ olymmath/
 │   ├── people.yaml           authors, reviewers, graders (opt-in)
 │   ├── aliases.tsv           merged tags: old → new
 │   ├── redirects.tsv         old locator → new locator
+│   ├── gaps.yaml             the reason of expected positions that can get no record: link-only, robots, no-source (14.3)
 │   ├── loose-removed.tsv     dataset rows that a review took out of the content: capture → reason (06.8)
 │   └── tags.reg              every tag ever minted, with the commit
 ├── problems/

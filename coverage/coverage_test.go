@@ -78,7 +78,7 @@ func TestBuild(t *testing.T) {
 		{Source: "b", Labels: []string{"Baltic Way"}, Year: 2002, Statement: "x"},
 		{Source: "b", Labels: []string{"numina:cn_k12"}, Statement: "x"},
 	}
-	rep, err := Build(c, a, 2026, func(fn func(seed.Row) error) error {
+	rep, err := Build(c, a, nil, 2026, func(fn func(seed.Row) error) error {
 		for _, r := range rows {
 			if err := fn(r); err != nil {
 				return err
@@ -146,7 +146,7 @@ func TestBuildAlso(t *testing.T) {
 	if len(fs) > 0 {
 		t.Fatalf("load: %v", fs)
 	}
-	rep, err := Build(c, aliases(t, c, ""), 2026, func(func(seed.Row) error) error { return nil })
+	rep, err := Build(c, aliases(t, c, ""), nil, 2026, func(func(seed.Row) error) error { return nil })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestMeasurePapers(t *testing.T) {
 		"2021-fall-a": {"p1": true},
 	}
 	seen := map[string]int{"2001": 1, "2010b": 1, "2021-fall-a": 3}
-	out := measure(c, cand, seen, map[int]int{2010: 4}, 9, 2026)
+	out := measure(c, cand, seen, map[int]int{2010: 4}, 9, 2026, nil)
 	// Two years with one paper, 21 years with the papers a and b, and the two fall papers of 2021: 2 + 42 + 2 papers of 2 positions.
 	if out.Expected != 92 || out.Candidate != 3 || out.NoCandidate != 89 {
 		t.Errorf("expected %d, candidate %d, none %d", out.Expected, out.Candidate, out.NoCandidate)

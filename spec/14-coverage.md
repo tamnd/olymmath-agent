@@ -58,6 +58,14 @@ And for the open universe, by source: candidates seen, located, matched to an ex
 - the queue sizes (unknown competitions, unlocated candidates, review pairs, find-the-original);
 - the change since the last release.
 
+Some expected positions can get no record under the rules of the project. The gap register `registers/gaps.yaml` gives the reason for them. Each entry has a competition, years (a year or a range such as `1970-1999`; none is every year), positions (none is every position), a reason and a note with the evidence. The reasons are:
+
+- `link-only`: the rules say the project only links the competition, and the official site gives no list to link.
+- `robots`: robots.txt blocks the source.
+- `no-source`: no allowed source was found. A position with a seed candidate stays open, because the candidate is a source to check.
+
+A position with no record that no entry names is open. The allowed positions are the expected positions less the positions with one of these reasons. The report gives C0 against the expected positions and against the allowed positions ("C0 allowed"), for each competition, for all competitions and for the national competitions of tier 1 (`registers/site-tiers.yaml`). It lists each entry with the number of positions it names now. Two entries must not name the same position.
+
 ## 14.4 Targets by phase
 
 | Phase | C0 | C1 | C4 | C7 |
