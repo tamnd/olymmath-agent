@@ -130,6 +130,11 @@ var (
 	tailRE = regexp.MustCompile(`(?:\n\s*(?:\$\$\s*)?\*\s*\*\s*\*(?:\s*\$\$)?|\n\s*\n\s*\p{Lu}{2,}(?:[ \-]+\p{Lu}{2,})+)\s*$`)
 	// olympiadTailRE is the heading of an olympiad and the table of its problems by class and day that a book puts after the last problem of the olympiad, as "17th All-Union Olympiad, 1983 (Kishinev)" and "| Class | 1st day | 2nd day |". The heading has a year and no point, colon or question mark, so a table that a problem gives is kept.
 	olympiadTailRE = regexp.MustCompile(`(?is)\n\s*\n(?:\$\$\s*\\begin\{gathered\}\s*)?[^\n]*\bolympiad\b[^.:?]*?\b(?:19|20)[0-9]{2}\b[^.:?]*?\n\s*\n\s*\|\s*(?:class|racc|pass|grade)\b.*$`)
+	// roundTailRE is the note on the next round that the Czech and Slovak olympiad prints after the last problem of a round, as "The regional round of category B takes place on Tuesday, January 22, 2008 so that ..." or "School - written part of the 1st round, category C is held", with the rules of the round (the time, the points, the aids) after it. The note is in a paragraph of its own after the problem and names a category, so it is cut with everything after it. The verb ends the line or a date follows it, so a sentence of a problem such as "is held to solve" stays.
+	roundTailRE = regexp.MustCompile(`(?is)\n\s*\n[^\n?]{0,90}\bcategory\b[^\n?]{0,30}?\b(?:takes|will take|is|will be) (?:place|held)(?:[ \t]*(?:\n|$)|\s+on\b|,).*$`)
+	// slashFracRE is a fraction that the dataset wrote as a superscript, a slash and a subscript, as "{ }^{x} /{ }_{10}" for x/10, and slashTopRE the same with no subscript, as "{ }^{1} / m".
+	slashFracRE = regexp.MustCompile(`\{ \}\^\{([^{}]*)\}\s?/\s?\{ \}_\{([^{}]*)\}`)
+	slashTopRE  = regexp.MustCompile(`\{ \}\^\{([^{}]*)\}\s?/\s?`)
 	// pageRE is the number of a page that a book prints after the last problem of the page, as "388", alone in the last paragraph of a text. A number of four digits is most often a year, so it stays.
 	pageRE = regexp.MustCompile(`^[0-9]{1,3}$`)
 	// gradeRE is the grade or the points of a problem in the last paragraph of a text, as "(10-11 grades)", "(10th grade)" or "(7-8 pts)", once its "$" signs, "\\text" and braces are taken out.
@@ -239,7 +244,8 @@ func Clean(raw string) (string, string) {
 		text = text[m[4]:]
 	}
 	text = strings.TrimSpace(gradeLeadRE.ReplaceAllString(pointsRE.ReplaceAllString(text, ""), ""))
-	text = bookTail(strings.TrimSpace(tailRE.ReplaceAllString(olympiadTailRE.ReplaceAllString(firstCopy(text), ""), "")))
+	text = bookTail(strings.TrimSpace(tailRE.ReplaceAllString(olympiadTailRE.ReplaceAllString(roundTailRE.ReplaceAllString(firstCopy(text), ""), ""), "")))
+	text = slashTopRE.ReplaceAllString(slashFracRE.ReplaceAllString(text, "$1 / $2"), "$1 / ")
 	text = bookLead(text)
 	// A step of a solution and the mark of the compendium often follow a problem number, as in "5. Since ..." or "27. (BLR) Ten points ...", so they are read after the number is cut.
 	switch {
