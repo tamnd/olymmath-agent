@@ -98,6 +98,9 @@ func TestSplit(t *testing.T) {
 	if got := Split(persian); len(got) != 3 || got[0].Number != 4 || got[0].Text != "فرض کنید $C$ یک دایره باشد." || got[1].Number != 5 || got[2].Number != 12 {
 		t.Errorf("Persian digits: %+v", got)
 	}
+	if got := Split([]Page{{N: 1, Text: "**۱-** فرض کنید $n>2$.\n**۲.** مثلث $ABC$ مفروض است.\n**۳-** ثابت کنید."}}); len(got) != 3 || got[0].Text != "فرض کنید $n>2$." || got[2].Number != 3 {
+		t.Errorf("bold numbers with a dash and no point: %+v", got)
+	}
 	if got := Split([]Page{{N: 1, Text: "٣. أثبت أن $a<b$.\n٤. أوجد $n$."}}); len(got) != 2 || got[0].Number != 3 || got[1].Text != "أوجد $n$." {
 		t.Errorf("Eastern Arabic digits: %+v", got)
 	}
