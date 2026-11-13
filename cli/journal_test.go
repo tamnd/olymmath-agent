@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -262,4 +263,28 @@ func TestJournalScan(t *testing.T) {
 	if _, err := journalScan(context.Background(), fc, "crux", j, &is); err == nil {
 		t.Error("an issue page with no PDF link gave no error")
 	}
+
+	// An issue that is not a scan goes to the vision lane when its text layer is not readable.
+	if _, err := exec.LookPath("pdftotext"); err != nil {
+		t.Skip("no pdftotext")
+	}
+	pages["/issue/3"] = `<a class='crux-download-link' href='https://example.org/v31n1.pdf'>Download</a>`
+	pages["/v31n1.pdf"] = string(onePagePDF(`(\351\351\351\351\351\351\351\351) Tj`))
+	is = archive.Issue{Year: 2005, Volume: 31, Number: 1, Month: "Feb", Page: "https://example.org/issue/3"}
+	row, err = journalScan(context.Background(), fc, "crux", j, &is)
+	if err != nil || !strings.HasPrefix(row, "2005\t31\t1\tFeb\thttps://example.org/v31n1.pdf\t") {
+		t.Errorf("an unreadable text layer gave %q, %v", row, err)
+	}
+}
+
+// onePagePDF is a PDF of one page that shows text with a standard font in the WinAnsi encoding. pdftotext rebuilds the missing cross-reference table.
+func onePagePDF(text string) []byte {
+	stream := "BT /F1 12 Tf 72 720 Td " + text + " ET"
+	return []byte("%PDF-1.4\n" +
+		"1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n" +
+		"2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n" +
+		"3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>\nendobj\n" +
+		fmt.Sprintf("4 0 obj\n<< /Length %d >>\nstream\n%s\nendstream\nendobj\n", len(stream), stream) +
+		"5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n" +
+		"trailer\n<< /Root 1 0 R >>\n%%EOF\n")
 }
