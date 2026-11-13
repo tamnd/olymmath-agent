@@ -594,6 +594,8 @@ func TestHasPosition(t *testing.T) {
 		{"2nd Australian 1981 Problem A2 Find all triangles.", true},
 		{"41st IMO 2000 shortlist Problem A4 The function f on the non-negative integers takes non-negative values.", true},
 		{"VMO 1990 Question 3 Find all reals x.", true},
+		{"43rd IMO 2002 shortlist Problem G2 The sides of the triangle ABC subtend the same angles at the point F inside the triangle.", true},
+		{"IMO shortlist 1996 Problem N3 Find all positive integers n.", true},
 		{"In 1953 Problem solvers met in a room. Find the number of handshakes.", false},
 		{"Find all n such that n^2 + 1953 is a square.", false},
 		{"(2004 China Western Mathematical Olympiad) Prove that $a+b>c$.", false},
