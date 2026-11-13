@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +15,7 @@ import (
 	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/coverage"
 	"github.com/tamnd/olymmath-agent/fetch"
+	"github.com/tamnd/olymmath-agent/publish"
 	"github.com/tamnd/olymmath-agent/seed"
 )
 
@@ -177,7 +179,12 @@ func runCoverage(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om coverage: %v\n", err)
 		return ExitFailure
 	}
-	rep, err := coverage.Build(corpus, al, *year, func(fn func(seed.Row) error) error {
+	gaps, err := coverage.LoadGaps(*root, corpus)
+	if err != nil {
+		fmt.Fprintf(env.Stderr, "om coverage: %v\n", err)
+		return ExitFailure
+	}
+	rep, err := coverage.Build(corpus, al, gaps, *year, func(fn func(seed.Row) error) error {
 		for _, s := range sources {
 			if err := seed.Read(*dir, s, fn); err != nil {
 				return fmt.Errorf("%s: %w", s, err)
@@ -186,6 +193,19 @@ func runCoverage(env Env, args []string) int {
 		return nil
 	})
 	if err != nil {
+		fmt.Fprintf(env.Stderr, "om coverage: %v\n", err)
+		return ExitFailure
+	}
+	tiers, err := publish.LoadTiers(filepath.Join(*root, "registers", "site-tiers.yaml"))
+	switch {
+	case err == nil:
+		for _, c := range rep.Competitions {
+			cc := corpus.Competition(c.Code)
+			c.Tier1 = cc != nil && cc.Group == "national" && tiers.First(cc)
+		}
+		t1 := rep.Sum(func(c *coverage.Comp) bool { return c.Tier1 })
+		rep.Tier1 = &t1
+	case !errors.Is(err, os.ErrNotExist):
 		fmt.Fprintf(env.Stderr, "om coverage: %v\n", err)
 		return ExitFailure
 	}
@@ -219,5 +239,9 @@ func runCoverage(env Env, args []string) int {
 	}
 	t := rep.Totals
 	fmt.Fprintf(env.Stdout, "%d expected positions: %d with a record, %d with a candidate, %d with no candidate. %d unknown labels. The report is in %s.\n", t.Expected, t.C0, t.Candidate, t.NoCandidate, len(rep.Unknown), *out)
+	fmt.Fprintf(env.Stdout, "All: C0 %s, %d of %d allowed positions (C0 allowed %s).\n", coverage.Pct(t.C0, t.Expected), t.C0, t.Allowed(), coverage.Pct(t.C0, t.Allowed()))
+	if n := rep.Tier1; n != nil {
+		fmt.Fprintf(env.Stdout, "Tier 1 nationals: C0 %d of %d (%s), %d of %d allowed positions (C0 allowed %s). No record: %d link-only, %d robots.txt, %d no allowed source, %d open.\n", n.C0, n.Expected, coverage.Pct(n.C0, n.Expected), n.C0, n.Allowed(), coverage.Pct(n.C0, n.Allowed()), n.LinkOnly, n.Robots, n.NoSource, n.Open)
+	}
 	return ExitOK
 }

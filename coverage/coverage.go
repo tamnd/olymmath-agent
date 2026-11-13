@@ -23,6 +23,10 @@ type Report struct {
 	Sources      []*Source `json:"sources"`
 	Unknown      []*Label  `json:"unknown"`
 	Aliases      int       `json:"aliases"`
+	// Tier1 sums the national competitions of tier 1 (registers/site-tiers.yaml). It is nil when the caller gives no tier.
+	Tier1 *Totals `json:"tier1_national,omitempty"`
+	// Gaps are the entries of the gap register, each with the number of positions it gives the reason of.
+	Gaps []*Gap `json:"gaps,omitempty"`
 }
 
 // Totals sums the measures of all competitions.
@@ -34,6 +38,39 @@ type Totals struct {
 	Candidate   int `json:"candidate"`
 	NoCandidate int `json:"no_candidate"`
 	Rows        int `json:"rows"`
+	// LinkOnly, Robots and NoSource count the expected positions with no record that the gap register gives that reason. Open counts the other expected positions with no record.
+	LinkOnly int `json:"link_only"`
+	Robots   int `json:"robots"`
+	NoSource int `json:"no_source"`
+	Open     int `json:"open"`
+}
+
+// Allowed is the number of expected positions that can have a record under the rules: the expected positions less the positions that are link-only by rule, blocked by robots.txt or with no allowed source.
+func (t Totals) Allowed() int { return t.Expected - t.LinkOnly - t.Robots - t.NoSource }
+
+func (t *Totals) add(o Totals) {
+	t.Expected += o.Expected
+	t.C0 += o.C0
+	t.C1 += o.C1
+	t.C2 += o.C2
+	t.Candidate += o.Candidate
+	t.NoCandidate += o.NoCandidate
+	t.Rows += o.Rows
+	t.LinkOnly += o.LinkOnly
+	t.Robots += o.Robots
+	t.NoSource += o.NoSource
+	t.Open += o.Open
+}
+
+// Sum sums the competitions for which in is true.
+func (r *Report) Sum(in func(c *Comp) bool) Totals {
+	var t Totals
+	for _, c := range r.Competitions {
+		if in(c) {
+			t.add(c.Totals)
+		}
+	}
+	return t
 }
 
 // Comp is the coverage of one competition.
@@ -41,6 +78,8 @@ type Comp struct {
 	Code  string `json:"code"`
 	Name  string `json:"name"`
 	Group string `json:"group"`
+	// Tier1 is true for a national competition of tier 1.
+	Tier1 bool `json:"tier1_national,omitempty"`
 	Totals
 	// Shape is false when the register gives no positions for the competition. Then Expected is 0 and the year list shows only the positions that the seed rows give.
 	Shape bool    `json:"shape"`
@@ -56,6 +95,8 @@ type Year struct {
 	Record    []string `json:"record,omitempty"`
 	Candidate []string `json:"candidate,omitempty"`
 	Missing   []string `json:"missing,omitempty"`
+	// Reasons gives the reason of each candidate or missing position that the gap register names. The other candidate and missing positions are open.
+	Reasons map[string]string `json:"reasons,omitempty"`
 	// Rows counts the seed rows of this edition, with or without a position. A row that does not name its paper counts in the first paper of the year.
 	Rows int `json:"rows"`
 }
@@ -76,9 +117,15 @@ type Label struct {
 	Rows   int    `json:"rows"`
 }
 
-// Build makes the report. rows walks every seed row.
-func Build(corpus *content.Corpus, al *seed.Aliases, thisYear int, rows func(fn func(seed.Row) error) error) (*Report, error) {
+// Build makes the report. gaps is the gap register, which can be nil. rows walks every seed row.
+func Build(corpus *content.Corpus, al *seed.Aliases, gaps *Gaps, thisYear int, rows func(fn func(seed.Row) error) error) (*Report, error) {
 	rep := &Report{ThisYear: thisYear, Aliases: al.Len()}
+	if gaps != nil {
+		for _, g := range gaps.List {
+			g.Count = 0
+		}
+		rep.Gaps = gaps.List
+	}
 	// cand[code][edition][pos] is true for a position with a seed candidate. seen[code][edition] counts the rows of the edition. The edition is the year, or the edition of the paper when the register lists the papers of the year. paperless[code][year] counts the rows of a year with papers that do not name their paper.
 	cand := map[string]map[string]map[string]bool{}
 	seen := map[string]map[string]int{}
@@ -145,18 +192,9 @@ func Build(corpus *content.Corpus, al *seed.Aliases, thisYear int, rows func(fn 
 		return nil, err
 	}
 	for _, c := range corpus.Competitions {
-		rep.Competitions = append(rep.Competitions, measure(c, cand[c.Code], seen[c.Code], paperless[c.Code], compRows[c.Code], thisYear))
+		rep.Competitions = append(rep.Competitions, measure(c, cand[c.Code], seen[c.Code], paperless[c.Code], compRows[c.Code], thisYear, gaps))
 	}
-	for _, c := range rep.Competitions {
-		t := &rep.Totals
-		t.Expected += c.Expected
-		t.C0 += c.C0
-		t.C1 += c.C1
-		t.C2 += c.C2
-		t.Candidate += c.Candidate
-		t.NoCandidate += c.NoCandidate
-		t.Rows += c.Rows
-	}
+	rep.Totals = rep.Sum(func(*Comp) bool { return true })
 	for _, s := range srcs {
 		rep.Sources = append(rep.Sources, s)
 	}
@@ -225,7 +263,7 @@ func papers(c *content.Competition, year int, editions []*content.Edition) []pap
 	return out
 }
 
-func measure(c *content.Competition, cand map[string]map[string]bool, seen map[string]int, paperless map[int]int, rows, thisYear int) *Comp {
+func measure(c *content.Competition, cand map[string]map[string]bool, seen map[string]int, paperless map[int]int, rows, thisYear int, gaps *Gaps) *Comp {
 	out := &Comp{Code: c.Code, Name: c.Name, Group: c.Group}
 	out.Rows = rows
 	out.Shape = c.HasShape()
@@ -267,15 +305,15 @@ func measure(c *content.Competition, cand map[string]map[string]bool, seen map[s
 			if i == 0 {
 				yr.Rows += paperless[y]
 			}
-			out.add(yr, Expected(c, y, pp.edition), pp.edition, cand[pp.id])
+			out.add(yr, Expected(c, y, pp.edition), pp.edition, cand[pp.id], gaps)
 			out.Years = append(out.Years, yr)
 		}
 	}
 	return out
 }
 
-// add measures one edition: the positions that the edition expects, the problems of the edition e, which is nil when the content has none, and the positions with a seed candidate.
-func (out *Comp) add(yr *Year, expected []string, e *content.Edition, cand map[string]bool) {
+// add measures one edition: the positions that the edition expects, the problems of the edition e, which is nil when the content has none, and the positions with a seed candidate. gaps gives the reason of each expected position with no record.
+func (out *Comp) add(yr *Year, expected []string, e *content.Edition, cand map[string]bool, gaps *Gaps) {
 	have := map[string]*content.Problem{}
 	if e != nil {
 		for _, p := range e.Problems {
@@ -332,12 +370,36 @@ func (out *Comp) add(yr *Year, expected []string, e *content.Edition, cand map[s
 			if counted {
 				out.Candidate++
 			}
-			continue
-		}
-		if counted {
+		} else if counted {
 			yr.Missing = append(yr.Missing, p)
 			out.NoCandidate++
 		}
+		if counted {
+			out.reason(yr, p, gaps.entry(out.Code, yr.Year, p), cand[p])
+		}
+	}
+}
+
+// reason counts the reason of an expected position with no record. A seed candidate is a source to check, so a position with a candidate is open when the entry says that it has no allowed source.
+func (out *Comp) reason(yr *Year, p string, g *Gap, cand bool) {
+	r := Open
+	if g != nil && (g.Reason != NoSource || !cand) {
+		r = g.Reason
+		g.Count++
+		if yr.Reasons == nil {
+			yr.Reasons = map[string]string{}
+		}
+		yr.Reasons[p] = r
+	}
+	switch r {
+	case LinkOnly:
+		out.LinkOnly++
+	case Robots:
+		out.Robots++
+	case NoSource:
+		out.NoSource++
+	default:
+		out.Open++
 	}
 }
 
@@ -364,7 +426,8 @@ func (r *Report) JSON(w io.Writer) error {
 	return enc.Encode(r)
 }
 
-func pct(n, d int) string {
+// Pct gives n of d as a percent with one decimal, or "-" when d is 0.
+func Pct(n, d int) string {
 	if d == 0 {
 		return "-"
 	}
@@ -377,21 +440,61 @@ func (r *Report) Markdown(w io.Writer, maxUnknown int) error {
 	t := r.Totals
 	p("# Coverage\n\n")
 	p("This report is made by `om coverage`. The register gives the expected positions of each competition. C0 is the share of expected positions with a problem record. C1 is the share with a canonical statement of class H1 or H2. C2 is the share with an H1 statement. A candidate is an expected position with no record and with at least one seed row from a wave 0 dataset. Spec 14 gives the definitions.\n\n")
+	p("The gap register (`%s`) gives the reason of an expected position with no record: link-only by rule, blocked by robots.txt, or no allowed source. A position that the register does not name is open. A position with a seed candidate is open, also when the register says it has no allowed source. The allowed positions are the expected positions less the positions that are link-only, blocked or with no allowed source. \"C0 allowed\" is the share of the allowed positions with a problem record.\n\n", GapFile)
 	p("## Totals\n\n")
-	p("| Expected | C0 | C1 | C2 | Candidate | No candidate | Located seed rows |\n|---:|---:|---:|---:|---:|---:|---:|\n")
-	p("| %d | %s | %s | %s | %d (%s) | %d (%s) | %d |\n\n", t.Expected, pct(t.C0, t.Expected), pct(t.C1, t.Expected), pct(t.C2, t.Expected), t.Candidate, pct(t.Candidate, t.Expected), t.NoCandidate, pct(t.NoCandidate, t.Expected), t.Rows)
+	p("| Expected | C0 | Allowed | C0 allowed | C1 | C2 | Candidate | No candidate | Located seed rows |\n|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
+	p("| %d | %s | %d | %s | %s | %s | %d (%s) | %d (%s) | %d |\n\n", t.Expected, Pct(t.C0, t.Expected), t.Allowed(), Pct(t.C0, t.Allowed()), Pct(t.C1, t.Expected), Pct(t.C2, t.Expected), t.Candidate, Pct(t.Candidate, t.Expected), t.NoCandidate, Pct(t.NoCandidate, t.Expected), t.Rows)
+	p("### Reasons of the positions with no record\n\n")
+	reasons(p, "All competitions", t)
+	if r.Tier1 != nil {
+		reasons(p, "Tier 1 nationals", *r.Tier1)
+	}
+	p("\n")
+	if r.Tier1 != nil {
+		n := *r.Tier1
+		p("## Tier 1 nationals\n\nThe national competitions of the countries and codes of tier 1 in `registers/site-tiers.yaml`.\n\n")
+		p("| Expected | With a record | C0 | Allowed | C0 allowed |\n|---:|---:|---:|---:|---:|\n")
+		p("| %d | %d | %s | %d | %s |\n\n", n.Expected, n.C0, Pct(n.C0, n.Expected), n.Allowed(), Pct(n.C0, n.Allowed()))
+		p("The tier 1 nationals with expected positions that have no record, the most open positions first:\n\n")
+		p("| Code | Expected | C0 | Allowed | C0 allowed | Candidate | Link-only | Robots | No source | Open |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
+		var list []*Comp
+		for _, c := range r.Competitions {
+			if c.Tier1 && c.Expected > c.C0 {
+				list = append(list, c)
+			}
+		}
+		slices.SortStableFunc(list, func(a, b *Comp) int { return cmp.Or(b.Open-a.Open, (b.Expected-b.C0)-(a.Expected-a.C0)) })
+		for _, c := range list {
+			p("| %s | %d | %s | %d | %s | %d | %d | %d | %d | %d |\n", c.Code, c.Expected, Pct(c.C0, c.Expected), c.Allowed(), Pct(c.C0, c.Allowed()), c.Candidate, c.LinkOnly, c.Robots, c.NoSource, c.Open)
+		}
+		p("\n")
+	}
 	p("## Sources\n\n| Source | Rows | Located | With a position | Not a competition |\n|---|---:|---:|---:|---:|\n")
 	for _, s := range r.Sources {
-		p("| %s | %d | %d (%s) | %d | %d |\n", s.ID, s.Rows, s.Located, pct(s.Located, s.Rows), s.Positioned, s.Excluded)
+		p("| %s | %d | %d (%s) | %d | %d |\n", s.ID, s.Rows, s.Located, Pct(s.Located, s.Rows), s.Positioned, s.Excluded)
 	}
 	p("\n## Competitions\n\nThe order is the order of the register. A competition with no shape in the register has no expected positions yet.\n\n")
-	p("| Code | Competition | Expected | C0 | C1 | C2 | Candidate | No candidate | Seed rows |\n|---|---|---:|---:|---:|---:|---:|---:|---:|\n")
+	p("| Code | Competition | Expected | C0 | Allowed | C0 allowed | C1 | C2 | Candidate | No candidate | Link-only | Robots | No source | Open | Seed rows |\n|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
 	for _, c := range r.Competitions {
 		exp := strconv.Itoa(c.Expected)
 		if !c.Shape {
 			exp = "no shape"
 		}
-		p("| %s | %s | %s | %s | %s | %s | %d | %d | %d |\n", c.Code, c.Name, exp, pct(c.C0, c.Expected), pct(c.C1, c.Expected), pct(c.C2, c.Expected), c.Candidate, c.NoCandidate, c.Rows)
+		p("| %s | %s | %s | %s | %d | %s | %s | %s | %d | %d | %d | %d | %d | %d | %d |\n", c.Code, c.Name, exp, Pct(c.C0, c.Expected), c.Allowed(), Pct(c.C0, c.Allowed()), Pct(c.C1, c.Expected), Pct(c.C2, c.Expected), c.Candidate, c.NoCandidate, c.LinkOnly, c.Robots, c.NoSource, c.Open, c.Rows)
+	}
+	if len(r.Gaps) > 0 {
+		p("\n## Gap register\n\nEach entry of `%s` with the number of expected positions with no record that it gives the reason of. An entry with 0 positions names no open position now, so it can go.\n\n", GapFile)
+		p("| Competition | Years | Positions | Reason | Count | Note |\n|---|---|---|---|---:|---|\n")
+		for _, g := range r.Gaps {
+			years, pos := strings.Join(g.Years, ", "), strings.Join(g.Positions, ", ")
+			if years == "" {
+				years = "all"
+			}
+			if pos == "" {
+				pos = "all"
+			}
+			p("| %s | %s | %s | %s | %d | %s |\n", g.Competition, years, pos, g.Reason, g.Count, mdCell(g.Note))
+		}
 	}
 	total := 0
 	for _, u := range r.Unknown {
@@ -406,6 +509,16 @@ func (r *Report) Markdown(w io.Writer, maxUnknown int) error {
 		p("| %s | %s | %d |\n", u.Source, strings.ReplaceAll(u.Label, "|", "\\|"), u.Rows)
 	}
 	return nil
+}
+
+// reasons writes one line of the reasons of the positions with no record.
+func reasons(p func(string, ...any), name string, t Totals) {
+	p("- %s: %d link-only by rule, %d blocked by robots.txt, %d with no allowed source, %d open.\n", name, t.LinkOnly, t.Robots, t.NoSource, t.Open)
+}
+
+// mdCell makes a text fit in one cell of a Markdown table.
+func mdCell(s string) string {
+	return strings.NewReplacer("|", "\\|", "\n", " ").Replace(strings.TrimSpace(s))
 }
 
 // UnknownTSV writes the unknown labels, one for each line: source, label and rows.
