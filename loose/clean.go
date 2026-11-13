@@ -41,6 +41,7 @@ const (
 	Informatics = "a task of informatics"
 	Shortlist   = "a shortlist or longlist row"
 	Grading     = "a grading scheme or a note"
+	Theorem     = "a theorem of a book"
 )
 
 var (
@@ -75,6 +76,12 @@ var (
 	pairLeadRE = regexp.MustCompile(`(?i)^\s*(?:[1-9][0-9]?-(?:[1-9][0-9]?|(?:ча|cha)\s*[1-9][0-9]?|(?:st|nd|rd|th)\s+[1-9][0-9]?)|0\.[0-9]{1,3}|example(?:\s+[0-9]{1,3})?\s*\([^()\n]{1,40}\)|example|[1-9][0-9]{0,3}\s?\((?:[0-9]{1,4}|!|U)\))\s*[.:]\s+`)
 	// wrapRE is a sign that a book repeats at a line break, so the dataset has it twice, as "$y=$ $=\\sqrt{x}$".
 	wrapRE = regexp.MustCompile(`=\$[ \n]*\$[ \n]*=|\+\$[ \n]*\$[ \n]*\+|-\$[ \n]*\$[ \n]*-|<\$[ \n]*\$[ \n]*<|>\$[ \n]*\$[ \n]*>|\\times\$[ \n]*\$[ \n]*\\times`)
+	// labelLeadRE is the mark of a problem of a round of a national olympiad, a letter and a number, as "B3." of the second round in the Netherlands or "Z2)" of the Slovenian competition.
+	labelLeadRE = regexp.MustCompile(`^\s*[A-Z][0-9]{1,2}\s?[.)]\s+`)
+	// theoremRE is a theorem of a book at the start of a text, as "Theorem 5.1.2 (Five Color Theorem)" or "Lemma 7.5.2". The book proves it, so it is not a problem.
+	theoremRE = regexp.MustCompile(`^(?:Theorem|Lemma|Proposition|Corollary)\s+[0-9]{1,2}(?:\.[0-9]{1,3}){0,2}\b`)
+	// replyRE is a message of the translator at the end of a text, as "If you need the entire text in English, please let me know." or "(Note: The last sentence was a mix of French and English. I have corrected it.)".
+	replyRE = regexp.MustCompile(`(?i)\bplease let me know\b|\bif you need (?:the )?(?:entire|full|complete|whole) (?:text|translation)\b|\bI have (?:corrected|translated|kept)\b|\bI will provide the (?:English )?translation\b|\boutput the translation result\b|\bkeeping the original text's line breaks\b|\bis the original (?:French|Spanish|German|Chinese|Russian|Croatian|Dutch) text\b`)
 	// tightLeadRE is a problem number glued to the text, as "3-There is" or "1.Let".
 	tightLeadRE = regexp.MustCompile(`^\s*([1-9][0-9]?)[-.]\p{Lu}\p{Ll}`)
 	// markRE is a problem mark inside a text: "Problem 2", "Task 3" or "p2." at the start of a line, or a bold "**3.**" or "**p14.**" anywhere. A row with such a mark after its start holds more than one problem. A post of a whole test often runs its problems on one line, as "... divided by $2024$ .**p14.** A right square pyramid ...".
@@ -231,7 +238,8 @@ func Clean(raw string) (string, string) {
 			text = rest
 		}
 	}
-	text = strings.TrimSpace(pointsRE.ReplaceAllString(pairLeadRE.ReplaceAllString(text, ""), ""))
+	text = strings.TrimSpace(pointsRE.ReplaceAllString(pairLeadRE.ReplaceAllString(labelLeadRE.ReplaceAllString(text, ""), ""), ""))
+	text = cutReply(text)
 	lead := 0
 	if m := leadRE.FindStringSubmatchIndex(text); m != nil {
 		lead, _ = strconv.Atoi(text[m[2]:m[3]])
@@ -253,6 +261,8 @@ func Clean(raw string) (string, string) {
 		return "", Solution
 	case shortlistRE.MatchString(text):
 		return "", Shortlist
+	case theoremRE.MatchString(text):
+		return "", Theorem
 	}
 	if m := answerRE.FindStringIndex(text); m != nil {
 		if m[0] < canon.MinText {
@@ -506,7 +516,13 @@ var stopWords = map[string][]string{
 	"fr": {"le", "la", "les", "de", "des", "que", "est", "un", "une", "soit", "pour", "et", "dans", "sont"},
 	"de": {"der", "die", "das", "und", "ist", "eine", "ein", "sei", "für", "mit", "dass", "von", "zu", "auf"},
 	"vi": {"của", "và", "là", "các", "cho", "với", "một", "có", "số", "tìm", "chứng", "minh", "rằng", "trong"},
+	// Croatian and Dutch are only told apart, so that a text in them that a row marks as English is not taken (spec 06.8).
+	"hr": {"je", "i", "u", "na", "se", "su", "od", "da", "za", "koji", "koja", "koje", "neka", "ako", "broj", "sve", "odredi", "kojima", "zadatak"},
+	"nl": {"het", "een", "van", "zijn", "op", "voor", "niet", "wat", "hoe", "bepaal", "er", "dan", "ook", "welke", "elke", "getal"},
 }
+
+// detectOnly are the languages that Lang tells apart but does not give: the content has no texts in them, so a text in one of them is dropped.
+var detectOnly = []string{"hr", "nl"}
 
 // Lang gives the language of a text, from the language that the row names and from the text. A row may name two languages, as "English; Russian", or none. The text decides between them: its script, then its common words. It gives "" when the language is not clear.
 func Lang(text, named string) string {
@@ -552,13 +568,14 @@ func Lang(text, named string) string {
 		}
 		return ""
 	default:
-		got = byWords(text)
-		if got == "" && len(want) == 1 && latinLang(want[0]) {
+		var counts map[string]int
+		got, counts = byWords(text)
+		if got == "" && len(want) == 1 && latinLang(want[0]) && !otherWords(counts, want[0]) {
 			// A text of mostly formulas has few words, so the language that the row names stands.
 			return want[0]
 		}
 	}
-	if got == "" {
+	if got == "" || contains(detectOnly, got) {
 		return ""
 	}
 	if len(want) == 0 || contains(want, got) || got == "en" {
@@ -568,7 +585,20 @@ func Lang(text, named string) string {
 }
 
 // latinLang tells if a language is written in the Latin script.
-func latinLang(c string) bool { _, ok := stopWords[c]; return ok || c == "af" }
+func latinLang(c string) bool {
+	_, ok := stopWords[c]
+	return ok && !contains(detectOnly, c) || c == "af"
+}
+
+// otherWords tells if the common words of another language outnumber those of the named language, as in a Spanish text that a row marks as English. The Romance languages share many common words, so byWords may not tell which of them it is.
+func otherWords(counts map[string]int, named string) bool {
+	for lang, c := range counts {
+		if lang != named && c >= 3 && c > 2*counts[named] {
+			return true
+		}
+	}
+	return false
+}
 
 func contains(list []string, s string) bool {
 	for _, x := range list {
@@ -579,8 +609,8 @@ func contains(list []string, s string) bool {
 	return false
 }
 
-// byWords gives the Latin language whose common words are the most frequent in the text, when they are clearly more frequent than the words of the next language.
-func byWords(text string) string {
+// byWords gives the Latin language whose common words are the most frequent in the text, when they are clearly more frequent than the words of the next language, and the count of the common words of each language.
+func byWords(text string) (string, map[string]int) {
 	counts := map[string]int{}
 	words := strings.FieldsFunc(strings.ToLower(stripMath(text)), func(r rune) bool { return !unicode.IsLetter(r) })
 	for _, w := range words {
@@ -591,7 +621,7 @@ func byWords(text string) string {
 		}
 	}
 	best, next := "", 0
-	for _, lang := range []string{"en", "es", "pt", "fr", "de", "vi"} {
+	for _, lang := range []string{"en", "es", "pt", "fr", "de", "vi", "hr", "nl"} {
 		switch c := counts[lang]; {
 		case best == "" || c > counts[best]:
 			next = counts[best]
@@ -601,9 +631,9 @@ func byWords(text string) string {
 		}
 	}
 	if counts[best] < 1 || counts[best] < 2*next {
-		return ""
+		return "", counts
 	}
-	return best
+	return best, counts
 }
 
 // mathRE finds the formulas of a text.
@@ -643,6 +673,18 @@ func stepWords(text string) int {
 		seen[strings.ToLower(w)] = true
 	}
 	return len(seen)
+}
+
+// cutReply cuts a message of the translator, and all that follows it, from the end of a text. The message is in a paragraph after the first one; a text that starts with such a message is left as it is.
+func cutReply(text string) string {
+	m := replyRE.FindStringIndex(text)
+	if m == nil {
+		return text
+	}
+	if k := strings.LastIndex(text[:m[0]], "\n\n"); k > 0 {
+		return strings.TrimSpace(text[:k])
+	}
+	return text
 }
 
 // firstCopy gives the first copy of a text that a dataset gave twice, in most cases a translation and the text again in other words: "Solve the system of inequalities: $$...$$\n\nSolve the following system of inequalities: $$...$$". The two copies are split at a blank line and must be close in length and in their word 5-grams, and have the same numbers: the parts of a problem, as "a) for $n=3$" and "b) for $n=4$", have other numbers.
