@@ -260,7 +260,7 @@ func runMatchrate(env Env, args []string) int {
 					m.All.Why[w]++
 					if code != "" && code != "-" {
 						m.All.NewLocated++
-						fmt.Fprintf(&fresh, "%s\t%d\t%s\t%s\t%.3f\t%s\t%s\n", src, r.Year, r.Number, strings.Join(r.Labels, "; "), n.all.Score, w, oneLine(r.Statement))
+						fmt.Fprintf(&fresh, "%s\t%d\t%s\t%s\t%.3f\t%s\t%s\n", src, r.Year, r.Number, strings.Join(r.Labels, "; "), n.all.Score, w, shownText(corpus, code, r))
 					}
 				}
 			}
@@ -315,6 +315,21 @@ func runMatchrate(env Env, args []string) int {
 // line gives the counts for the output of om matchrate.
 func (a Against) line(rows int) string {
 	return fmt.Sprintf("%d matched (%d by key, %d by link), %d variants, %d near, %d new (%.2f%%), %d new problems (%.0f for each 10,000 rows), %d new with a competition", a.Matched, a.ByKey, a.ByLink, a.Variant, a.Near, a.New, 100*a.Rate(rows), a.NewProblems, a.Per10k(rows), a.NewLocated)
+}
+
+// noText are the competitions whose texts the reports do not show: the link-only competitions, and the Japan Mathematical Olympiad, whose official text the project does not copy (document 11).
+var noText = append(slices.Clone(LinkOnly), "jp-jmo")
+
+// shownText gives the text of a row for the list of new rows, or "-" when the project may not show it: a text of a source of zone Z3 or of a source that asked for no copy, a text of problems.ru, or a text of a competition of noText.
+func shownText(corpus *content.Corpus, code string, r seed.Row) string {
+	hidden := func(id string) bool {
+		s := corpus.Source(id)
+		return s != nil && (s.DoNotRepublish || s.Zone.Statement == "Z3")
+	}
+	if r.Source == problemsRu || hidden(r.Source) || hidden(r.Author) || slices.Contains(noText, code) || namesBlock(r.Statement+"\n"+strings.Join(r.Labels, "\n"), noText) {
+		return "-"
+	}
+	return oneLine(r.Statement)
 }
 
 // docAnswer gives the answer of the nearest record, or "" when there is none.

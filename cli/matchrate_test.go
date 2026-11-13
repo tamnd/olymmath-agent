@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/seed"
 	"github.com/tamnd/olymmath-agent/tag"
 )
@@ -213,5 +214,27 @@ Find all primes $p$ such that $p^2 + 2$ is also a prime number.
 	}
 	if err != nil || len(rates) != 1 || rates[0].All.ByLink != 1 || rates[0].Placed.New != 4 || rates[0].All.Why["passed the checks"] != 1 {
 		t.Errorf("derived.json: %v %+v", err, rates)
+	}
+}
+
+func TestShownText(t *testing.T) {
+	corpus, _ := content.Load(copyContent(t))
+	row := seed.Row{Source: "imo-official", Statement: "Find all n.\nShow it."}
+	if got := shownText(corpus, "imo", row); got != oneLine(row.Statement) {
+		t.Errorf("imo: %q", got)
+	}
+	if got := shownText(corpus, "kr-kmo", row); got != "-" {
+		t.Errorf("kr-kmo: %q", got)
+	}
+	if got := shownText(corpus, "jp-jmo", row); got != "-" {
+		t.Errorf("jp-jmo: %q", got)
+	}
+	bmo := seed.Row{Source: "imo-official", Statement: "Find all n. (1994 British Mathematical Olympiad)"}
+	if got := shownText(corpus, "", bmo); got != "-" {
+		t.Errorf("bmo: %q", got)
+	}
+	ru := seed.Row{Source: problemsRu, Statement: "x"}
+	if got := shownText(corpus, "", ru); got != "-" {
+		t.Errorf("problems-ru: %q", got)
 	}
 }
