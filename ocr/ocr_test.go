@@ -86,6 +86,14 @@ func TestSplit(t *testing.T) {
 		t.Errorf("words with a space, a letter or №: %+v", got)
 	}
 
+	dashes := []Page{{N: 1, Text: "# Fase nacional 2008\n**1.-** Halla dos enteros positivos.\n# SOLUCIÓN:\nLa suma es par.\n**2.-** Prueba que $a<b$.\n**1.-** No es un problema."}}
+	if got := Split(dashes); len(got) != 2 || got[0].Text != "Halla dos enteros positivos." || got[1].Number != 2 || got[1].Text != "Prueba que $a<b$." {
+		t.Errorf("bold numbers with a dash: %+v", got)
+	}
+	if got := Split([]Page{{N: 1, Text: "1.- Halla $a$ y $b$.\n2.- Prueba que $a<b$."}}); len(got) != 2 || got[1].Text != "Prueba que $a<b$." {
+		t.Errorf("bare numbers with a dash: %+v", got)
+	}
+
 	letters := []Page{{N: 2, Text: "# 2022 PAPER A: PROBLEMS\n**A1.** Let $ABCD$ be a unit square here.\n\nA2. Let $n$ be a positive integer there.\n**A3**. Show that $f$ has two roots."}}
 	if got := Split(letters); len(got) != 3 || got[0].Number != 1 || got[0].Text != "Let $ABCD$ be a unit square here." || got[1].Text != "Let $n$ be a positive integer there." || got[2].Number != 3 {
 		t.Errorf("letters: %+v", got)
