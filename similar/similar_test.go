@@ -119,10 +119,10 @@ func TestNearest(t *testing.T) {
 }
 
 // bestMap is best as it was with a new map for each text. TestBestSameAsMap compares the two.
-func bestMap(i int, words []string, vec map[string]float64, index map[string][]posting, n int, least float64) []Match {
+func bestMap(i int, words []string, vec []float64, index map[string][]posting, n int, least float64) []Match {
 	score := map[int]float64{}
-	for _, w := range words {
-		x := vec[w]
+	for k, w := range words {
+		x := vec[k]
 		for _, p := range index[w] {
 			if p.doc != i {
 				score[p.doc] += x * p.w

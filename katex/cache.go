@@ -1,6 +1,7 @@
 package katex
 
 import (
+	"bufio"
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/gob"
@@ -40,7 +41,10 @@ func cacheName(macros map[string]string) string {
 	return "katex-" + hex.EncodeToString(h.Sum(nil))[:16] + ".gob.gz"
 }
 
-// LoadCache reads the formulas that an earlier run saved in dir with SaveCache. A missing or broken file is an empty cache, as the renders give the same result.
+// streamFormat is the comment in the gzip header of a cache file that is a stream of entries, one gob value each. A file of an older om has no comment and one gob value with all the entries. The comment tells the two apart before the first read, because a gob decoder reads all of a value into memory before it checks the type.
+const streamFormat = "om katex entries"
+
+// LoadCache reads the formulas that an earlier run saved in dir with SaveCache. A missing or broken file is an empty cache, as the renders give the same result. A file in the stream format loads one entry at a time, so the load needs no buffer for the whole file. A file of an older om loads too.
 func (r *Renderer) LoadCache(dir string) {
 	f, err := os.Open(filepath.Join(dir, r.name)) // #nosec G304 -- the cache directory is from the user.
 	if err != nil {
@@ -51,22 +55,44 @@ func (r *Renderer) LoadCache(dir string) {
 	if err != nil {
 		return
 	}
-	var entries []cacheEntry
-	if err := gob.NewDecoder(z).Decode(&entries); err != nil {
-		return
-	}
+	dec := gob.NewDecoder(bufio.NewReader(z))
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, e := range entries {
-		res := result{html: e.HTML}
-		if e.Failed {
-			res.err = &Error{TeX: e.TeX, Message: e.Error}
+	if z.Comment != streamFormat {
+		var entries []cacheEntry
+		if dec.Decode(&entries) == nil {
+			for _, e := range entries {
+				if r.add(e) != nil {
+					return
+				}
+			}
 		}
-		k := key{e.TeX, e.Display}
-		if _, ok := r.cache[k]; !ok {
-			r.cache[k] = res
+		return
+	}
+	for {
+		var e cacheEntry
+		if dec.Decode(&e) != nil || r.add(e) != nil {
+			return
 		}
 	}
+}
+
+// add puts an entry of a cache file in the cache, unless the formula is there. r.mu must be held.
+func (r *Renderer) add(e cacheEntry) error {
+	k := key{e.TeX, e.Display}
+	if _, ok := r.cache[k]; ok {
+		return nil
+	}
+	html, err := r.squeeze(e.HTML)
+	if err != nil {
+		return err
+	}
+	res := result{html: html, size: len(e.HTML)}
+	if e.Failed {
+		res.err = &Error{TeX: e.TeX, Message: e.Error}
+	}
+	r.cache[k] = res
+	return nil
 }
 
 // SaveCache writes the formulas that the Renderer gave since New to a file in dir, and deletes the cache files of other releases or macros. The formulas that no render asked for go, so the file stays as large as the formulas of one site.
@@ -74,25 +100,24 @@ func (r *Renderer) SaveCache(dir string) error {
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return err
 	}
+	// The entries keep the compressed HTML until the encoder needs it, so the save needs no memory for the HTML of all the formulas.
+	type saved struct {
+		k   key
+		res result
+	}
 	r.mu.Lock()
-	entries := make([]cacheEntry, 0, len(r.cache))
+	entries := make([]saved, 0, len(r.cache))
 	for k, res := range r.cache {
-		if !res.used || res.timeout {
-			continue
+		if res.used && !res.timeout {
+			entries = append(entries, saved{k, res})
 		}
-		e := cacheEntry{TeX: k.tex, Display: k.display, HTML: res.html}
-		var ke *Error
-		if errors.As(res.err, &ke) {
-			e.Error, e.Failed = ke.Message, true
-		}
-		entries = append(entries, e)
 	}
 	r.mu.Unlock()
 	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].TeX != entries[j].TeX {
-			return entries[i].TeX < entries[j].TeX
+		if entries[i].k.tex != entries[j].k.tex {
+			return entries[i].k.tex < entries[j].k.tex
 		}
-		return !entries[i].Display && entries[j].Display
+		return !entries[i].k.display && entries[j].k.display
 	})
 	tmp, err := os.CreateTemp(dir, r.name+".*")
 	if err != nil {
@@ -100,9 +125,24 @@ func (r *Renderer) SaveCache(dir string) error {
 	}
 	defer func() { _ = os.Remove(tmp.Name()) }()
 	z := gzip.NewWriter(tmp)
-	if err := gob.NewEncoder(z).Encode(entries); err != nil {
-		_ = tmp.Close()
-		return err
+	z.Comment = streamFormat
+	// One gob value for each entry, so the encoder needs no buffer for the whole file.
+	enc := gob.NewEncoder(z)
+	for _, s := range entries {
+		e := cacheEntry{TeX: s.k.tex, Display: s.k.display}
+		var ke *Error
+		if errors.As(s.res.err, &ke) {
+			e.Error, e.Failed = ke.Message, true
+		}
+		html, err := r.expand(s.res)
+		if err == nil {
+			e.HTML = html
+			err = enc.Encode(e)
+		}
+		if err != nil {
+			_ = tmp.Close()
+			return err
+		}
 	}
 	if err := z.Close(); err != nil {
 		_ = tmp.Close()

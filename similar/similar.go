@@ -87,8 +87,8 @@ func FindFromAlso(texts []string, from, n int, least float64, also func(i int) [
 	return out, extra
 }
 
-// weigh gives the words of each text that count, in order, the weight of each word in each text, and the index of the texts of each word.
-func weigh(texts []string) ([][]string, []map[string]float64, map[string][]posting) {
+// weigh gives the words of each text that count, in order, the weight of each of these words in each text, in the same order, and the index of the texts of each word. The weights are slices and not maps, and the counts of a text go when its weights are done, so a large corpus needs less memory.
+func weigh(texts []string) ([][]string, [][]float64, map[string][]posting) {
 	tf := make([]map[string]float64, len(texts))
 	df := map[string]int{}
 	for i, t := range texts {
@@ -102,28 +102,29 @@ func weigh(texts []string) ([][]string, []map[string]float64, map[string][]posti
 	}
 	limit := max(len(texts)/10, 2)
 	index := map[string][]posting{}
-	vecs := make([]map[string]float64, len(texts))
+	vecs := make([][]float64, len(texts))
 	// The words of each text in order, so that the sums do not depend on the order of a map.
 	sorted := make([][]string, len(texts))
 	for i := range texts {
-		vecs[i] = map[string]float64{}
 		for w := range tf[i] {
 			if df[w] >= 2 && df[w] <= limit {
 				sorted[i] = append(sorted[i], w)
 			}
 		}
 		sort.Strings(sorted[i])
+		vecs[i] = make([]float64, len(sorted[i]))
 		var norm float64
-		for _, w := range sorted[i] {
+		for k, w := range sorted[i] {
 			x := (1 + math.Log(tf[i][w])) * math.Log(float64(len(texts))/float64(df[w]))
-			vecs[i][w] = x
+			vecs[i][k] = x
 			norm += x * x
 		}
 		norm = math.Sqrt(norm)
-		for _, w := range sorted[i] {
-			vecs[i][w] /= norm
-			index[w] = append(index[w], posting{i, vecs[i][w]})
+		for k, w := range sorted[i] {
+			vecs[i][k] /= norm
+			index[w] = append(index[w], posting{i, vecs[i][k]})
 		}
+		tf[i] = nil
 	}
 	return sorted, vecs, index
 }
@@ -142,9 +143,9 @@ func newScores(n int) *scores {
 }
 
 // best gives the n best matches of text i, and the scores of i with the texts of also. It uses s for the sums and leaves it empty for the next text.
-func best(i int, words []string, vec map[string]float64, index map[string][]posting, n int, least float64, s *scores, also []int) ([]Match, []float64) {
-	for _, w := range words {
-		x := vec[w]
+func best(i int, words []string, vec []float64, index map[string][]posting, n int, least float64, s *scores, also []int) ([]Match, []float64) {
+	for k, w := range words {
+		x := vec[k]
 		for _, p := range index[w] {
 			if p.doc != i {
 				if !s.seen[p.doc] {
