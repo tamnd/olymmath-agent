@@ -108,7 +108,8 @@ func (l *CLI) Argv(q Question, dir string) (argv []string, outFile string) {
 		}
 		argv = append(argv, "-p")
 	case "claude":
-		argv = append(argv, "-p", "--output-format", "json", "--strict-mcp-config", "--allowedTools", "Read")
+		// --no-session-persistence keeps the session of the call off the disk. Each call has its own directory, so a kept session is a new project of the client each time.
+		argv = append(argv, "-p", "--output-format", "json", "--no-session-persistence", "--strict-mcp-config", "--allowedTools", "Read")
 		if l.Model != "" {
 			argv = append(argv, "--model", l.Model)
 		}

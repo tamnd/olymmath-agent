@@ -69,7 +69,7 @@ func TestCLIKinds(t *testing.T) {
 	}{
 		{"codex", "Problem 1. $x$", "Problem 1. $x$", "", []string{"exec", "-i", "/tmp/x/p1.png", "--"}},
 		{"gemini", `{"response": "Problem 1.", "stats": {"models": {"gemini-2.5-pro": {}}}}`, "Problem 1.", "gemini-2.5-pro", []string{"--include-directories", "/tmp/x", "-p"}},
-		{"claude", `{"result": "Problem 1.", "is_error": false, "modelUsage": {"claude-x": {}}}`, "Problem 1.", "claude-x", []string{"-p", "--add-dir", "/tmp/x", "--allowedTools"}},
+		{"claude", `{"result": "Problem 1.", "is_error": false, "modelUsage": {"claude-x": {}}}`, "Problem 1.", "claude-x", []string{"-p", "--no-session-persistence", "--add-dir", "/tmp/x", "--allowedTools"}},
 	}
 	for _, c := range cases {
 		l, argv := fake(t, c.kind, c.out, "", nil)
