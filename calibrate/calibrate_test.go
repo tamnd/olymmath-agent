@@ -108,12 +108,12 @@ func TestCompareReport(t *testing.T) {
 	}
 	opc := SetByName("opc")
 	oi, _ := opc.Read("testdata/opc.jsonl")
-	b := Compare(opc, oi, map[string]int{oi[0].ID: 7, oi[1].ID: 6})
+	b := Compare(opc, oi, map[string]int{oi[0].ID: 5, oi[1].ID: 4})
 	if b.N != 2 || b.Exact != 1 || !math.IsNaN(b.Quadratic) {
 		t.Fatalf("the binary agreement is %+v", b)
 	}
 	var w bytes.Buffer
-	all := Overall([]*Set{set, opc}, map[string][]Item{"gradingbench": items, "opc": oi}, map[string]int{"gradingbench/" + items[0].ID: 7, "gradingbench/" + items[1].ID: 0, "opc/" + oi[0].ID: 7, "opc/" + oi[1].ID: 6})
+	all := Overall([]*Set{set, opc}, map[string][]Item{"gradingbench": items, "opc": oi}, map[string]int{"gradingbench/" + items[0].ID: 7, "gradingbench/" + items[1].ID: 0, "opc/" + oi[0].ID: 5, "opc/" + oi[1].ID: 4})
 	if all.N != 4 || all.Exact != 1 || all.Kappa != 1 {
 		t.Fatalf("the overall agreement is %+v", all)
 	}
@@ -121,5 +121,43 @@ func TestCompareReport(t *testing.T) {
 	out := w.String()
 	if !strings.Contains(out, "| IMO-GradingBench | CC-BY-4.0 | 4 | 100.0% | 1.000 | 1.000 to 1.000 | 1.000 | 100.0% | yes |") || !strings.Contains(out, "CC-BY-NC-SA-4.0") || !strings.Contains(out, "| All sets, pass or fail | | 4 | 100.0% | 1.000 |") || !strings.Contains(out, "The sample has 4 items.") {
 		t.Fatalf("the report is\n%s", out)
+	}
+}
+
+func TestWithoutScale(t *testing.T) {
+	var items []Item
+	for i := range 20 {
+		items = append(items, Item{ID: strconv.Itoa(i)})
+	}
+	test := Sample(items, 5, 3)
+	dev := Without(items, test)
+	if len(dev) != 15 {
+		t.Fatalf("the dev split has %d items", len(dev))
+	}
+	for _, it := range dev {
+		if slices.ContainsFunc(test, func(x Item) bool { return x.ID == it.ID }) {
+			t.Fatalf("the item %s is in both splits", it.ID)
+		}
+	}
+	// IMO-GradingBench puts 4 points in almost; ProofBench keeps the buckets of content.Bucket.
+	gb, pb := SetByName("gradingbench"), SetByName("proofbench")
+	for score, want := range map[int]int{7: 0, 6: 1, 4: 1, 3: 2, 1: 2, 0: 3} {
+		if got := gb.bucketIndex(score); got != want {
+			t.Fatalf("gradingbench %d is in bucket %d, want %d", score, got, want)
+		}
+	}
+	if pb.bucketIndex(4) != 2 || pb.bucketIndex(5) != 1 {
+		t.Fatal("the buckets of ProofBench changed")
+	}
+	// The grader reads the scale of IMO-GradingBench before its guidelines.
+	it := Item{Set: "gradingbench", ID: "x", Guidelines: "(Partial) a lemma"}
+	if r := it.Task(nil).Rubric; !strings.HasPrefix(r, "The human graders") || !strings.HasSuffix(r, "Guidelines:\n(Partial) a lemma") {
+		t.Fatalf("the rubric is %q", r)
+	}
+	if r := (Item{Set: "opc"}).Task(nil).Rubric; !strings.HasPrefix(r, "The human judges") || !strings.HasSuffix(r, grade.GenericRubric) {
+		t.Fatalf("the rubric of the Open Proof Corpus is %q", r)
+	}
+	if r := (Item{Set: "proofbench", Guidelines: "1 pt"}).Task(nil).Rubric; r != "1 pt" {
+		t.Fatalf("the rubric of ProofBench is %q", r)
 	}
 }
