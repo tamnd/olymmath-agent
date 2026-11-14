@@ -90,7 +90,7 @@ func runGrade(env Env, args []string) int {
 	}
 	dir := filepath.Join(*work, rec.ID)
 	b := &model.Budget{Client: client, Limit: *budget, Batch: *batch}
-	results, err := grade.Run(context.Background(), &model.Cache{Client: b, Dir: filepath.Join(dir, "calls")}, tasks, opts)
+	results, err := grade.Run(context.Background(), &model.Cache{Client: b, Dir: filepath.Join(dir, "calls"), Each: allCLI(taskJurors(tasks))}, tasks, opts)
 	if err != nil {
 		rec.Status = "failed"
 		fmt.Fprintf(env.Stderr, "om grade: %v\n", err)

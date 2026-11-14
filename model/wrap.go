@@ -14,6 +14,8 @@ import (
 type Cache struct {
 	Client Client
 	Dir    string
+	// Each sends the requests one at a time and keeps each response as soon as it comes. So a run that stops loses at most one call. It is for a client that makes one call at a time anyway, such as CLI; a Batch API client needs the whole list.
+	Each bool
 }
 
 // Complete answers from the cache and sends the other requests to the client.
@@ -31,6 +33,21 @@ func (c *Cache) Complete(ctx context.Context, reqs []Request) ([]Response, error
 		at = append(at, i)
 	}
 	if len(todo) == 0 {
+		return out, nil
+	}
+	if c.Each {
+		for j, r := range todo {
+			got, err := c.Client.Complete(ctx, []Request{r})
+			if err != nil {
+				return nil, err
+			}
+			out[at[j]] = got[0]
+			if got[0].Err == nil {
+				if err := c.put(r, got[0]); err != nil {
+					return nil, err
+				}
+			}
+		}
 		return out, nil
 	}
 	got, err := c.Client.Complete(ctx, todo)
