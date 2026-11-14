@@ -51,6 +51,16 @@ func juryNote(tasks []grade.Task) string {
 	return fmt.Sprintf("Note: %d of the juries have no grader of another model family than the generator. Spec 07.4 asks for one. Add a juror such as cli:gemini or cli:codex to -jurors.", n)
 }
 
+// allCLI reports whether each model is a cli: model. The calls of such a run go one at a time, so its cache keeps each response as it comes (model.Cache.Each).
+func allCLI(models []string) bool {
+	for _, m := range models {
+		if !model.IsCLI(m) {
+			return false
+		}
+	}
+	return len(models) > 0
+}
+
 // juryClient gives the client of a jury: the Messages API for the Claude jurors, and the local command-line clients for the cli: jurors. It needs an API key only when a juror is not a cli: model. work is the directory of the lane state.
 func juryClient(jurors []string, batch bool, work string) (model.Client, error) {
 	api, cli := false, false

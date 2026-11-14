@@ -73,6 +73,38 @@ func TestCache(t *testing.T) {
 	}
 }
 
+// stopAfter answers n calls and then fails, as a run that is stopped.
+type stopAfter struct {
+	f *Fake
+	n int
+}
+
+func (s *stopAfter) Complete(ctx context.Context, reqs []Request) ([]Response, error) {
+	if s.f.Calls()+len(reqs) > s.n {
+		return nil, errors.New("stopped")
+	}
+	return s.f.Complete(ctx, reqs)
+}
+
+func TestCacheEach(t *testing.T) {
+	f := &Fake{Answer: func(r Request) string { return "answer to " + r.Messages[0].Text }}
+	dir := t.TempDir()
+	reqs := []Request{{ID: "1", Model: Haiku, Messages: []Message{{"user", "a"}}}, {ID: "2", Model: Haiku, Messages: []Message{{"user", "b"}}}}
+	c := &Cache{Client: &stopAfter{f, 1}, Dir: dir, Each: true}
+	if _, err := c.Complete(context.Background(), reqs); err == nil {
+		t.Fatal("the stopped run gives no error")
+	}
+	// The first response was kept before the run stopped.
+	if !c.Has(reqs[0]) || c.Has(reqs[1]) {
+		t.Fatal("the cache does not hold the first response only")
+	}
+	c = &Cache{Client: f, Dir: dir, Each: true}
+	got, err := c.Complete(context.Background(), reqs)
+	if err != nil || !got[0].Cached || got[1].Cached || got[1].Text != "answer to b" || f.Calls() != 2 {
+		t.Fatalf("the resumed run gives %+v, %v, %d calls", got, err, f.Calls())
+	}
+}
+
 func TestBudget(t *testing.T) {
 	f := &Fake{Answer: func(Request) string { return strings.Repeat("x", 4000) }}
 	// A Haiku call with 1,000,000 output tokens can cost $0.50.

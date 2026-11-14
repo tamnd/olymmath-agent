@@ -129,7 +129,7 @@ func runCalibrate(env Env, args []string) int {
 			return ExitUsage
 		}
 		b := &model.Budget{Client: client, Limit: *budget, Batch: *batch}
-		results, err := grade.Run(context.Background(), &model.Cache{Client: b, Dir: filepath.Join(dir, "calls")}, tasks, grade.Options{})
+		results, err := grade.Run(context.Background(), &model.Cache{Client: b, Dir: filepath.Join(dir, "calls"), Each: allCLI(taskJurors(tasks))}, tasks, grade.Options{})
 		if err != nil {
 			fmt.Fprintf(env.Stderr, "om calibrate: %v\n", err)
 			return ExitFailure

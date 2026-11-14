@@ -132,7 +132,7 @@ func runSolve(env Env, args []string) int {
 	b := &model.Budget{Client: client, Limit: *budget, Batch: *batch}
 	// The calls of the run so far were paid; the cache gives them again at no cost.
 	b.Charge(rec.Cost)
-	results, err := solve.Run(context.Background(), &model.Cache{Client: b, Dir: filepath.Join(dir, "calls")}, items, opts)
+	results, err := solve.Run(context.Background(), &model.Cache{Client: b, Dir: filepath.Join(dir, "calls"), Each: allCLI(models)}, items, opts)
 	if err != nil {
 		rec.Status = "failed"
 		fmt.Fprintf(env.Stderr, "om solve: %v\n", err)
