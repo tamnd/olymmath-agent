@@ -138,6 +138,8 @@ type Verdict struct {
 	Score    int
 	Notes    string
 	Revised  bool
+	// First is the score of the first round, before the grader read the notes of the others.
+	First int
 }
 
 // Name gives the real model of the verdict: the model that answered, or the juror when the client did not tell it.
@@ -343,6 +345,8 @@ func take(r *Result, v, round int, req model.Request, res model.Response) {
 	vd := &r.Verdicts[v]
 	if round == 2 {
 		vd.Revised = s != vd.Score
+	} else {
+		vd.First = s
 	}
 	vd.Score, vd.Notes = s, res.Text
 	if c.Answered != "" {

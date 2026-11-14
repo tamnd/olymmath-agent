@@ -51,6 +51,11 @@ func TestCalibrateGrades(t *testing.T) {
 	if code == ExitUsage || outA != outB || !strings.Contains(outA, "The sample has 2 of IMO-GradingBench, drawn at random in each set with the seed 5") || !strings.Contains(outA, "| IMO-GradingBench | CC-BY-4.0 | 2 |") {
 		t.Fatalf("the seeded run gives %d,\n%s", code, outA)
 	}
+	// -holdout leaves out the test sample, so the dev sample is the other two items.
+	code, outC, _ := run("calibrate", "-set", "gradingbench", "-work", work, "-grades", grades, "-limit", "2", "-seed", "6", "-holdout", "5", "-holdout-limit", "2")
+	if code == ExitUsage || outC == outA || !strings.Contains(outC, "after the test sample of the seed 5 was left out") {
+		t.Fatalf("the dev run gives %d,\n%s", code, outC)
+	}
 	if code, _, errs := run("calibrate", "-set", "proofbench", "-work", work, "-grades", grades); code != ExitUsage || !strings.Contains(errs, "om calibrate fetch") {
 		t.Fatalf("a missing set gives %d, %q", code, errs)
 	}

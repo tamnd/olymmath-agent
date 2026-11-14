@@ -29,6 +29,12 @@ type Set struct {
 	Files []string
 	// Binary is true when the human grade is pass or fail, not points out of 7.
 	Binary bool
+	// Almost is the least score out of 7 in the almost bucket of the human graders of the set, or 0 for the buckets of content.Bucket (5 and 6). The human labels of IMO-GradingBench put 4 to 6 in almost and 1 to 3 in partial.
+	Almost int
+	// Scale tells the grader how the human graders of the set use the scale. It goes before the guidelines of the set, or before the generic rubric of om, in the rubric of the task. It is empty when the guidelines of the set are enough.
+	Scale string
+	// PassAt is the least jury score that counts as a pass of a binary set, or 0 for Pass.
+	PassAt int
 	cols   []string
 	item   func(seed.Record) (Item, bool)
 }
@@ -53,7 +59,8 @@ type Item struct {
 // Sets are the calibration sets. The licences were read from the pages of the sets on 2026-11-04.
 var Sets = []*Set{
 	{
-		Name: "gradingbench", Title: "IMO-GradingBench", Licence: "CC-BY-4.0", Keep: true,
+		Name: "gradingbench", Title: "IMO-GradingBench", Licence: "CC-BY-4.0", Keep: true, Almost: 4,
+		Scale: gradingBenchScale,
 		Home:  "https://github.com/google-deepmind/superhuman/tree/main/imobench",
 		Files: []string{"https://raw.githubusercontent.com/google-deepmind/superhuman/main/imobench/gradingbench.csv"},
 		cols:  []string{"Grading ID", "Problem", "Solution", "Grading guidelines", "Response", "Points", "Reward"},
@@ -89,6 +96,7 @@ var Sets = []*Set{
 	{
 		// The Open Proof Corpus is CC BY-NC-SA 4.0: om reads it in the work directory and keeps it out of git.
 		Name: "opc", Title: "Open Proof Corpus", Licence: "CC-BY-NC-SA-4.0", Keep: false, Binary: true,
+		Scale: opcScale, PassAt: 5,
 		Home: "https://huggingface.co/datasets/INSAIT-Institute/OPC",
 		Files: []string{
 			"https://huggingface.co/datasets/INSAIT-Institute/OPC/resolve/main/data/test-00000-of-00001.parquet",
@@ -122,6 +130,17 @@ var Sets = []*Set{
 		},
 	},
 }
+
+// gradingBenchScale is the scale of the human graders of IMO-GradingBench, from the labels of its rows: 7 is correct, 4 to 6 almost, 1 to 3 partial and 0 incorrect.
+const gradingBenchScale = `The human graders of this problem give one of four grades:
+7 (correct): a complete and rigorous proof.
+4 to 6 (almost): the proof is complete apart from small errors or gaps that are easy to fix, or it reaches the (Almost) items of the guidelines.
+1 to 3 (partial): the proof is not complete, but it reaches the (Partial) items of the guidelines or equal progress.
+0 (incorrect): no real progress.
+The guidelines below list the progress that earns partial or almost.`
+
+// opcScale is the standard of the human judges of the Open Proof Corpus. Their notes pass a proof that "would still most likely be worth 5/7 points on a competition".
+const opcScale = `The human judges of this problem pass or fail each proof. They pass a proof that a competition would give 5 or more points of 7: a complete proof, with at most small slips or routine details left out. They fail a proof with a wrong step, a key step that is not proved, a claim that is not standard and has no proof, or an answer with no real proof.`
 
 // SetByName gives the set with the name, or nil.
 func SetByName(name string) *Set {
@@ -171,14 +190,30 @@ func (s *Set) Read(path string) ([]Item, error) {
 
 // Task gives the grading task of an item. A juror that wrote the proof is taken out of the jury.
 func (it Item) Task(jurors []string) grade.Task {
+	rubric := strings.TrimSpace(it.Guidelines)
+	if s := SetByName(it.Set); s != nil && s.Scale != "" {
+		if rubric == "" {
+			rubric = s.Scale + "\n\n" + grade.GenericRubric
+		} else {
+			rubric = s.Scale + "\n\nGuidelines:\n" + rubric
+		}
+	}
 	return grade.Task{
-		ID: it.Set + "/" + it.ID, Statement: it.Problem, Rubric: it.Guidelines, Reference: it.Reference,
+		ID: it.Set + "/" + it.ID, Statement: it.Problem, Rubric: rubric, Reference: it.Reference,
 		Solution: it.Solution, Generator: it.Model, Jurors: grade.Jurors(jurors, it.Model),
 	}
 }
 
-// Pass is the least jury score that counts as a pass in a binary set.
+// Pass is the least jury score that counts as a pass, unless the set has its own PassAt.
 const Pass = 7
+
+// passAt gives the least jury score that counts as a pass of the set.
+func (s *Set) passAt() int {
+	if s.PassAt > 0 {
+		return s.PassAt
+	}
+	return Pass
+}
 
 // Agreement compares the jury scores with the human grades of the items.
 type Agreement struct {
@@ -207,6 +242,21 @@ func Sample(items []Item, n int, seed uint64) []Item {
 	out := make([]Item, 0, n)
 	for _, i := range idx {
 		out = append(out, items[i])
+	}
+	return out
+}
+
+// Without gives the items that are not in drop, in order. It keeps a dev split apart from the test split.
+func Without(items, drop []Item) []Item {
+	ids := map[string]bool{}
+	for _, it := range drop {
+		ids[it.ID] = true
+	}
+	var out []Item
+	for _, it := range items {
+		if !ids[it.ID] {
+			out = append(out, it)
+		}
 	}
 	return out
 }
@@ -248,7 +298,7 @@ func (s *Set) Pass(human int) bool {
 	return human == 7
 }
 
-// Overall gives the agreement on pass and fail over the items of all sets, so the sets with points and the binary set count together. A pass is 7 points, or a pass of a binary set; a jury pass is a score of Pass. Exact is the part of the items with the same pass or fail.
+// Overall gives the agreement on pass and fail over the items of all sets, so the sets with points and the binary set count together. A pass is 7 points, or a pass of a binary set; a jury pass is a score of Pass, or of PassAt in a set that has one. Exact is the part of the items with the same pass or fail.
 func Overall(sets []*Set, items map[string][]Item, jury map[string]int) Agreement {
 	a := Agreement{Set: "all", Quadratic: math.NaN()}
 	var hum, mac []int
@@ -263,7 +313,7 @@ func Overall(sets []*Set, items map[string][]Item, jury map[string]int) Agreemen
 			if s.Pass(it.Human) {
 				h = 1
 			}
-			if j >= Pass {
+			if j >= s.passAt() {
 				m = 1
 			}
 			hum, mac = append(hum, h), append(mac, m)
@@ -294,7 +344,7 @@ func Compare(set *Set, items []Item, jury map[string]int) Agreement {
 		a.N++
 		if set.Binary {
 			m := 0
-			if j >= Pass {
+			if j >= set.passAt() {
 				m = 1
 			}
 			hum, mac = append(hum, it.Human), append(mac, m)
@@ -303,8 +353,8 @@ func Compare(set *Set, items []Item, jury map[string]int) Agreement {
 			}
 			continue
 		}
-		hum = append(hum, bucketIndex(it.Human))
-		mac = append(mac, bucketIndex(j))
+		hum = append(hum, set.bucketIndex(it.Human))
+		mac = append(mac, set.bucketIndex(j))
 		hp, mp = append(hp, it.Human), append(mp, j)
 		if j == it.Human {
 			exact++
@@ -330,8 +380,11 @@ func Compare(set *Set, items []Item, jury map[string]int) Agreement {
 	return a
 }
 
-// bucketIndex gives the index of the bucket of a score out of 7 in content.Buckets.
-func bucketIndex(score int) int {
+// bucketIndex gives the index of the bucket of a score out of 7 in content.Buckets, with the almost bucket of the set.
+func (s *Set) bucketIndex(score int) int {
+	if s.Almost > 0 && score >= s.Almost && score < 7 {
+		return 1
+	}
 	b := content.Bucket(score, 7)
 	for i, x := range content.Buckets {
 		if x == b {
@@ -404,7 +457,7 @@ func Report(w io.Writer, rows []Agreement, overall *Agreement, jurors []string, 
 		a := *overall
 		fmt.Fprintf(w, "| All sets, pass or fail | | %d | %s | %s | %s | n/a | n/a | %s |\n", a.N, pct(a.Exact, a.N), num(a.Kappa), interval(a), met(a))
 	}
-	fmt.Fprintln(w, "\nKappa is on the four buckets (correct, almost, partial, incorrect), or on pass and fail for the Open Proof Corpus, where a pass is a jury score of 7. The quadratic kappa is on the points from 0 to 7. The row of all sets is on pass and fail, where a human pass is 7 points or a pass of the Open Proof Corpus. The 95% interval is the 2.5 and 97.5 percentiles of the kappa of 2,000 bootstrap resamples of the proofs.")
+	fmt.Fprintln(w, "\nKappa is on the four buckets (correct, almost, partial, incorrect), or on pass and fail for the Open Proof Corpus, where a jury pass is a score of 5 or more, the standard of its judges. The buckets of IMO-GradingBench are the labels of the set: almost is 4 to 6 points and partial 1 to 3. The quadratic kappa is on the points from 0 to 7. The row of all sets is on pass and fail, where a human pass is 7 points or a pass of the Open Proof Corpus. The 95% interval is the 2.5 and 97.5 percentiles of the kappa of 2,000 bootstrap resamples of the proofs.")
 }
 
 func met(a Agreement) string {

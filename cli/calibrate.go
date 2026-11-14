@@ -35,10 +35,11 @@ type calibrationGrade struct {
 	Graders []calibrationJudge `json:"graders,omitempty"`
 }
 
-// calibrationJudge is the last score of one juror.
+// calibrationJudge is the last score of one juror, and its score of the first round.
 type calibrationJudge struct {
 	By    string `json:"by"`
 	Score int    `json:"score"`
+	First int    `json:"first"`
 }
 
 func calibrationSets(names string) ([]*calibrate.Set, error) {
@@ -62,6 +63,8 @@ func runCalibrate(env Env, args []string) int {
 	work := fs.String("work", defaultWork(), "the work directory; the data is in its calibration directory")
 	limit := fs.Int("limit", 0, "the most items of each set, or 0 for all. They are spread evenly over the set, or drawn at random with -seed.")
 	seed := fs.Uint64("seed", 0, "draw the items of -limit at random with this seed, so the sample can be drawn again; 0 spreads them evenly")
+	holdout := fs.Uint64("holdout", 0, "leave out the items of the test sample drawn with this seed and -holdout-limit, so a dev run does not see the test items")
+	holdoutLimit := fs.Int("holdout-limit", 50, "the size of the test sample of each set that -holdout leaves out")
 	grades := fs.String("grades", "", "a JSON Lines file of jury scores {\"id\": \"set/item\", \"score\": N}; om compares them and calls no model")
 	dry := fs.Bool("dry-run", false, "print the plan and the cost estimate, and call no model")
 	budget := fs.Float64("budget", 0, "the most the run may cost, in US dollars")
@@ -89,6 +92,9 @@ func runCalibrate(env Env, args []string) int {
 		if err != nil {
 			fmt.Fprintf(env.Stderr, "om calibrate: %v\n", err)
 			return ExitUsage
+		}
+		if *holdout != 0 {
+			its = calibrate.Without(its, calibrate.Sample(its, *holdoutLimit, *holdout))
 		}
 		if *seed != 0 {
 			its = calibrate.Sample(its, *limit, *seed)
@@ -164,7 +170,7 @@ func runCalibrate(env Env, args []string) int {
 		defer func() { _ = f.Close() }()
 		w = f
 	}
-	calibrate.Report(w, rows, &overall, grade.Jurors(js, ""), source, sampleNote(ss, items, *limit, *seed))
+	calibrate.Report(w, rows, &overall, grade.Jurors(js, ""), source, sampleNote(ss, items, *limit, *seed, *holdout, *holdoutLimit))
 	for _, a := range rows {
 		if a.N == 0 || !(a.Kappa >= calibrate.Target) {
 			return ExitFindings
@@ -174,7 +180,7 @@ func runCalibrate(env Env, args []string) int {
 }
 
 // sampleNote says how the items of the run were chosen.
-func sampleNote(ss []*calibrate.Set, items map[string][]calibrate.Item, limit int, seed uint64) string {
+func sampleNote(ss []*calibrate.Set, items map[string][]calibrate.Item, limit int, seed, holdout uint64, holdoutLimit int) string {
 	if limit <= 0 {
 		return ""
 	}
@@ -185,6 +191,9 @@ func sampleNote(ss []*calibrate.Set, items map[string][]calibrate.Item, limit in
 	how := "spread evenly over each set"
 	if seed != 0 {
 		how = fmt.Sprintf("drawn at random in each set with the seed %d (om calibrate -limit %d -seed %d)", seed, limit, seed)
+	}
+	if holdout != 0 {
+		how += fmt.Sprintf(", after the test sample of the seed %d was left out (-holdout %d -holdout-limit %d)", holdout, holdout, holdoutLimit)
 	}
 	return fmt.Sprintf("The sample has %s, %s.", strings.Join(parts, ", "), how)
 }
@@ -252,7 +261,7 @@ func writeCalibrationGrades(path string, results []*grade.Result, scores map[str
 		scores[r.Task.ID] = r.Score
 		g := calibrationGrade{ID: r.Task.ID, Score: r.Score, Queue: r.Queue}
 		for _, v := range r.Verdicts {
-			g.Graders = append(g.Graders, calibrationJudge{By: "model:" + v.Name(), Score: v.Score})
+			g.Graders = append(g.Graders, calibrationJudge{By: "model:" + v.Name(), Score: v.Score, First: v.First})
 		}
 		line, _ := json.Marshal(g)
 		b.Write(line)
