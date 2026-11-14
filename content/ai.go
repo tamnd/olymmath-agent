@@ -181,7 +181,7 @@ func (r *Rubric) Max() int { return Scales[r.Scale] }
 // RunRecord is the record of one run of the solver or the grader (spec 07.6): its models, its budget, its token counts and its cost. The file is runs/<id>.json. The transcripts are not in git; each solution names the hash of its transcript.
 type RunRecord struct {
 	ID string `json:"id"`
-	// Kind is solve or grade.
+	// Kind is solve, grade or rubric.
 	Kind     string `json:"kind"`
 	Pipeline string `json:"pipeline"`
 	Started  string `json:"started"`
