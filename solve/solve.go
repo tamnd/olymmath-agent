@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"math/rand/v2"
 	"slices"
 	"strings"
 
@@ -80,6 +82,10 @@ type Filter struct {
 	MinBand, MaxBand int
 	// Limit is the most problems, or 0 for all.
 	Limit int
+	// PerBand keeps at most this many problems of each band, drawn at random with Seed. The band 0 holds the problems with no band. 0 keeps all.
+	PerBand int
+	// Seed fixes the random draw of PerBand, so that a pilot can run again on the same problems.
+	Seed uint64
 }
 
 // Select gives the problems of priority P1 of spec 07.2: no solution at all, and a statement with a text. They come in the order of their locators.
@@ -118,8 +124,35 @@ func Select(c *content.Corpus, f Filter, o Options) []Item {
 		out = append(out, it)
 	}
 	slices.SortFunc(out, func(a, b Item) int { return cmp.Compare(a.Problem.Locator(), b.Problem.Locator()) })
+	if f.PerBand > 0 {
+		out = perBand(out, f.PerBand, f.Seed)
+	}
 	if f.Limit > 0 && len(out) > f.Limit {
 		out = out[:f.Limit]
+	}
+	return out
+}
+
+// perBand keeps at most n items of each band. The draw uses a fixed seed, and the kept items stay in the order of their locators.
+func perBand(items []Item, n int, seed uint64) []Item {
+	groups := map[int][]int{}
+	for i, it := range items {
+		groups[it.Band] = append(groups[it.Band], i)
+	}
+	var keep []int
+	for _, band := range slices.Sorted(maps.Keys(groups)) {
+		idx := groups[band]
+		if len(idx) > n {
+			r := rand.New(rand.NewPCG(seed, uint64(band))) // #nosec G404 G115 -- a pilot sample that a run can make again, not a secret.
+			r.Shuffle(len(idx), func(i, j int) { idx[i], idx[j] = idx[j], idx[i] })
+			idx = idx[:n]
+		}
+		keep = append(keep, idx...)
+	}
+	slices.Sort(keep)
+	out := make([]Item, len(keep))
+	for i, k := range keep {
+		out[i] = items[k]
 	}
 	return out
 }

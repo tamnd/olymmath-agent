@@ -81,7 +81,7 @@ Prices (Anthropic, October 2026, per million tokens, Batch API 50% off): Opus 5.
 | P4 alternative solutions, Opus, k = 2 | ~5,000 | ~$6,000 |
 | Grading jury on everything published | none | about equal to generation |
 
-`om solve` takes `--budget` and stops at it. Each run writes its token counts and cost to `runs/`, using the `pricing` package of kvant-solver. These numbers are estimates; the first batch of 500 problems measures the real cost per difficulty band, and the plan is revised from it.
+`om solve` takes `--budget` and stops at it. Each run writes its token counts and cost to `runs/`, using the `pricing` package of kvant-solver. These numbers are estimates; the first batch of 500 problems measures the real cost per difficulty band, and the plan is revised from it. `om solve -per-band N -seed S` draws the pilot: at most N problems of each band, at random with a fixed seed, so a run can start again on the same problems.
 
 ## 7.7 Human contributions
 
