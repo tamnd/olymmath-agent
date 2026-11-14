@@ -100,7 +100,7 @@ func runGrade(env Env, args []string) int {
 	overBudget := false
 	for i, r := range results {
 		s := jobs[i].sol
-		item := content.RunItem{Problem: s.Problem, Solution: s.Tag, Model: strings.Join(r.Task.Jurors, ","), Tokens: r.Tokens, Cost: r.Cost, Calls: len(r.Calls)}
+		item := content.RunItem{Problem: s.Problem, Solution: s.Tag, Model: strings.Join(r.Task.Jurors, ","), Tokens: r.Tokens, Cost: r.Cost, Calls: len(r.Calls), Seconds: r.Seconds}
 		if tr, err := json.MarshalIndent(r.Calls, "", "  "); err == nil {
 			item.Transcript = grade.Hash(string(tr))
 			if os.MkdirAll(dir, 0o750) == nil {

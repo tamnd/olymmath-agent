@@ -210,6 +210,8 @@ type RunItem struct {
 	Tokens  Tokens  `json:"tokens"`
 	Cost    float64 `json:"cost_usd"`
 	Calls   int     `json:"calls"`
+	// Seconds is the time of the model calls of the item, when the client measures it.
+	Seconds float64 `json:"seconds,omitempty"`
 	// Transcript is the SHA-256 of the transcript of the item.
 	Transcript string `json:"transcript,omitempty"`
 	Note       string `json:"note,omitempty"`

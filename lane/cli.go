@@ -88,7 +88,8 @@ func (l *CLI) Argv(q Question, dir string) (argv []string, outFile string) {
 	switch l.Kind {
 	case "codex":
 		outFile = filepath.Join(dir, "answer.txt")
-		argv = append(argv, "exec", "--skip-git-repo-check", "--ephemeral", "-s", "read-only", "-C", dir, "-o", outFile)
+		// --json writes the events of the call to the standard output. The last event has the token count.
+		argv = append(argv, "exec", "--skip-git-repo-check", "--ephemeral", "--json", "-s", "read-only", "-C", dir, "-o", outFile)
 		if l.Model != "" {
 			argv = append(argv, "-m", l.Model)
 		}
@@ -170,14 +171,17 @@ func (l *CLI) Ask(ctx context.Context, q Question) (Answer, error) {
 		}
 		return a, fmt.Errorf("%s: %w: %s", l.Kind, runErr, oneLine(string(stderr)))
 	}
-	text, model, err := l.read(stdout, outFile)
+	text, model, usage, err := l.read(stdout, outFile)
 	if err != nil {
 		return a, fmt.Errorf("%s: %w", l.Kind, err)
 	}
+	a.Usage = usage
 	if model == "" && l.Kind == "codex" {
-		// codex exec writes the model to its standard error, in a header line such as "model: gpt-5.5".
+		// codex exec writes the model to its standard error, in a header line such as "model: gpt-5.5", when it does not write JSON. With --json the model is the one of the request or of the configuration of codex.
 		if m := codexModelRE.FindSubmatch(stderr); m != nil {
 			model = string(m[1])
+		} else if l.Model == "" {
+			model = codexConfigModel()
 		}
 	}
 	if model != "" {
@@ -191,15 +195,19 @@ func (l *CLI) Ask(ctx context.Context, q Question) (Answer, error) {
 	return a, nil
 }
 
-// read gives the text and the model of the answer from the output of the client.
-func (l *CLI) read(stdout []byte, outFile string) (text, model string, err error) {
+// read gives the text, the model and the token count of the answer from the output of the client.
+func (l *CLI) read(stdout []byte, outFile string) (text, model string, u Usage, err error) {
 	switch l.Kind {
 	case "codex":
+		u, last := codexEvents(stdout)
 		b, err := os.ReadFile(outFile) // #nosec G304 -- a file in the temporary directory of the call.
 		if err != nil {
-			return "", "", fmt.Errorf("no last message: %w", err)
+			if last != "" {
+				return last, "", u, nil
+			}
+			return "", "", u, fmt.Errorf("no last message: %w", err)
 		}
-		return string(b), "", nil
+		return string(b), "", u, nil
 	case "gemini":
 		var r struct {
 			Response string `json:"response"`
@@ -208,24 +216,90 @@ func (l *CLI) read(stdout []byte, outFile string) (text, model string, err error
 			} `json:"stats"`
 		}
 		if err := json.Unmarshal(stdout, &r); err != nil {
-			return string(stdout), "", nil
+			return string(stdout), "", Usage{}, nil
 		}
-		return r.Response, firstKey(r.Stats.Models), nil
+		return r.Response, firstKey(r.Stats.Models), Usage{}, nil
 	case "claude":
 		var r struct {
 			Result     string                     `json:"result"`
 			IsError    bool                       `json:"is_error"`
 			ModelUsage map[string]json.RawMessage `json:"modelUsage"`
+			Usage      struct {
+				Input      int `json:"input_tokens"`
+				Output     int `json:"output_tokens"`
+				CacheRead  int `json:"cache_read_input_tokens"`
+				CacheWrite int `json:"cache_creation_input_tokens"`
+			} `json:"usage"`
 		}
 		if err := json.Unmarshal(stdout, &r); err != nil {
-			return "", "", fmt.Errorf("the output is not JSON: %w", err)
+			return "", "", Usage{}, fmt.Errorf("the output is not JSON: %w", err)
 		}
 		if r.IsError {
-			return "", "", fmt.Errorf("the client gave an error: %s", oneLine(r.Result))
+			return "", "", Usage{}, fmt.Errorf("the client gave an error: %s", oneLine(r.Result))
 		}
-		return r.Result, firstKey(r.ModelUsage), nil
+		u := Usage{Input: r.Usage.Input, Output: r.Usage.Output, CacheRead: r.Usage.CacheRead, CacheWrite: r.Usage.CacheWrite}
+		return r.Result, firstKey(r.ModelUsage), u, nil
 	}
-	return string(stdout), "", nil
+	return string(stdout), "", Usage{}, nil
+}
+
+// codexEvents reads the JSON Lines events of codex exec --json. It gives the sum of the token counts of the turns and the text of the last message. A line that is not an event is skipped.
+func codexEvents(stdout []byte) (Usage, string) {
+	var u Usage
+	last := ""
+	for _, line := range bytes.Split(stdout, []byte("\n")) {
+		var e struct {
+			Type string `json:"type"`
+			Item struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"item"`
+			Usage struct {
+				Input      int `json:"input_tokens"`
+				Cached     int `json:"cached_input_tokens"`
+				CacheWrite int `json:"cache_write_input_tokens"`
+				Output     int `json:"output_tokens"`
+			} `json:"usage"`
+		}
+		if json.Unmarshal(bytes.TrimSpace(line), &e) != nil {
+			continue
+		}
+		switch {
+		case e.Type == "turn.completed":
+			// input_tokens counts the cached tokens too.
+			u.Input += max(0, e.Usage.Input-e.Usage.Cached)
+			u.CacheRead += e.Usage.Cached
+			u.CacheWrite += e.Usage.CacheWrite
+			u.Output += e.Usage.Output
+		case e.Type == "item.completed" && e.Item.Type == "agent_message":
+			last = e.Item.Text
+		}
+	}
+	return u, last
+}
+
+// codexModelLine finds the model line of the configuration of codex.
+var codexModelLine = regexp.MustCompile(`(?m)^\s*model\s*=\s*"([^"]+)"`)
+
+// codexConfigModel gives the default model of codex from its configuration file, or "". The model line must come before the first table of the file.
+func codexConfigModel() string {
+	dir := os.Getenv("CODEX_HOME")
+	if dir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		dir = filepath.Join(home, ".codex")
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "config.toml")) // #nosec G304 G703 -- the configuration file of codex.
+	if err != nil {
+		return ""
+	}
+	top, _, _ := strings.Cut("\n"+string(b), "\n[")
+	if m := codexModelLine.FindStringSubmatch(top); m != nil {
+		return m[1]
+	}
+	return ""
 }
 
 // firstKey gives the first key of a map in sorted order, or "".

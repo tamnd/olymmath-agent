@@ -24,7 +24,20 @@ type Answer struct {
 	// Version is the version of the client, such as 2.1.318, when it tells it.
 	Version string
 	Seconds float64
+	// Usage is the token count that the client gave for the call. It is zero when the client does not give one.
+	Usage Usage
 }
+
+// Usage counts the tokens of one call, as the client reports them. Input does not count the tokens read from the cache of the provider.
+type Usage struct {
+	Input      int
+	Output     int
+	CacheRead  int
+	CacheWrite int
+}
+
+// Known reports whether the client gave a token count.
+func (u Usage) Known() bool { return u.Input+u.Output+u.CacheRead+u.CacheWrite > 0 }
 
 // Asker is the interface between om and a model.
 type Asker interface {

@@ -171,3 +171,29 @@ func TestGradeOtherFamily(t *testing.T) {
 		t.Fatalf("with cli: jurors only: code %d, out %q, errs %q", code, out, errs)
 	}
 }
+
+// TestSolveCLI runs om solve with a generator of a local command-line client. It needs no API key, and the solution names the model that answered.
+func TestSolveCLI(t *testing.T) {
+	t.Setenv(model.KeyEnv, "")
+	f := fakeModel(t)
+	newClient = func(bool) (model.Client, error) { return model.NewAnthropic() }
+	old := newCLIClient
+	newCLIClient = func(string) model.Client { return cliModel{f} }
+	t.Cleanup(func() { newCLIClient = old })
+	dir := copyContent(t)
+	code, out, errs := run("solve", "-budget", "0.01", "-model", "cli:gemini/gemini-2.5-pro", "-content", dir, "-work", t.TempDir(), "-k", "1", "imo/2024/p2")
+	if code != ExitOK || !strings.Contains(out, "1 accepted") {
+		t.Fatalf("code %d, out %q, errs %q", code, out, errs)
+	}
+	corpus, findings := content.Load(dir)
+	if findings.Errors() > 0 {
+		t.Fatalf("the content has errors after om solve: %v", findings)
+	}
+	s := corpus.ByTag("03JXB69J3N").Solutions[0]
+	if s.Run == nil || s.Run.Model != "gemini-2.5-pro" || s.Author.Display != "gemini-2.5-pro" {
+		t.Fatalf("the solution is %+v, run %+v", s, s.Run)
+	}
+	if rec := corpus.Runs[s.Run.RunID]; rec == nil || rec.Items[0].Model != "gemini-2.5-pro" || rec.Items[0].Tokens.Input == 0 {
+		t.Fatalf("the run record is %+v", rec)
+	}
+}
