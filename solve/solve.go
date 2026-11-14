@@ -214,6 +214,7 @@ type Call struct {
 	Output  string          `json:"output"`
 	Usage   content.Tokens  `json:"usage"`
 	Cost    float64         `json:"cost_usd"`
+	Seconds float64         `json:"seconds,omitempty"`
 	Cached  bool            `json:"cached,omitempty"`
 	Error   string          `json:"error,omitempty"`
 }
@@ -233,9 +234,21 @@ type Result struct {
 	// Follows is the tag of the human solution that the solution closely follows (S5).
 	Follows string
 	Note    string
-	Tokens  content.Tokens
-	Cost    float64
+	// Answered is the model that wrote the accepted solution, when the client told it and it is not Model. A cli: generator such as cli:claude/claude-sonnet-5-5 is answered by claude-sonnet-5-5.
+	Answered string
+	Tokens   content.Tokens
+	Cost     float64
+	// Seconds is the time of the calls, when the client measures it.
+	Seconds float64
 	Calls   []Call
+}
+
+// Writer gives the model that wrote the solution: the model that answered, or the model of the item.
+func (r *Result) Writer() string {
+	if r.Answered != "" {
+		return r.Answered
+	}
+	return r.Model
 }
 
 // Transcript gives the calls as JSON and its SHA-256.
@@ -249,8 +262,8 @@ func (r *Result) Transcript() ([]byte, string) {
 func (r *Result) RunItem(solution string) content.RunItem {
 	_, h := r.Transcript()
 	return content.RunItem{
-		Problem: r.Problem.Tag, Solution: solution, Band: r.Band, Model: r.Model,
-		Stage: r.Stage, Outcome: r.Outcome, Tokens: r.Tokens, Cost: r.Cost, Calls: len(r.Calls),
+		Problem: r.Problem.Tag, Solution: solution, Band: r.Band, Model: r.Writer(),
+		Stage: r.Stage, Outcome: r.Outcome, Tokens: r.Tokens, Cost: r.Cost, Calls: len(r.Calls), Seconds: r.Seconds,
 		Transcript: h, Note: r.Note,
 	}
 }
@@ -275,6 +288,8 @@ type attempt struct {
 	rounds int
 	// mismatch is true when the attempt passed the verifier with another answer than the problem.
 	mismatch bool
+	// answered is the model that wrote the text, when the client told it.
+	answered string
 }
 
 func (a *attempt) genSystem() string {
@@ -361,7 +376,7 @@ func Run(ctx context.Context, client model.Client, items []Item, o Options) ([]*
 // step takes the response of one call of an attempt.
 func step(a *attempt, req model.Request, res model.Response, o Options) {
 	r := a.res
-	c := Call{Stage: stageOf[req.Kind], Attempt: a.n, Model: req.Model, Key: req.Key(), Input: req.Messages, Output: res.Text, Usage: res.Usage, Cached: res.Cached}
+	c := Call{Stage: stageOf[req.Kind], Attempt: a.n, Model: req.Model, Key: req.Key(), Input: req.Messages, Output: res.Text, Usage: res.Usage, Seconds: res.Seconds, Cached: res.Cached}
 	if res.Err == nil {
 		c.Cost, _ = model.Cost(req.Model, res.Usage, res.Batch)
 	} else {
@@ -370,6 +385,7 @@ func step(a *attempt, req model.Request, res model.Response, o Options) {
 	r.Calls = append(r.Calls, c)
 	r.Tokens.Add(res.Usage)
 	r.Cost += c.Cost
+	r.Seconds += res.Seconds
 	if later(c.Stage, r.Stage) {
 		r.Stage = c.Stage
 	}
@@ -388,6 +404,10 @@ func step(a *attempt, req model.Request, res model.Response, o Options) {
 			a.rounds++
 		}
 		a.text, a.passes, a.state = strings.TrimSpace(res.Text), 0, needVerify
+		a.answered = ""
+		if res.Model != req.Model {
+			a.answered = res.Model
+		}
 		if res.StopReason == "max_tokens" {
 			a.report = "The solution was cut at the token limit. Write it again, shorter."
 			a.state = needRevise
@@ -437,7 +457,7 @@ func end(r *Result, atts []*attempt) {
 		}
 		switch a.state {
 		case accepted:
-			r.Outcome, r.Text, r.Attempt = Accepted, a.text, a.n
+			r.Outcome, r.Text, r.Attempt, r.Answered = Accepted, a.text, a.n, a.answered
 			r.Answer = Boxed(a.text)
 			r.AnswerCheck = check(r.Problem, r.Answer)
 			r.Follows = follows(r.Problem, a.text)

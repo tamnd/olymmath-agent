@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -72,7 +73,7 @@ func runSolve(env Env, args []string) int {
 	dry := fs.Bool("dry-run", false, "print the plan and the cost estimate, and call no model")
 	budget := fs.Float64("budget", 0, "the most the run may cost, in US dollars. The run stops before a call that could pass it.")
 	k := fs.Int("k", 0, "the attempts for each problem (default 2, and 4 from band 8 up)")
-	mdl := fs.String("model", "", "the generator for every problem (default "+model.Sonnet+", and "+model.Opus+" from band 8 up)")
+	mdl := fs.String("model", "", "the generator for every problem (default "+model.Sonnet+", and "+model.Opus+" from band 8 up). A model cli:claude, cli:codex or cli:gemini, or cli:<client>/<model>, runs a local command-line client with its own login.")
 	effort := fs.String("effort", "", "the effort of the calls: low, medium, high or max")
 	limit := fs.Int("limit", 0, "the most problems, or 0 for all")
 	comp := fs.String("comp", "", "only the problems of this competition")
@@ -105,7 +106,13 @@ func runSolve(env Env, args []string) int {
 		fmt.Fprintln(env.Stderr, "om solve: set -budget in US dollars, or use -dry-run")
 		return ExitUsage
 	}
-	client, err := newClient(*batch)
+	var models []string
+	for _, it := range items {
+		if !slices.Contains(models, it.Model) {
+			models = append(models, it.Model)
+		}
+	}
+	client, err := juryClient(models, *batch, *work)
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om solve: %v\n", err)
 		return ExitUsage
@@ -223,7 +230,8 @@ func writeAISolution(corpus *content.Corpus, root, runID string, r *solve.Result
 	t := tags[0]
 	_, hash := r.Transcript()
 	var b strings.Builder
-	fmt.Fprintf(&b, "---\ntag: %s\nkind: solution\nproblem: %s\norigin: ai\nauthor:\n  display: %s\nzone: Z1\nlang: en\ncomplete: true\n", t, p.Tag, r.Model)
+	writer := r.Writer()
+	fmt.Fprintf(&b, "---\ntag: %s\nkind: solution\nproblem: %s\norigin: ai\nauthor:\n  display: %s\nzone: Z1\nlang: en\ncomplete: true\n", t, p.Tag, writer)
 	if r.Answer != "" {
 		fmt.Fprintf(&b, "answer_claimed: %s\n", yamlString(r.Answer))
 	}
@@ -234,8 +242,8 @@ func writeAISolution(corpus *content.Corpus, root, runID string, r *solve.Result
 		fmt.Fprintf(&b, "follows: %s\n", r.Follows)
 	}
 	fmt.Fprintf(&b, "run:\n  model: %s\n  prompt: %s\n  pipeline: %s\n  date: %s\n  run_id: %s\n  transcript: %s\n  tokens: {input: %d, output: %d, cache_read: %d, cache_write: %d}\n  cost: %.4f\n",
-		r.Model, solve.Pipeline, solve.Pipeline, now.UTC().Format(time.DateOnly), runID, hash, r.Tokens.Input, r.Tokens.Output, r.Tokens.CacheRead, r.Tokens.CacheWrite, r.Cost)
-	if c := model.Cutoffs[r.Model]; c != "" {
+		writer, solve.Pipeline, solve.Pipeline, now.UTC().Format(time.DateOnly), runID, hash, r.Tokens.Input, r.Tokens.Output, r.Tokens.CacheRead, r.Tokens.CacheWrite, r.Cost)
+	if c := model.Cutoffs[writer]; c != "" {
 		fmt.Fprintf(&b, "  cutoff: %s\n", c)
 	}
 	fmt.Fprintf(&b, "---\n%s\n", r.Text)

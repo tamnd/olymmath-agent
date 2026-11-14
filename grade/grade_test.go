@@ -16,6 +16,10 @@ func TestJurors(t *testing.T) {
 	if got := Jurors(DefaultJurors, model.Sonnet); !slices.Equal(got, []string{model.Haiku, model.Opus}) {
 		t.Fatalf("Jurors for Sonnet = %v", got)
 	}
+	// A cli: juror that names the generator does not grade its solution.
+	if got := Jurors([]string{"cli:codex", "cli:claude/claude-sonnet-5-5", "cli:claude"}, model.Sonnet); !slices.Equal(got, []string{"cli:codex", "cli:claude"}) {
+		t.Fatalf("Jurors of cli: models for Sonnet = %v", got)
+	}
 }
 
 func TestScore(t *testing.T) {

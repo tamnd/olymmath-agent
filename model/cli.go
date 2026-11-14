@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/lane"
@@ -62,7 +63,7 @@ func Family(id string) string {
 	return ""
 }
 
-// CLI is a Client that sends each request to a local command-line client, such as codex or gemini, through a lane of the lane package. Each client runs with its own login, so CLI sends no API key. The calls cost nothing here, because the plan of the client pays for them; the usage is an estimate of four bytes a token. A client whose allowance is spent rests until the time that it gave, and a client with no login is skipped for the rest of the run (lane.Chain). The other requests of the list still go.
+// CLI is a Client that sends each request to a local command-line client, such as codex or gemini, through a lane of the lane package. Each client runs with its own login, so CLI sends no API key. The calls cost nothing here, because the plan of the client pays for them. The usage is the token count that the client gives (codex and claude), or else an estimate of four bytes a token. A client whose allowance is spent rests until the time that it gave, and a client with no login is skipped for the rest of the run (lane.Chain). The other requests of the list still go.
 //
 // A command-line client takes one prompt and keeps no conversation, so CLI writes the system text and the messages as one prompt. The effort and the output limit of a request do not reach the client.
 type CLI struct {
@@ -72,14 +73,20 @@ type CLI struct {
 	StateDir string
 	// Parallel is the most calls at the same time. It is 1 when it is 0.
 	Parallel int
+	// Timeout is the longest time of one call. NewCLI sets it to CLITimeout.
+	Timeout time.Duration
 
 	mu     sync.Mutex
 	chains map[string]*lane.Chain
 }
 
+// CLITimeout is the longest time of one call of a CLI client. A solver or a grader can think for many minutes on a hard problem, so it is longer than lane.DefaultTimeout.
+const CLITimeout = 30 * time.Minute
+
 // NewCLI gives a CLI client for the command-line clients on this machine (lane.Defaults). stateDir is the directory of the rests of the lanes, or "".
 func NewCLI(stateDir string) *CLI {
-	return &CLI{StateDir: stateDir, Lane: func(client, name string) (lane.Named, error) {
+	c := &CLI{StateDir: stateDir, Timeout: CLITimeout}
+	c.Lane = func(client, name string) (lane.Named, error) {
 		for _, l := range lane.Defaults() {
 			if l.Name() != client {
 				continue
@@ -93,10 +100,14 @@ func NewCLI(stateDir string) *CLI {
 				return nil, err
 			}
 			out.Model = name
+			if c.Timeout > 0 {
+				out.Timeout = c.Timeout
+			}
 			return out, nil
 		}
 		return nil, fmt.Errorf("the client %s is not on this machine", client)
-	}}
+	}
+	return c
 }
 
 // chain gives the chain of one lane for a model id, so that the rests of the lane apply to each call.
@@ -176,8 +187,11 @@ func (c *CLI) one(ctx context.Context, ch *lane.Chain, r Request) Response {
 		}
 		return res
 	}
-	res.Text, res.StopReason, res.Model = a.Text, "end_turn", a.Model
+	res.Text, res.StopReason, res.Model, res.Seconds = a.Text, "end_turn", a.Model, a.Seconds
 	res.Usage = content.Tokens{Input: Tokens(p), Output: Tokens(a.Text)}
+	if u := a.Usage; u.Known() {
+		res.Usage = content.Tokens{Input: u.Input, Output: u.Output, CacheRead: u.CacheRead, CacheWrite: u.CacheWrite}
+	}
 	return res
 }
 

@@ -59,6 +59,8 @@ type Response struct {
 	Usage      content.Tokens `json:"usage"`
 	// Batch is true when the call went through the Batch API, at half the price.
 	Batch bool `json:"batch,omitempty"`
+	// Seconds is the time of the call, when the client measures it.
+	Seconds float64 `json:"seconds,omitempty"`
 	// Cached is true when the response came from the cache of a resumed run. It cost nothing this time.
 	Cached bool `json:"-"`
 	// Err is the error of this request. The other requests of the list can still succeed.

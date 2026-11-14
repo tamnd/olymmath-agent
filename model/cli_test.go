@@ -118,6 +118,21 @@ func TestCLIComplete(t *testing.T) {
 	}
 }
 
+func TestCLIUsage(t *testing.T) {
+	cl := &fakeLane{name: "claude", ask: func(lane.Question) (lane.Answer, error) {
+		return lane.Answer{Text: "SCORE: 2", Model: "claude-x", Seconds: 12.5, Usage: lane.Usage{Input: 3, Output: 40, CacheRead: 900, CacheWrite: 7}}, nil
+	}}
+	var made []string
+	c := fakeCLI(map[string]*fakeLane{"claude": cl}, &made)
+	got, err := c.Complete(context.Background(), []Request{{ID: "a", Model: "cli:claude", Messages: []Message{{"user", "x"}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (content.Tokens{Input: 3, Output: 40, CacheRead: 900, CacheWrite: 7}); got[0].Usage != want || got[0].Seconds != 12.5 {
+		t.Fatalf("response %+v", got[0])
+	}
+}
+
 func TestCLIQuota(t *testing.T) {
 	codex := &fakeLane{name: "codex", ask: func(lane.Question) (lane.Answer, error) {
 		return lane.Answer{Lane: "codex"}, &lane.QuotaError{Lane: "codex", Message: "you've hit your usage limit"}

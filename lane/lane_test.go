@@ -38,6 +38,8 @@ func TestQuota(t *testing.T) {
 // fake gives a CLI lane whose program gives out and errOut and records the command line.
 func fake(t *testing.T, kind, out, errOut string, err error) (*CLI, *[]string) {
 	t.Helper()
+	// The tests do not read the configuration of codex on this machine.
+	t.Setenv("CODEX_HOME", t.TempDir())
 	l, e := NewCLI(kind, "/bin/"+kind)
 	if e != nil {
 		t.Fatal(e)
@@ -90,6 +92,46 @@ func TestCLIKinds(t *testing.T) {
 		if c.kind != "gemini" && (*argv)[len(*argv)-2] != "--" {
 			t.Errorf("%s: the prompt does not come after --", c.kind)
 		}
+	}
+}
+
+func TestCLIUsage(t *testing.T) {
+	events := `{"type":"thread.started","thread_id":"x"}
+{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"SCORE: 3"}}
+{"type":"turn.completed","usage":{"input_tokens":15025,"cached_input_tokens":11776,"cache_write_input_tokens":0,"output_tokens":5,"reasoning_output_tokens":0}}
+`
+	l, argv := fake(t, "codex", "SCORE: 3", "", nil)
+	l.run = func(_ context.Context, dir string, a []string) ([]byte, []byte, error) {
+		if len(a) == 2 {
+			return []byte("codex-cli 0.167.0"), nil, nil
+		}
+		*argv = a
+		return []byte(events), []byte("Reading additional input from stdin..."), os.WriteFile(filepath.Join(dir, "answer.txt"), []byte("SCORE: 3"), 0o600)
+	}
+	if err := os.WriteFile(filepath.Join(os.Getenv("CODEX_HOME"), "config.toml"), []byte("model = \"gpt-x\"\n[projects.\"/a\"]\nmodel = \"other\"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	a, err := l.Ask(context.Background(), Question{Prompt: "p"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (Usage{Input: 3249, CacheRead: 11776, Output: 5}); a.Usage != want || a.Model != "gpt-x" || a.Text != "SCORE: 3" {
+		t.Errorf("codex: %+v", a)
+	}
+	if !slices.Contains(*argv, "--json") {
+		t.Errorf("codex: no --json in %q", *argv)
+	}
+
+	l, _ = fake(t, "claude", `{"result": "OK", "is_error": false, "modelUsage": {"claude-x": {}}, "usage": {"input_tokens": 2, "cache_creation_input_tokens": 7, "cache_read_input_tokens": 15677, "output_tokens": 4}}`, "", nil)
+	a, err = l.Ask(context.Background(), Question{Prompt: "p"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := (Usage{Input: 2, Output: 4, CacheRead: 15677, CacheWrite: 7}); a.Usage != want || !a.Usage.Known() {
+		t.Errorf("claude: %+v", a.Usage)
+	}
+	if (Usage{}).Known() {
+		t.Error("a zero usage is known")
 	}
 }
 

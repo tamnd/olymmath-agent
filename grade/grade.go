@@ -42,11 +42,11 @@ func OtherFamily(jurors []string, gen string) bool {
 	return false
 }
 
-// Jurors gives the jury for a solution of the model gen: the jurors without gen, since a model does not grade its own output. When fewer than two are left, it adds the first of Opus, Sonnet and Haiku that is not there.
+// Jurors gives the jury for a solution of the model gen: the jurors without gen, since a model does not grade its own output. A juror cli:<client>/<model> whose model is gen is also taken out. When fewer than two are left, it adds the first of Opus, Sonnet and Haiku that is not there.
 func Jurors(jurors []string, gen string) []string {
 	var out []string
 	for _, j := range jurors {
-		if j != gen && !slices.Contains(out, j) {
+		if j != gen && !slices.Contains(out, j) && (gen == "" || cliModel(j) != gen) {
 			out = append(out, j)
 		}
 	}
@@ -59,6 +59,18 @@ func Jurors(jurors []string, gen string) []string {
 		}
 	}
 	return out
+}
+
+// cliModel gives the model that a cli:<client>/<model> juror names, or "".
+func cliModel(j string) string {
+	if !model.IsCLI(j) {
+		return ""
+	}
+	_, name, err := model.ParseCLI(j)
+	if err != nil {
+		return ""
+	}
+	return name
 }
 
 const system = `You are a strict olympiad grader. Grade the proposed solution of the problem below on the IMO scale from 0 to 7, with the rubric below.
@@ -154,6 +166,8 @@ type Result struct {
 	Calls  []Call
 	Tokens content.Tokens
 	Cost   float64
+	// Seconds is the time of the calls, when the client measures it.
+	Seconds float64
 	// Err is set when a grader gave no score.
 	Err error
 }
@@ -167,6 +181,7 @@ type Call struct {
 	Output   string         `json:"output"`
 	Usage    content.Tokens `json:"usage"`
 	Cost     float64        `json:"cost_usd"`
+	Seconds  float64        `json:"seconds,omitempty"`
 	Cached   bool           `json:"cached,omitempty"`
 	Error    string         `json:"error,omitempty"`
 }
@@ -299,7 +314,7 @@ func Run(ctx context.Context, client model.Client, tasks []Task, o Options) ([]*
 }
 
 func take(r *Result, v, round int, req model.Request, res model.Response) {
-	c := Call{Round: round, Model: req.Model, Output: res.Text, Usage: res.Usage, Cached: res.Cached}
+	c := Call{Round: round, Model: req.Model, Output: res.Text, Usage: res.Usage, Seconds: res.Seconds, Cached: res.Cached}
 	if res.Model != req.Model {
 		c.Answered = res.Model
 	}
@@ -311,6 +326,7 @@ func take(r *Result, v, round int, req model.Request, res model.Response) {
 	r.Calls = append(r.Calls, c)
 	r.Tokens.Add(res.Usage)
 	r.Cost += c.Cost
+	r.Seconds += res.Seconds
 	if res.Err != nil {
 		if r.Err == nil {
 			r.Err = res.Err
