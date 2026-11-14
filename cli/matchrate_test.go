@@ -54,7 +54,7 @@ func TestMatchrate(t *testing.T) {
 		t.Errorf("output: %s", out)
 	}
 	md, err := os.ReadFile(filepath.Join(root, "reports", "coverage", "match.md"))
-	for _, want := range []string{"| imo-official | 5 | 2 | 1 | 0 | 0 | 0 | 3 | 60.00% | 3 | 6000 | 1 |", "| imo-official | 5 | 3 | 1 | 0 | 0 | 0 | 2 | 40.00% | 2 | 4000 | 1 |", "| imo-official | 5 | 6000 | 4000 |", "| dataset not read by the loose import | 2 | 2 |"} {
+	for _, want := range []string{"| imo-official | 5 | 2 | 1 | 0 | 0 | 0 | 3 | 60.00% | 3 | 3 | 6000 | 1 |", "| imo-official | 5 | 3 | 1 | 0 | 0 | 0 | 2 | 40.00% | 2 | 2 | 4000 | 1 |", "| imo-official | 5 | 6000 | 4000 |", "| dataset not read by the loose import | 2 | 2 |"} {
 		if err != nil || !strings.Contains(string(md), want) {
 			t.Errorf("match.md has no %q: %v\n%s", want, err, md)
 		}
@@ -102,7 +102,7 @@ func TestMatchrateDerived(t *testing.T) {
 	}
 	cov := filepath.Join(root, "reports", "coverage")
 	md, err := os.ReadFile(filepath.Join(cov, "derived.md"))
-	for _, want := range []string{"| hf-copy | 5 | 3 | 1 | 0 | 0 | 0 | 2 | 40.00% | 2 | 4000 | 1 |", "1 of 1 datasets give 100 or more new problems for each 10,000 rows against all the records", "no seed rows yet, so they are not in the tables: hf-unread."} {
+	for _, want := range []string{"| hf-copy | 5 | 3 | 1 | 0 | 0 | 0 | 2 | 40.00% | 2 | 2 | 4000 | 1 |", "1 of 1 datasets give 100 or more new problems for each 10,000 rows against all the records", "no seed rows yet, so they are not in the tables: hf-unread."} {
 		if err != nil || !strings.Contains(string(md), want) {
 			t.Errorf("derived.md has no %q: %v\n%s", want, err, md)
 		}

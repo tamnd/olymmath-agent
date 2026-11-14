@@ -55,6 +55,11 @@ type Against struct {
 	New int `json:"new"`
 	// NewProblems are the new rows counted once for each group of new rows of the dataset that are one problem by E. A dataset often has the same problem in several rows.
 	NewProblems int `json:"new_problems"`
+	// NewTexts are the new rows counted once for each text.
+	NewTexts int `json:"new_texts"`
+	// Sample is the number of new texts in the sample when the new texts of the dataset need too much memory for the groups, and 0 when the groups hold all the new texts. SampleProblems are the groups of the sample. NewProblems is then SampleProblems scaled to all the new texts, an estimate.
+	Sample         int `json:"sample,omitempty"`
+	SampleProblems int `json:"sample_problems,omitempty"`
 	// NewLocated are the new rows whose labels name a competition of the register. They can become problem records.
 	NewLocated int `json:"new_located"`
 	// Why counts the new rows by the reason that the loose import made no record of them. Only All has it.
@@ -77,6 +82,9 @@ func (a *Against) add(o Against) {
 	a.Near += o.Near
 	a.New += o.New
 	a.NewProblems += o.NewProblems
+	a.NewTexts += o.NewTexts
+	a.Sample += o.Sample
+	a.SampleProblems += o.SampleProblems
 	a.NewLocated += o.NewLocated
 	for k, v := range o.Why {
 		if a.Why == nil {
@@ -127,6 +135,7 @@ func runMatchrate(env Env, args []string) int {
 	out := fs.String("out", "", "the directory of the report; the default is reports/coverage in the content repository")
 	derived := fs.Bool("derived", false, "match the derived datasets of the source register (derived: true) and write derived.md, derived.json and derived-new.tsv")
 	workers := fs.Int("workers", runtime.NumCPU(), "the number of workers that match the rows")
+	groupMB := fs.Int("group-mb", 256, "the most memory in MB for the new texts of one dataset in the groups; above it the groups come from a sample of the new texts")
 	pos, err := parseMixed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -208,7 +217,7 @@ func runMatchrate(env Env, args []string) int {
 		m := MatchRate{Source: src, All: Against{Why: map[string]int{}}}
 		// cache holds the nearest records of each text of the dataset, so a text that the dataset has in many rows is matched once. The new texts are kept once each, for the groups.
 		cache := map[uint64]nearPair{}
-		newPlaced, newAll := map[uint64]string{}, map[uint64]string{}
+		newPlaced, newAll := newNewTexts(*groupMB<<20), newNewTexts(*groupMB<<20)
 		var batch []seed.Row
 		flush := func() {
 			keys := make([]uint64, len(batch))
@@ -249,13 +258,13 @@ func runMatchrate(env Env, args []string) int {
 				onPlaced, linked := captures[r.Source+"/"+r.File+"#row="+strconv.Itoa(r.Row)]
 				m.Rows++
 				if m.Placed.count(keyed, linked && onPlaced, n.placed, r.Answer, docAnswer(answers, n.placed)) {
-					newPlaced[keys[i]] = texts[i]
+					newPlaced.add(keys[i], texts[i])
 					if code != "" && code != "-" {
 						m.Placed.NewLocated++
 					}
 				}
 				if m.All.count(keyed, linked, n.all, r.Answer, docAnswer(answers, n.all)) {
-					newAll[keys[i]] = texts[i]
+					newAll.add(keys[i], texts[i])
 					w := why.why(r)
 					m.All.Why[w]++
 					if code != "" && code != "-" {
@@ -280,9 +289,10 @@ func runMatchrate(env Env, args []string) int {
 		}
 		flush()
 		cache = nil
-		m.Placed.NewProblems = groups(slices.Collect(maps.Values(newPlaced)), *workers)
+		newPlaced.count(&m.Placed, *workers)
 		newPlaced = nil
-		m.All.NewProblems = groups(slices.Collect(maps.Values(newAll)), *workers)
+		newAll.count(&m.All, *workers)
+		newAll = nil
 		fmt.Fprintf(env.Stdout, "%s: %d rows. Against the placed records: %s. Against all the records: %s.\n", src, m.Rows, m.Placed.line(m.Rows), m.All.line(m.Rows))
 		rates = append(rates, m)
 	}
@@ -314,7 +324,31 @@ func runMatchrate(env Env, args []string) int {
 
 // line gives the counts for the output of om matchrate.
 func (a Against) line(rows int) string {
-	return fmt.Sprintf("%d matched (%d by key, %d by link), %d variants, %d near, %d new (%.2f%%), %d new problems (%.0f for each 10,000 rows), %d new with a competition", a.Matched, a.ByKey, a.ByLink, a.Variant, a.Near, a.New, 100*a.Rate(rows), a.NewProblems, a.Per10k(rows), a.NewLocated)
+	return fmt.Sprintf("%d matched (%d by key, %d by link), %d variants, %d near, %d new (%.2f%%), %s new problems (%s for each 10,000 rows%s), %d new with a competition", a.Matched, a.ByKey, a.ByLink, a.Variant, a.Near, a.New, 100*a.Rate(rows), a.problems(), a.per10k(rows), a.sampleNote(), a.NewLocated)
+}
+
+// problems gives the new problems, with "about" when they are an estimate from a sample.
+func (a Against) problems() string {
+	if a.Sample > 0 {
+		return fmt.Sprintf("about %d", a.NewProblems)
+	}
+	return strconv.Itoa(a.NewProblems)
+}
+
+// per10k gives Per10k, with "about" when the new problems are an estimate from a sample.
+func (a Against) per10k(rows int) string {
+	if a.Sample > 0 {
+		return fmt.Sprintf("about %.0f", a.Per10k(rows))
+	}
+	return fmt.Sprintf("%.0f", a.Per10k(rows))
+}
+
+// sampleNote tells the sample of the groups, if there is one.
+func (a Against) sampleNote() string {
+	if a.Sample == 0 {
+		return ""
+	}
+	return fmt.Sprintf("; %d groups in a sample of %d of the %d new texts", a.SampleProblems, a.Sample, a.NewTexts)
 }
 
 // noText are the competitions whose texts the reports do not show: the link-only competitions, and the Japan Mathematical Olympiad, whose official text the project does not copy (document 11).
@@ -415,15 +449,15 @@ func groups(texts []string, workers int) int {
 
 // matchMethod tells how a row is matched, for the reports.
 func matchMethod(placed, records int) string {
-	return fmt.Sprintf("A seed row is matched by key (K) when its competition, year and position give an appearance that has a record. It is matched by link when its capture (the file and the row of the dataset) is a statement of a record: an import took the row into that record. Else it is compared by E, the cosine of the TF-IDF weights of the words and TeX, with the canonical statements of the records. A row whose nearest record has E of at least %.1f is matched, unless the row and the record both have an answer and the answers differ after a light normalization (signal A). Such a row is a variant: it can be another problem, or the same answer in another form, so a person must look at it. A row with E from %.1f to %.1f is near, and a person must look at it too. The other rows are new. New rows of one dataset that have E of at least %.1f with each other are one new problem, so a problem that the dataset has in several rows counts once.\n\nEach row is matched twice: against the %d placed records (with an appearance in a competition), and against all %d records with a statement, the loose records under problems/_loose included. The weights of the words come from all the records in both cases.", match.EStrict, DupLeast, match.EStrict, match.EStrict, placed, records)
+	return fmt.Sprintf("A seed row is matched by key (K) when its competition, year and position give an appearance that has a record. It is matched by link when its capture (the file and the row of the dataset) is a statement of a record: an import took the row into that record. Else it is compared by E, the cosine of the TF-IDF weights of the words and TeX, with the canonical statements of the records. A row whose nearest record has E of at least %.1f is matched, unless the row and the record both have an answer and the answers differ after a light normalization (signal A). Such a row is a variant: it can be another problem, or the same answer in another form, so a person must look at it. A row with E from %.1f to %.1f is near, and a person must look at it too. The other rows are new. New rows of one dataset that have E of at least %.1f with each other are one new problem, so a problem that the dataset has in several rows counts once. The new texts count each text of the new rows once.\n\nEach row is matched twice: against the %d placed records (with an appearance in a competition), and against all %d records with a statement, the loose records under problems/_loose included. The weights of the words come from all the records in both cases.", match.EStrict, DupLeast, match.EStrict, match.EStrict, placed, records)
 }
 
 func rateTable(p func(string, ...any), rates []MatchRate, side func(MatchRate) Against) {
-	p("| Dataset | Rows | Matched | By key | By link | Variants | Near | New rows | New rate | New problems | New per 10,000 rows | New with a competition |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
+	p("| Dataset | Rows | Matched | By key | By link | Variants | Near | New rows | New rate | New texts | New problems | New per 10,000 rows | New with a competition |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n")
 	var t MatchRate
 	row := func(name string, m MatchRate) {
 		a := side(m)
-		p("| %s | %d | %d | %d | %d | %d | %d | %d | %.2f%% | %d | %.0f | %d |\n", name, m.Rows, a.Matched, a.ByKey, a.ByLink, a.Variant, a.Near, a.New, 100*a.Rate(m.Rows), a.NewProblems, a.Per10k(m.Rows), a.NewLocated)
+		p("| %s | %d | %d | %d | %d | %d | %d | %d | %.2f%% | %d | %s | %s | %d |\n", name, m.Rows, a.Matched, a.ByKey, a.ByLink, a.Variant, a.Near, a.New, 100*a.Rate(m.Rows), a.NewTexts, a.problems(), a.per10k(m.Rows), a.NewLocated)
 	}
 	for _, m := range rates {
 		row(m.Source, m)
@@ -441,10 +475,28 @@ func rateTables(p func(string, ...any), rates []MatchRate) {
 	p("## New problems for each 10,000 rows\n\n| Dataset | Rows | Against the placed records | Against all the records |\n|---|---:|---:|---:|\n")
 	var t MatchRate
 	for _, m := range rates {
-		p("| %s | %d | %.0f | %.0f |\n", m.Source, m.Rows, m.Placed.Per10k(m.Rows), m.All.Per10k(m.Rows))
+		p("| %s | %d | %s | %s |\n", m.Source, m.Rows, m.Placed.per10k(m.Rows), m.All.per10k(m.Rows))
 		t.add(m)
 	}
-	p("| All | %d | %.0f | %.0f |\n\n", t.Rows, t.Placed.Per10k(t.Rows), t.All.Per10k(t.Rows))
+	p("| All | %d | %s | %s |\n\n", t.Rows, t.Placed.per10k(t.Rows), t.All.per10k(t.Rows))
+	var sampled []string
+	for _, m := range rates {
+		for _, x := range []struct {
+			side string
+			a    Against
+		}{{"the placed records", m.Placed}, {"all the records", m.All}} {
+			if x.a.Sample > 0 {
+				sampled = append(sampled, fmt.Sprintf("%s against %s: %d groups in a sample of %d of the %d new texts", m.Source, x.side, x.a.SampleProblems, x.a.Sample, x.a.NewTexts))
+			}
+		}
+	}
+	if len(sampled) > 0 {
+		p("A number with \"about\" is an estimate. The new texts of the dataset need too much memory for the groups, so the groups are counted in a sample: the new texts with the smallest hashes, as many as fit in the memory. The groups of the sample are then scaled to all the new texts. The estimate can be too high, because a problem with many texts loses fewer of its texts to the sample. The groups of the sample alone can be too low. The samples are:\n\n")
+		for _, s := range sampled {
+			p("- %s.\n", s)
+		}
+		p("\n")
+	}
 	p("## Against the placed records\n\n")
 	rateTable(p, rates, placedSide)
 	p("\n## Against all the records\n\n")
