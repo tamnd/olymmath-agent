@@ -19,6 +19,9 @@ import (
 // Rule is the rule of the jury.
 const Rule = "min-of-jury-v1"
 
+// RuleTieBreak is the rule of a jury with a tie-break juror (Options.TieBreak): the minimum, or the median of the three scores when the two jurors end in different buckets.
+const RuleTieBreak = "min-of-jury-tiebreak-v1"
+
 // Pipeline is the version of the grader prompts.
 const Pipeline = "grade/1"
 
@@ -163,11 +166,13 @@ type Result struct {
 	Task     Task
 	Verdicts []Verdict
 	// Score is the minimum of the scores; Queue is true when they still differ by more than Spread.
-	Score  int
-	Queue  bool
-	Calls  []Call
-	Tokens content.Tokens
-	Cost   float64
+	Score int
+	Queue bool
+	// TieBreak is the verdict of the tie-break juror, when the jury needed one. The score is then the median of the three scores.
+	TieBreak *Verdict
+	Calls    []Call
+	Tokens   content.Tokens
+	Cost     float64
 	// Seconds is the time of the calls, when the client measures it.
 	Seconds float64
 	// Err is set when a grader gave no score.
@@ -191,7 +196,12 @@ type Call struct {
 // Grade gives the content record of the result.
 func (r *Result) Grade(at, runID string) *content.Grade {
 	g := &content.Grade{Scale: "imo-7", Score: r.Score, Bucket: content.Bucket(r.Score, 7), Rubric: r.Task.Ref, At: at, Rule: Rule, Queue: r.Queue, RunID: runID}
-	for _, v := range r.Verdicts {
+	vs := r.Verdicts
+	if r.TieBreak != nil {
+		g.Rule = RuleTieBreak
+		vs = append(slices.Clone(vs), *r.TieBreak)
+	}
+	for _, v := range vs {
 		g.Graders = append(g.Graders, content.Judgement{By: "model:" + v.Name(), Family: v.Family(), Score: v.Score, NotesHash: Hash(v.Notes), Revised: v.Revised})
 	}
 	return g
@@ -219,6 +229,8 @@ func Score(notes string) (int, bool) {
 type Options struct {
 	MaxTokens int
 	Effort    string
+	// TieBreak is a third juror, or "". When the last scores of the jurors are in different buckets (content.Bucket), it reads the notes of both and gives its own score, and the jury score is the median of the three.
+	TieBreak string
 }
 
 func prefix(t Task) string {
@@ -312,7 +324,67 @@ func Run(ctx context.Context, client model.Client, tasks []Task, o Options) ([]*
 		}
 		r.Queue = spread(r) > Spread
 	}
+	if o.TieBreak != "" {
+		if err := tieBreak(ctx, client, results, o); err != nil {
+			return results, err
+		}
+	}
 	return results, nil
+}
+
+// split reports whether the last scores of a jury of two are in different buckets.
+func split(r *Result) bool {
+	return r.Err == nil && len(r.Verdicts) == 2 && content.Bucket(r.Verdicts[0].Score, 7) != content.Bucket(r.Verdicts[1].Score, 7)
+}
+
+// tieBreak asks the tie-break juror about each split jury. Its score and the two scores of the jury give the median. A tie-break juror that wrote the solution, or that gives no score, leaves the jury score as it is.
+func tieBreak(ctx context.Context, client model.Client, results []*Result, o Options) error {
+	var reqs []model.Request
+	var at []*Result
+	for _, r := range results {
+		if !split(r) || o.TieBreak == r.Task.Generator || (r.Task.Generator != "" && cliModel(o.TieBreak) == r.Task.Generator) {
+			continue
+		}
+		var notes strings.Builder
+		for k, v := range r.Verdicts {
+			fmt.Fprintf(&notes, "Grader %d gave %d:\n%s\n\n", k+1, v.Score, strings.TrimSpace(v.Notes))
+		}
+		reqs = append(reqs, model.Request{ID: r.Task.ID + "/" + o.TieBreak + "/tiebreak", Kind: "grade", Model: o.TieBreak, System: prefix(r.Task), MaxTokens: o.MaxTokens, Effort: o.Effort,
+			Messages: []model.Message{{Role: "user", Text: ask(r.Task) + "\n\nTwo graders of the jury do not agree. Their notes are below. Check the points where they differ against the solution and the rubric, and give your own grade. End with one line \"SCORE: N\".\n\n" + notes.String()}}})
+		at = append(at, r)
+	}
+	if len(reqs) == 0 {
+		return nil
+	}
+	got, err := client.Complete(ctx, reqs)
+	if err != nil {
+		return err
+	}
+	for k, res := range got {
+		r := at[k]
+		c := Call{Round: 3, Model: reqs[k].Model, Output: res.Text, Usage: res.Usage, Seconds: res.Seconds, Cached: res.Cached}
+		if res.Model != reqs[k].Model {
+			c.Answered = res.Model
+		}
+		if res.Err != nil {
+			c.Error = res.Err.Error()
+		} else {
+			c.Cost, _ = model.Cost(reqs[k].Model, res.Usage, res.Batch)
+		}
+		r.Calls = append(r.Calls, c)
+		r.Tokens.Add(res.Usage)
+		r.Cost += c.Cost
+		r.Seconds += res.Seconds
+		s, ok := Score(res.Text)
+		if res.Err != nil || !ok {
+			continue
+		}
+		v := &Verdict{Model: reqs[k].Model, Answered: c.Answered, Score: s, First: s, Notes: res.Text}
+		r.TieBreak = v
+		a, b := r.Verdicts[0].Score, r.Verdicts[1].Score
+		r.Score = max(min(a, b), min(max(a, b), s))
+	}
+	return nil
 }
 
 func take(r *Result, v, round int, req model.Request, res model.Response) {

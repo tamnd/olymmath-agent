@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/tamnd/olymmath-agent/content"
 	"github.com/tamnd/olymmath-agent/model"
 )
 
@@ -139,5 +140,46 @@ func TestRunOtherFamily(t *testing.T) {
 	}
 	if est, calls, err := Estimate([]Task{tk}, Options{}, true); err != nil || calls != 2 || est <= 0 {
 		t.Fatalf("Estimate = %v, %d, %v", est, calls, err)
+	}
+}
+
+func TestRunTieBreak(t *testing.T) {
+	// Sonnet says 7 (correct) and Haiku 6 (almost): the jury is split, so the tie-break juror decides between them.
+	f := jury(map[string]int{model.Sonnet: 7, model.Haiku: 6, model.Opus: 7}, nil)
+	tk := task()
+	tk.Generator = "gpt-x"
+	tk.Jurors = []string{model.Sonnet, model.Haiku}
+	got, err := Run(context.Background(), f, []Task{tk}, Options{TieBreak: model.Opus})
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := got[0]
+	if r.Score != 7 || r.TieBreak == nil || r.TieBreak.Score != 7 || f.Calls() != 3 {
+		t.Fatalf("score %d, tie-break %+v, %d calls", r.Score, r.TieBreak, f.Calls())
+	}
+	if !strings.Contains(f.Requests[2].Messages[0].Text, "Grader 2 gave 6") {
+		t.Fatal("the tie-break juror does not see the notes of the jury")
+	}
+	if g := r.Grade("2026-11-15", "grade-20261115-0001"); g.Rule != RuleTieBreak || !slices.Contains(content.GradeRules, g.Rule) || len(g.Graders) != 3 {
+		t.Fatalf("the grade is %+v", g)
+	}
+	// A tie-break score out of the range of the jury gives the nearer end of the range: the median.
+	f = jury(map[string]int{model.Sonnet: 7, model.Haiku: 6, model.Opus: 2}, nil)
+	got, _ = Run(context.Background(), f, []Task{tk}, Options{TieBreak: model.Opus})
+	if got[0].Score != 6 {
+		t.Fatalf("score %d, want 6", got[0].Score)
+	}
+	// A jury in one bucket needs no tie-break.
+	f = jury(map[string]int{model.Sonnet: 6, model.Haiku: 5, model.Opus: 7}, nil)
+	got, _ = Run(context.Background(), f, []Task{tk}, Options{TieBreak: model.Opus})
+	if got[0].Score != 5 || got[0].TieBreak != nil || f.Calls() != 2 {
+		t.Fatalf("score %d, %d calls", got[0].Score, f.Calls())
+	}
+	// The tie-break juror does not grade its own solution.
+	tk.Generator = model.Opus
+	f = jury(map[string]int{model.Sonnet: 7, model.Haiku: 6, model.Opus: 7}, nil)
+	got, _ = Run(context.Background(), f, []Task{tk}, Options{TieBreak: model.Opus})
+	if got[0].Score != 6 || f.Calls() != 2 {
+		t.Fatalf("score %d, %d calls", got[0].Score, f.Calls())
 	}
 }
