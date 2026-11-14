@@ -373,9 +373,10 @@ var (
 	genLang      = []string{"language", "lang"}
 )
 
-// GenericFiles selects the data files of a dataset that the generic profile reads. Putnam-AXIOM has the original problems, versions with a changed answer form and variations made by a program. Only the originals are human text.
+// GenericFiles selects the data files of a dataset that the generic profile reads. Putnam-AXIOM has the original problems, versions with a changed answer form and variations made by a program. Only the originals are human text. The genselect rows of OpenMathReasoning are prompts that give a problem and three solutions to compare, not problems. Their problems are in the other files.
 var GenericFiles = map[string]func(path string) bool{
-	"hf-putnam-axiom": func(p string) bool { return strings.Contains(p, "originals") },
+	"hf-putnam-axiom":      func(p string) bool { return strings.Contains(p, "originals") },
+	"hf-openmathreasoning": func(p string) bool { return !strings.Contains(p, "genselect") },
 }
 
 // Generic makes a profile from the column names of a table. It serves the small human sets, which have the usual names.
