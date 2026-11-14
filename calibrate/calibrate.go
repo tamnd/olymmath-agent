@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"math/rand/v2"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -190,11 +192,98 @@ type Agreement struct {
 	Quadratic float64
 	// Within1 is the part of the items where the points differ by at most 1.
 	Within1 float64
+	// Low and High are the bounds of the 95% interval of Kappa, from a bootstrap over the items (Interval). They are NaN when the kappa is.
+	Low, High float64
+}
+
+// Sample keeps n items of the list, drawn at random with the seed, in the order of the list. The same seed gives the same items. It keeps all items when n is 0 or not less than their number.
+func Sample(items []Item, n int, seed uint64) []Item {
+	if n <= 0 || n >= len(items) {
+		return items
+	}
+	r := rand.New(rand.NewPCG(seed, 0)) // #nosec G404 -- a reproducible sample, not a secret.
+	idx := r.Perm(len(items))[:n]
+	slices.Sort(idx)
+	out := make([]Item, 0, n)
+	for _, i := range idx {
+		out = append(out, items[i])
+	}
+	return out
+}
+
+// Bootstrap is the number of resamples of Interval.
+const Bootstrap = 2000
+
+// Interval gives the 95% interval of Cohen's kappa of two ratings with k categories: the 2.5 and 97.5 percentiles of the kappa of Bootstrap resamples of the items, drawn with a fixed seed. A resample with a kappa that is NaN is left out.
+func Interval(a, b []int, k int, quadratic bool) (lo, hi float64) {
+	n := len(a)
+	if n == 0 || n != len(b) || math.IsNaN(Kappa(a, b, k, quadratic)) {
+		return math.NaN(), math.NaN()
+	}
+	r := rand.New(rand.NewPCG(1, 2)) // #nosec G404 -- a reproducible bootstrap, not a secret.
+	ks := make([]float64, 0, Bootstrap)
+	ra, rb := make([]int, n), make([]int, n)
+	for range Bootstrap {
+		for i := range n {
+			j := r.IntN(n)
+			ra[i], rb[i] = a[j], b[j]
+		}
+		if v := Kappa(ra, rb, k, quadratic); !math.IsNaN(v) {
+			ks = append(ks, v)
+		}
+	}
+	if len(ks) == 0 {
+		return math.NaN(), math.NaN()
+	}
+	slices.Sort(ks)
+	at := func(q float64) float64 { return ks[min(len(ks)-1, int(q*float64(len(ks))))] }
+	return at(0.025), at(0.975)
+}
+
+// Pass reports whether a human grade of an item is a pass: 1 in a binary set, 7 points out of 7 in the other sets.
+func (s *Set) Pass(human int) bool {
+	if s.Binary {
+		return human == 1
+	}
+	return human == 7
+}
+
+// Overall gives the agreement on pass and fail over the items of all sets, so the sets with points and the binary set count together. A pass is 7 points, or a pass of a binary set; a jury pass is a score of Pass. Exact is the part of the items with the same pass or fail.
+func Overall(sets []*Set, items map[string][]Item, jury map[string]int) Agreement {
+	a := Agreement{Set: "all", Quadratic: math.NaN()}
+	var hum, mac []int
+	same := 0
+	for _, s := range sets {
+		for _, it := range items[s.Name] {
+			j, ok := jury[s.Name+"/"+it.ID]
+			if !ok {
+				continue
+			}
+			h, m := 0, 0
+			if s.Pass(it.Human) {
+				h = 1
+			}
+			if j >= Pass {
+				m = 1
+			}
+			hum, mac = append(hum, h), append(mac, m)
+			if h == m {
+				same++
+			}
+		}
+	}
+	a.N = len(hum)
+	a.Kappa = Kappa(hum, mac, 2, false)
+	a.Low, a.High = Interval(hum, mac, 2, false)
+	if a.N > 0 {
+		a.Exact = float64(same) / float64(a.N)
+	}
+	return a
 }
 
 // Compare gives the agreement of the jury scores (by item id) with the items. Items with no score are left out.
 func Compare(set *Set, items []Item, jury map[string]int) Agreement {
-	a := Agreement{Set: set.Name, Quadratic: math.NaN()}
+	a := Agreement{Set: set.Name, Quadratic: math.NaN(), Low: math.NaN(), High: math.NaN()}
 	var hum, mac, hp, mp []int
 	exact, within := 0, 0
 	for _, it := range items {
@@ -231,9 +320,11 @@ func Compare(set *Set, items []Item, jury map[string]int) Agreement {
 	a.Exact = float64(exact) / float64(a.N)
 	if set.Binary {
 		a.Kappa = Kappa(hum, mac, 2, false)
+		a.Low, a.High = Interval(hum, mac, 2, false)
 		return a
 	}
 	a.Kappa = Kappa(hum, mac, len(content.Buckets), false)
+	a.Low, a.High = Interval(hum, mac, len(content.Buckets), false)
 	a.Quadratic = Kappa(hp, mp, 8, true)
 	a.Within1 = float64(within) / float64(a.N)
 	return a
@@ -293,24 +384,41 @@ func Kappa(a, b []int, k int, quadratic bool) float64 {
 // Target is the kappa that the grader must reach before it is used at scale (issue 7).
 const Target = 0.8
 
-// Report writes the agreements as Markdown.
-func Report(w io.Writer, rows []Agreement, jurors []string, source string) {
+// Report writes the agreements as Markdown. overall is the agreement on pass and fail over all sets (Overall), or nil. sample says how the items were chosen, or is empty.
+func Report(w io.Writer, rows []Agreement, overall *Agreement, jurors []string, source, sample string) {
 	fmt.Fprintf(w, "# Grader calibration\n\nThe jury (%s, rule %s) graded the human-graded proofs of the calibration sets. The scores came from %s. The target is a Cohen's kappa of %.1f or more on each set.\n\n", strings.Join(jurors, ", "), grade.Rule, source, Target)
-	fmt.Fprintln(w, "| Set | Licence | Proofs | Exact | Kappa | Quadratic kappa | Within 1 point | Target met |")
-	fmt.Fprintln(w, "|---|---|---|---|---|---|---|---|")
+	if sample != "" {
+		fmt.Fprintf(w, "%s\n\n", sample)
+	}
+	fmt.Fprintln(w, "| Set | Licence | Proofs | Exact | Kappa | 95% interval | Quadratic kappa | Within 1 point | Target met |")
+	fmt.Fprintln(w, "|---|---|---|---|---|---|---|---|---|")
 	for _, a := range rows {
 		s := SetByName(a.Set)
 		title, lic := a.Set, ""
 		if s != nil {
 			title, lic = s.Title, s.Licence
 		}
-		met := "no"
-		if a.Kappa >= Target {
-			met = "yes"
-		}
-		fmt.Fprintf(w, "| %s | %s | %d | %s | %s | %s | %s | %s |\n", title, lic, a.N, pct(a.Exact, a.N), num(a.Kappa), num(a.Quadratic), within(a), met)
+		fmt.Fprintf(w, "| %s | %s | %d | %s | %s | %s | %s | %s | %s |\n", title, lic, a.N, pct(a.Exact, a.N), num(a.Kappa), interval(a), num(a.Quadratic), within(a), met(a))
 	}
-	fmt.Fprintln(w, "\nKappa is on the four buckets (correct, almost, partial, incorrect), or on pass and fail for the Open Proof Corpus, where a pass is a jury score of 7. The quadratic kappa is on the points from 0 to 7.")
+	if overall != nil {
+		a := *overall
+		fmt.Fprintf(w, "| All sets, pass or fail | | %d | %s | %s | %s | n/a | n/a | %s |\n", a.N, pct(a.Exact, a.N), num(a.Kappa), interval(a), met(a))
+	}
+	fmt.Fprintln(w, "\nKappa is on the four buckets (correct, almost, partial, incorrect), or on pass and fail for the Open Proof Corpus, where a pass is a jury score of 7. The quadratic kappa is on the points from 0 to 7. The row of all sets is on pass and fail, where a human pass is 7 points or a pass of the Open Proof Corpus. The 95% interval is the 2.5 and 97.5 percentiles of the kappa of 2,000 bootstrap resamples of the proofs.")
+}
+
+func met(a Agreement) string {
+	if a.Kappa >= Target {
+		return "yes"
+	}
+	return "no"
+}
+
+func interval(a Agreement) string {
+	if math.IsNaN(a.Low) || math.IsNaN(a.High) {
+		return "n/a"
+	}
+	return fmt.Sprintf("%.3f to %.3f", a.Low, a.High)
 }
 
 func pct(x float64, n int) string {

@@ -3,6 +3,8 @@ package calibrate
 import (
 	"bytes"
 	"math"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -36,6 +38,41 @@ func TestKappa(t *testing.T) {
 	far := Kappa([]int{0, 7, 3, 5}, []int{0, 7, 0, 5}, 8, true)
 	if near <= far {
 		t.Fatalf("near %v, far %v", near, far)
+	}
+}
+
+func TestSampleInterval(t *testing.T) {
+	var items []Item
+	for i := range 100 {
+		items = append(items, Item{ID: strconv.Itoa(i)})
+	}
+	a, b := Sample(items, 10, 7), Sample(items, 10, 7)
+	if len(a) != 10 || !slices.EqualFunc(a, b, func(x, y Item) bool { return x.ID == y.ID }) {
+		t.Fatalf("the samples of one seed differ: %v and %v", a, b)
+	}
+	if c := Sample(items, 10, 8); slices.EqualFunc(a, c, func(x, y Item) bool { return x.ID == y.ID }) {
+		t.Fatal("two seeds give the same sample")
+	}
+	if len(Sample(items, 0, 7)) != 100 || len(Sample(items, 200, 7)) != 100 {
+		t.Fatal("a sample of 0 or of more than all is not all")
+	}
+	// Agreement on 40 of 50 items: the kappa is in its interval, and the interval is not empty.
+	var x, y []int
+	for i := range 50 {
+		x = append(x, i%2)
+		if i < 40 {
+			y = append(y, i%2)
+		} else {
+			y = append(y, 1-i%2)
+		}
+	}
+	k := Kappa(x, y, 2, false)
+	lo, hi := Interval(x, y, 2, false)
+	if !(lo < k && k < hi) || lo < -1 || hi > 1 {
+		t.Fatalf("kappa %v, interval %v to %v", k, lo, hi)
+	}
+	if lo, _ := Interval([]int{1, 1}, []int{1, 1}, 2, false); !math.IsNaN(lo) {
+		t.Fatal("the interval of a NaN kappa is not NaN")
 	}
 }
 
@@ -76,9 +113,13 @@ func TestCompareReport(t *testing.T) {
 		t.Fatalf("the binary agreement is %+v", b)
 	}
 	var w bytes.Buffer
-	Report(&w, []Agreement{a, b}, grade.DefaultJurors, "a test")
+	all := Overall([]*Set{set, opc}, map[string][]Item{"gradingbench": items, "opc": oi}, map[string]int{"gradingbench/" + items[0].ID: 7, "gradingbench/" + items[1].ID: 0, "opc/" + oi[0].ID: 7, "opc/" + oi[1].ID: 6})
+	if all.N != 4 || all.Exact != 1 || all.Kappa != 1 {
+		t.Fatalf("the overall agreement is %+v", all)
+	}
+	Report(&w, []Agreement{a, b}, &all, grade.DefaultJurors, "a test", "The sample has 4 items.")
 	out := w.String()
-	if !strings.Contains(out, "| IMO-GradingBench | CC-BY-4.0 | 4 | 100.0% | 1.000 | 1.000 | 100.0% | yes |") || !strings.Contains(out, "CC-BY-NC-SA-4.0") {
+	if !strings.Contains(out, "| IMO-GradingBench | CC-BY-4.0 | 4 | 100.0% | 1.000 | 1.000 to 1.000 | 1.000 | 100.0% | yes |") || !strings.Contains(out, "CC-BY-NC-SA-4.0") || !strings.Contains(out, "| All sets, pass or fail | | 4 | 100.0% | 1.000 |") || !strings.Contains(out, "The sample has 4 items.") {
 		t.Fatalf("the report is\n%s", out)
 	}
 }
