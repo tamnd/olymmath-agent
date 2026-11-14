@@ -45,6 +45,12 @@ func TestCalibrateGrades(t *testing.T) {
 	if !strings.Contains(string(b), "| IMO-GradingBench | CC-BY-4.0 | 4 | 50.0% | 1.000 |") {
 		t.Fatalf("the report is\n%s", b)
 	}
+	// A seed draws the same sample each time, and the report says so.
+	code, outA, _ := run("calibrate", "-set", "gradingbench", "-work", work, "-grades", grades, "-limit", "2", "-seed", "5")
+	_, outB, _ := run("calibrate", "-set", "gradingbench", "-work", work, "-grades", grades, "-limit", "2", "-seed", "5")
+	if code == ExitUsage || outA != outB || !strings.Contains(outA, "The sample has 2 of IMO-GradingBench, drawn at random in each set with the seed 5") || !strings.Contains(outA, "| IMO-GradingBench | CC-BY-4.0 | 2 |") {
+		t.Fatalf("the seeded run gives %d,\n%s", code, outA)
+	}
 	if code, _, errs := run("calibrate", "-set", "proofbench", "-work", work, "-grades", grades); code != ExitUsage || !strings.Contains(errs, "om calibrate fetch") {
 		t.Fatalf("a missing set gives %d, %q", code, errs)
 	}
@@ -61,5 +67,12 @@ func TestCalibrateJury(t *testing.T) {
 	code, out, errs := run("calibrate", "-set", "gradingbench", "-work", work, "-budget", "1")
 	if code != ExitFindings || f.Calls() != 8 || !strings.Contains(out, "4 proofs graded") || !strings.Contains(out, "| no |") {
 		t.Fatalf("code %d, %d calls, out %q, errs %q", code, f.Calls(), out, errs)
+	}
+	files, _ := filepath.Glob(filepath.Join(work, "calibration", "grades-*.jsonl"))
+	if len(files) != 1 {
+		t.Fatalf("grades files %v", files)
+	}
+	if b, _ := os.ReadFile(files[0]); !strings.Contains(string(b), `"graders":[{"by":"model:`) {
+		t.Fatalf("the grades file has no graders:\n%s", b)
 	}
 }
