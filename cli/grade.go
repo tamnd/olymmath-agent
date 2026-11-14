@@ -38,6 +38,7 @@ func runGrade(env Env, args []string) int {
 	regrade := fs.Bool("regrade", false, "also grade the solutions that have a jury grade")
 	human := fs.Bool("human", false, "also grade the human solutions of the named problems or solutions")
 	effort := fs.String("effort", "", "the effort of the calls: low, medium, high or max")
+	tie := fs.String("tiebreak", "", "a third juror that breaks the tie when the two jurors end in different buckets; the jury score is then the median of the three")
 	pos, err := parseMixed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -47,7 +48,7 @@ func runGrade(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om grade: the content has %d errors. Run om check first.\n", findings.Errors())
 		return ExitFindings
 	}
-	if err := checkJurors(strings.Split(*jurors, ",")); err != nil {
+	if err := checkJurors(append(strings.Split(*jurors, ","), tieJuror(*tie)...)); err != nil {
 		fmt.Fprintf(env.Stderr, "om grade: %v\n", err)
 		return ExitUsage
 	}
@@ -59,7 +60,7 @@ func runGrade(env Env, args []string) int {
 	for i, j := range jobs {
 		tasks[i] = j.task
 	}
-	opts := grade.Options{Effort: *effort}
+	opts := grade.Options{Effort: *effort, TieBreak: strings.TrimSpace(*tie)}
 	cost, calls, err := grade.Estimate(tasks, opts, *batch)
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om grade: %v\n", err)
@@ -76,7 +77,7 @@ func runGrade(env Env, args []string) int {
 		fmt.Fprintln(env.Stderr, "om grade: set -budget in US dollars, or use -dry-run")
 		return ExitUsage
 	}
-	client, err := juryClient(taskJurors(tasks), *batch, *work)
+	client, err := juryClient(append(taskJurors(tasks), tieJuror(*tie)...), *batch, *work)
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om grade: %v\n", err)
 		return ExitUsage
@@ -90,7 +91,7 @@ func runGrade(env Env, args []string) int {
 	}
 	dir := filepath.Join(*work, rec.ID)
 	b := &model.Budget{Client: client, Limit: *budget, Batch: *batch}
-	results, err := grade.Run(context.Background(), &model.Cache{Client: b, Dir: filepath.Join(dir, "calls"), Each: allCLI(taskJurors(tasks))}, tasks, opts)
+	results, err := grade.Run(context.Background(), &model.Cache{Client: b, Dir: filepath.Join(dir, "calls"), Each: allCLI(append(taskJurors(tasks), tieJuror(*tie)...))}, tasks, opts)
 	if err != nil {
 		rec.Status = "failed"
 		fmt.Fprintf(env.Stderr, "om grade: %v\n", err)

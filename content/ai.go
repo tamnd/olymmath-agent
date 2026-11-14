@@ -49,7 +49,7 @@ type Grade struct {
 var Scales = map[string]int{"imo-7": 7}
 
 // GradeRules are the rules that make the score of a jury from the scores of its graders.
-var GradeRules = []string{"min-of-jury-v1"}
+var GradeRules = []string{"min-of-jury-v1", "min-of-jury-tiebreak-v1"}
 
 // Buckets are the buckets of a grade, best first (spec 07.4).
 var Buckets = []string{"correct", "almost", "partial", "incorrect"}

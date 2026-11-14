@@ -11,6 +11,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -33,6 +34,8 @@ type calibrationGrade struct {
 	Queue bool   `json:"queue,omitempty"`
 	// Graders are the scores of the jurors, by the model that answered, so the agreement of each juror can be measured.
 	Graders []calibrationJudge `json:"graders,omitempty"`
+	// TieBreak is the score of the tie-break juror, when the jury needed one.
+	TieBreak *calibrationJudge `json:"tiebreak,omitempty"`
 }
 
 // calibrationJudge is the last score of one juror, and its score of the first round.
@@ -69,6 +72,7 @@ func runCalibrate(env Env, args []string) int {
 	dry := fs.Bool("dry-run", false, "print the plan and the cost estimate, and call no model")
 	budget := fs.Float64("budget", 0, "the most the run may cost, in US dollars")
 	jurors := fs.String("jurors", strings.Join(grade.DefaultJurors, ","), "the models of the jury, by commas. A juror such as cli:gemini runs a local command-line client (see om grade).")
+	tie := fs.String("tiebreak", "", "a third juror that breaks the tie when the two jurors end in different buckets; the jury score is then the median of the three")
 	batch := fs.Bool("batch", true, "use the Batch API, at half the price")
 	out := fs.String("out", "", "the report file, for example reports/calibration.md in the content repository; empty for the standard output")
 	if _, err := parseMixed(fs, args); err != nil {
@@ -83,7 +87,7 @@ func runCalibrate(env Env, args []string) int {
 	items := map[string][]calibrate.Item{}
 	var tasks []grade.Task
 	js := strings.Split(*jurors, ",")
-	if err := checkJurors(js); err != nil {
+	if err := checkJurors(append(slices.Clone(js), tieJuror(*tie)...)); err != nil {
 		fmt.Fprintf(env.Stderr, "om calibrate: %v\n", err)
 		return ExitUsage
 	}
@@ -129,13 +133,15 @@ func runCalibrate(env Env, args []string) int {
 			fmt.Fprintln(env.Stderr, "om calibrate: set -budget in US dollars, -grades FILE, or -dry-run")
 			return ExitUsage
 		}
-		client, err := juryClient(taskJurors(tasks), *batch, *work)
+		opts := grade.Options{TieBreak: strings.TrimSpace(*tie)}
+		all := append(taskJurors(tasks), tieJuror(*tie)...)
+		client, err := juryClient(all, *batch, *work)
 		if err != nil {
 			fmt.Fprintf(env.Stderr, "om calibrate: %v\n", err)
 			return ExitUsage
 		}
 		b := &model.Budget{Client: client, Limit: *budget, Batch: *batch}
-		results, err := grade.Run(context.Background(), &model.Cache{Client: b, Dir: filepath.Join(dir, "calls"), Each: allCLI(taskJurors(tasks))}, tasks, grade.Options{})
+		results, err := grade.Run(context.Background(), &model.Cache{Client: b, Dir: filepath.Join(dir, "calls"), Each: allCLI(all)}, tasks, opts)
 		if err != nil {
 			fmt.Fprintf(env.Stderr, "om calibrate: %v\n", err)
 			return ExitFailure
@@ -262,6 +268,9 @@ func writeCalibrationGrades(path string, results []*grade.Result, scores map[str
 		g := calibrationGrade{ID: r.Task.ID, Score: r.Score, Queue: r.Queue}
 		for _, v := range r.Verdicts {
 			g.Graders = append(g.Graders, calibrationJudge{By: "model:" + v.Name(), Score: v.Score, First: v.First})
+		}
+		if v := r.TieBreak; v != nil {
+			g.TieBreak = &calibrationJudge{By: "model:" + v.Name(), Score: v.Score, First: v.First}
 		}
 		line, _ := json.Marshal(g)
 		b.Write(line)

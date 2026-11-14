@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/tamnd/olymmath-agent/grade"
 	"github.com/tamnd/olymmath-agent/model"
@@ -23,6 +24,14 @@ func taskJurors(tasks []grade.Task) []string {
 		}
 	}
 	return out
+}
+
+// tieJuror gives the tie-break juror as a list, empty when there is none.
+func tieJuror(m string) []string {
+	if m = strings.TrimSpace(m); m == "" {
+		return nil
+	}
+	return []string{m}
 }
 
 // checkJurors gives an error for a cli: juror that names no known client.

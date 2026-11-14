@@ -80,4 +80,8 @@ func TestCalibrateJury(t *testing.T) {
 	if b, _ := os.ReadFile(files[0]); !strings.Contains(string(b), `"graders":[{"by":"model:`) {
 		t.Fatalf("the grades file has no graders:\n%s", b)
 	}
+	// A tie-break juror that names no known client is a usage error.
+	if code, _, errs := run("calibrate", "-set", "gradingbench", "-work", work, "-budget", "1", "-tiebreak", "cli:nope"); code != ExitUsage || !strings.Contains(errs, "cli:nope") {
+		t.Fatalf("a bad tie-break juror gives %d, %q", code, errs)
+	}
 }
