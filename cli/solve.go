@@ -79,6 +79,8 @@ func runSolve(env Env, args []string) int {
 	comp := fs.String("comp", "", "only the problems of this competition")
 	minBand := fs.Int("min-band", 0, "only the problems of this band or harder")
 	maxBand := fs.Int("max-band", 0, "only the problems of this band or easier")
+	perBand := fs.Int("per-band", 0, "at most this many problems of each band, drawn at random with -seed; the problems with no band count as one band")
+	seed := fs.Uint64("seed", 1, "the seed of the -per-band draw")
 	batch := fs.Bool("batch", true, "use the Batch API, at half the price")
 	work := fs.String("work", defaultWork(), "the directory of the call caches and the transcripts")
 	resume := fs.String("resume", "", "the id of a run to go on with; the calls that ended come from the cache")
@@ -92,7 +94,7 @@ func runSolve(env Env, args []string) int {
 		return ExitFindings
 	}
 	opts := solve.Options{Model: *mdl, K: *k, Effort: *effort}
-	items := solve.Select(corpus, solve.Filter{Comp: *comp, Tags: pos, MinBand: *minBand, MaxBand: *maxBand, Limit: *limit}, opts)
+	items := solve.Select(corpus, solve.Filter{Comp: *comp, Tags: pos, MinBand: *minBand, MaxBand: *maxBand, Limit: *limit, PerBand: *perBand, Seed: *seed}, opts)
 	est, err := solve.Plan(items, opts, *batch)
 	if err != nil {
 		fmt.Fprintf(env.Stderr, "om solve: %v\n", err)

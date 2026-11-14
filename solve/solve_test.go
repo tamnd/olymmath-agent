@@ -2,6 +2,7 @@ package solve
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -38,6 +39,42 @@ func TestSelect(t *testing.T) {
 	}
 	if got := Select(c, Filter{Limit: 1}, Options{}); len(got) != 1 {
 		t.Fatalf("Limit 1 gives %d", len(got))
+	}
+}
+
+func TestPerBand(t *testing.T) {
+	var items []Item
+	for i := range 30 {
+		p := &content.Problem{Tag: fmt.Sprintf("x%02d", i)}
+		items = append(items, Item{Problem: p, Band: i % 3})
+	}
+	a := perBand(items, 4, 7)
+	if len(a) != 12 {
+		t.Fatalf("perBand keeps %d items, want 12", len(a))
+	}
+	count := map[int]int{}
+	for _, it := range a {
+		count[it.Band]++
+	}
+	for b := range 3 {
+		if count[b] != 4 {
+			t.Errorf("band %d has %d items, want 4", b, count[b])
+		}
+	}
+	b := perBand(items, 4, 7)
+	c := perBand(items, 4, 8)
+	same := true
+	for i := range a {
+		if a[i].Problem != b[i].Problem {
+			t.Fatal("the same seed gives a different draw")
+		}
+		same = same && a[i].Problem == c[i].Problem
+	}
+	if same {
+		t.Error("a different seed gives the same draw")
+	}
+	if got := perBand(items, 50, 7); len(got) != 30 {
+		t.Errorf("a large n keeps %d items, want 30", len(got))
 	}
 }
 
