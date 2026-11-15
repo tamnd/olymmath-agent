@@ -52,6 +52,22 @@ func TestChooseReworded(t *testing.T) {
 	}
 }
 
+func TestChooseLast(t *testing.T) {
+	text := "The sides of a triangle with positive area have lengths $4$, $6$, and $x$. What is the smallest positive number that is not a possible value of $x$?"
+	cs := []*Candidate{
+		cand("amc10/2000/p10", "hf-aops-wiki-pages", "D", "The sides of a triangle with positive area have lengths $4$ $6$ , and $x$. What is the smallest positive number that is not a possible value of $x$", ""),
+		cand("amc10/2000/p10", "hf-numinamath-1-5", "D", text, ""),
+	}
+	ch, ok := Choose("amc10/2000/p10", cs, "en")
+	if !ok || ch.Best.Source != "hf-numinamath-1-5" {
+		t.Fatalf("best %v, want hf-numinamath-1-5", ch.Best)
+	}
+	only, _ := Choose("amc10/2000/p10", cs[:1], "en")
+	if only.Best == nil || only.Best.Source != "hf-aops-wiki-pages" {
+		t.Fatalf("best %v, want the wiki pages when they are the only text", only.Best)
+	}
+}
+
 func TestChooseDispute(t *testing.T) {
 	cs := []*Candidate{
 		cand("aime/2021a/p3", "aops-wiki", "H3", geo, "12"),
