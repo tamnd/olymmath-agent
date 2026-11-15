@@ -96,3 +96,45 @@ func TestWriterKeepsLastWrite(t *testing.T) {
 		t.Errorf("the file has %v, %v, want [99]", b, err)
 	}
 }
+
+// TestLooseBatchSameOutput builds the site with one loose problem in each batch and with all of them in one batch. The texts of a batch leave the memory after its pages, so a text can render twice. It wants the same files and the same warnings each time.
+func TestLooseBatchSameOutput(t *testing.T) {
+	corpus, fs := content.Load("../content/testdata/valid")
+	if len(fs) != 0 {
+		t.Fatal(fs)
+	}
+	if len(corpus.Loose) == 0 {
+		t.Fatal("the test content has no loose problem")
+	}
+	// Two more loose problems with the texts of the first one, so a text is in three batches.
+	for _, suffix := range []string{"A", "B"} {
+		q := *corpus.Loose[0]
+		q.Tag += suffix
+		corpus.Loose = append(corpus.Loose, &q)
+	}
+	old := LooseBatch
+	defer func() { LooseBatch = old }()
+	run := func(batch int) (map[string][]byte, Stats) {
+		LooseBatch = batch
+		files, stats, err := Render(corpus, Options{URL: "https://example.org", Commit: "0123456789abcdef", Version: "test", Date: time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return files, stats
+	}
+	one, s1 := run(1)
+	all, sa := run(len(corpus.Loose))
+	if len(one) != len(all) || len(s1.Errors) != len(sa.Errors) {
+		t.Fatalf("a batch of 1 gives %d files and %d warnings, one batch gives %d and %d", len(one), len(s1.Errors), len(all), len(sa.Errors))
+	}
+	for f, data := range all {
+		if !bytes.Equal(one[f], data) {
+			t.Errorf("%s differs", f)
+		}
+	}
+	for i := range sa.Errors {
+		if s1.Errors[i].Error() != sa.Errors[i].Error() {
+			t.Errorf("warning %d: %v, want %v", i, s1.Errors[i], sa.Errors[i])
+		}
+	}
+}

@@ -47,24 +47,36 @@ func (p Plan) Split(files map[string][]byte, place Place) map[string][]byte {
 
 // PlanSplit tells where each file of a built site goes, with files by their slash paths. It takes the redirect pages from redirects.json in files. It has the rules of Split and then of Fit with limit, so a release in memory gives the same static assets and the same packs as om site build, split and pack on disk. It gives an error, with the plan, when more than limit files stay.
 func PlanSplit(files map[string][]byte, corpus *content.Corpus, t Tiers, limit int) (Plan, error) {
-	p := Plan{Places: make(map[string]Place, len(files))}
 	data, ok := files["redirects.json"]
 	if !ok {
-		return p, fmt.Errorf("the site has no redirects.json")
+		return Plan{Places: map[string]Place{}}, fmt.Errorf("the site has no redirects.json")
 	}
-	redirects, err := redirectFiles(data)
+	paths := make([]string, 0, len(files))
+	for f := range files {
+		paths = append(paths, f)
+	}
+	return PlanPaths(paths, data, corpus, t, limit)
+}
+
+// PlanPaths is PlanSplit for the slash paths of the files and the data of redirects.json. It needs no data of the other files, so a release can keep them on the disk. The paths must be different.
+func PlanPaths(paths []string, redirectsJSON []byte, corpus *content.Corpus, t Tiers, limit int) (Plan, error) {
+	p := Plan{Places: make(map[string]Place, len(paths))}
+	for _, f := range paths {
+		p.Places[f] = Static
+	}
+	redirects, err := redirectFiles(redirectsJSON)
 	if err != nil {
 		return p, err
 	}
 	for _, f := range redirects {
-		if _, ok := files[f]; ok {
+		if _, ok := p.Places[f]; ok {
 			p.Places[f] = Gone
 			p.Deleted++
 		}
 	}
 	rules := Rules(corpus, t)
 	static := 0
-	for f := range files {
+	for _, f := range paths {
 		if p.Places[f] == Gone {
 			continue
 		}
@@ -122,6 +134,20 @@ func PlanSplit(files map[string][]byte, corpus *content.Corpus, t Tiers, limit i
 
 // Release writes the files of a site that site.Render built, by the plan: the static assets to out, the packs to pack and the index of each pack to out/_pack. It replaces both directories. It gives the same files as om site build, split and pack, and it writes no redirect page and no file of R2 apart from the packs.
 func Release(files map[string][]byte, p Plan, out, pack string) (PackResult, error) {
+	paths := make([]string, 0, len(files))
+	for f := range files {
+		paths = append(paths, f)
+	}
+	return release(paths, func(f string) ([]byte, error) { return files[f], nil }, p, out, pack)
+}
+
+// ReleaseSpool is Release for the files in a spool. It reads each file from the spool when it writes it, so it keeps few files in memory at a time.
+func ReleaseSpool(s *Spool, p Plan, out, pack string) (PackResult, error) {
+	return release(s.Paths(), s.Read, p, out, pack)
+}
+
+// release writes the files at paths by the plan. read gives the data of a file by its slash path.
+func release(paths []string, read func(f string) ([]byte, error), p Plan, out, pack string) (PackResult, error) {
 	for _, d := range []string{out, pack} {
 		if err := os.RemoveAll(d); err != nil {
 			return PackResult{}, err
@@ -131,14 +157,23 @@ func Release(files map[string][]byte, p Plan, out, pack string) (PackResult, err
 	if err := os.MkdirAll(out, 0o750); err != nil {
 		return PackResult{}, err
 	}
+	var static, bucket []string
+	for _, f := range paths {
+		switch p.Places[f] {
+		case Static:
+			static = append(static, f)
+		case Bucket:
+			bucket = append(bucket, f)
+		}
+	}
 	// The packs and the static assets are different files, so they write at the same time.
 	var res PackResult
 	var perr error
 	var wg sync.WaitGroup
 	wg.Go(func() {
-		res, perr = PackFiles(p.Split(files, Bucket), pack, filepath.Join(out, "_pack"))
+		res, perr = packPaths(bucket, read, pack, filepath.Join(out, "_pack"))
 	})
-	err := site.Write(out, p.Split(files, Static))
+	err := site.WriteEach(out, static, read)
 	wg.Wait()
 	if err == nil {
 		err = perr

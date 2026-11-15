@@ -1,12 +1,13 @@
 package publish
 
 import (
-	"bytes"
+	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -103,13 +104,22 @@ func Pack(in, out, index string) (PackResult, error) {
 
 // PackFiles packs files, by their slash paths, as Pack packs a directory with these files. It gives the same packs and indexes, and it reads no file.
 func PackFiles(files map[string][]byte, out, index string) (PackResult, error) {
-	groups := map[string][]string{}
+	paths := make([]string, 0, len(files))
 	for rel := range files {
+		paths = append(paths, rel)
+	}
+	return packPaths(paths, func(f string) ([]byte, error) { return files[f], nil }, out, index)
+}
+
+// packPaths packs the files at the slash paths, as Pack packs a directory with these files. read gives the data of a file by its slash path.
+func packPaths(paths []string, read func(f string) ([]byte, error), out, index string) (PackResult, error) {
+	groups := map[string][]string{}
+	for _, rel := range paths {
 		if err := group(groups, rel); err != nil {
 			return PackResult{}, err
 		}
 	}
-	return packGroups(groups, out, index, func(f string) ([]byte, error) { return files[f], nil })
+	return packGroups(groups, out, index, read)
 }
 
 // group adds the file at the slash path rel to the files of its top folder.
@@ -164,34 +174,39 @@ func shardOf(f string) int {
 	return int(h.Sum32() % Shards)
 }
 
-// packFolder writes the packs of one folder and its index.
+// packFolder writes the packs of one folder and its index. It writes one pack at a time, and it reads each file when it adds it to the pack, so it keeps one file in memory at a time and not the folder.
 func packFolder(out, index, folder string, files []string, read func(f string) ([]byte, error)) error {
 	sort.Strings(files)
 	n := shards(len(files))
-	bufs := make([]bytes.Buffer, n)
 	ix := PackIndex{Files: make(map[string]PackEntry, len(files))}
-	for _, f := range files {
-		b, err := read(folder + "/" + f)
-		if err != nil {
-			return err
-		}
-		s := -1
-		if n > 1 {
-			s = shardOf(f)
-		}
-		buf := &bufs[max(s, 0)]
-		sum := sha256.Sum256(b)
-		ix.Files[f] = PackEntry{Offset: buf.Len(), Length: len(b), Hash: hex.EncodeToString(sum[:8]), Shard: s}
-		buf.Write(b)
-	}
-	for i := range bufs {
+	for i := range n {
 		name := folder
 		if n > 1 {
 			name = fmt.Sprintf("%s-%02d", folder, i)
 		}
-		sum := sha256.Sum256(bufs[i].Bytes())
-		key := PackDir + "/" + name + "." + hex.EncodeToString(sum[:6]) + ".pack"
-		if err := os.WriteFile(filepath.Join(out, filepath.FromSlash(key)), bufs[i].Bytes(), 0o644); err != nil { // #nosec G306 -- the site is public.
+		key, err := writePack(out, name, func(w io.Writer) error {
+			off := 0
+			for _, f := range files {
+				s := -1
+				if n > 1 {
+					if s = shardOf(f); s != i {
+						continue
+					}
+				}
+				b, err := read(folder + "/" + f)
+				if err != nil {
+					return err
+				}
+				if _, err := w.Write(b); err != nil {
+					return err
+				}
+				sum := sha256.Sum256(b)
+				ix.Files[f] = PackEntry{Offset: off, Length: len(b), Hash: hex.EncodeToString(sum[:8]), Shard: s}
+				off += len(b)
+			}
+			return nil
+		})
+		if err != nil {
 			return err
 		}
 		if n > 1 {
@@ -204,6 +219,30 @@ func packFolder(out, index, folder string, files []string, read func(f string) (
 		return writeShards(index, folder, ix)
 	}
 	return writeJSON(filepath.Join(index, folder+".json"), ix)
+}
+
+// writePack writes the pack name of a folder to out/pack. fill writes the data of the pack. The pack goes to a temporary file first, because its key has the hash of its bytes. It gives the key.
+func writePack(out, name string, fill func(w io.Writer) error) (string, error) {
+	tmp := filepath.Join(out, PackDir, name+".tmp")
+	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644) // #nosec G302 G304 -- the site is public, and the path is under the output directory.
+	if err != nil {
+		return "", err
+	}
+	h := sha256.New()
+	bw := bufio.NewWriterSize(f, 1<<20)
+	err = fill(io.MultiWriter(bw, h))
+	if err == nil {
+		err = bw.Flush()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		_ = os.Remove(tmp)
+		return "", err
+	}
+	key := PackDir + "/" + name + "." + hex.EncodeToString(h.Sum(nil)[:6]) + ".pack"
+	return key, os.Rename(tmp, filepath.Join(out, filepath.FromSlash(key)))
 }
 
 // writeShards writes the index of a big folder as a head with the packs and one file for the entries of each shard.

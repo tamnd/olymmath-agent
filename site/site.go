@@ -79,20 +79,26 @@ func Build(corpus *content.Corpus, opts Options) (Stats, error) {
 	return b.stats, err
 }
 
-// Render builds the site of corpus in memory and writes no file. It gives the data of each file by its slash path, for example imo/2024/p1.html. The files are the same as the files of Build, and opts.Out is not used. A release takes the files that stay static assets and packs the rest, so the files that go to R2 never touch the disk.
+// Render builds the site of corpus in memory and writes no file. It gives the data of each file by its slash path, for example imo/2024/p1.html. The files are the same as the files of Build, and opts.Out is not used. It keeps all the files in memory, so a big corpus needs RenderTo.
 func Render(corpus *content.Corpus, opts Options) (map[string][]byte, Stats, error) {
-	b, err := newBuilder(corpus, opts)
-	if err != nil {
-		return nil, Stats{}, err
-	}
 	files := map[string][]byte{}
 	// A path that a build writes twice keeps its last data, as on disk.
-	b.out = func(rel string, data []byte) error {
+	stats, err := RenderTo(corpus, opts, func(rel string, data []byte) error {
 		files[rel] = data
 		return nil
+	})
+	return files, stats, err
+}
+
+// RenderTo builds the site of corpus and hands each file to out by its slash path, for example imo/2024/p1.html, as soon as the file is ready. The files are the same as the files of Build, and opts.Out is not used. A path that the build writes twice comes twice, and the last data counts. out must not keep or change data after it returns, unless it copies it. A release puts the files in a spool on the disk, so the memory does not grow with the bytes of the site.
+func RenderTo(corpus *content.Corpus, opts Options, out func(rel string, data []byte) error) (Stats, error) {
+	b, err := newBuilder(corpus, opts)
+	if err != nil {
+		return Stats{}, err
 	}
+	b.out = out
 	err = b.run()
-	return files, b.stats, err
+	return b.stats, err
 }
 
 // Write writes files to dir, by their slash paths, with one worker for each CPU. The files and the folders have the same modes as the files of Build. dir must be empty or missing.
@@ -104,6 +110,25 @@ func Write(dir string, files map[string][]byte) error {
 		}
 	}
 	return w.close()
+}
+
+// WriteEach writes the files at the slash paths rels to dir, as Write does. read gives the data of each file. It reads a file just before it writes it, so few files are in memory at a time.
+func WriteEach(dir string, rels []string, read func(rel string) ([]byte, error)) error {
+	w := newWriter(max(runtime.NumCPU(), 1))
+	var err error
+	for _, rel := range rels {
+		var data []byte
+		if data, err = read(rel); err != nil {
+			break
+		}
+		if err = w.write(filepath.Join(dir, filepath.FromSlash(rel)), data); err != nil {
+			break
+		}
+	}
+	if werr := w.close(); err == nil {
+		err = werr
+	}
+	return err
 }
 
 // run builds the site and hands each file to b.out. It loads and saves the formula cache.
@@ -428,24 +453,34 @@ func (b *builder) html(src, where string) template.HTML {
 	return template.HTML(r.html) // #nosec G203 -- goldmark escapes raw HTML and KaTeX escapes its input.
 }
 
-// prerender renders each Markdown text of the corpus, with one worker for each CPU. The pages then take the HTML from b.rendered, in the same order as before, so the output and the order of the warnings do not depend on the workers.
+// prerender renders each Markdown text of the problems with a position, with one worker for each CPU. The pages then take the HTML from b.rendered, in the same order as before, so the output and the order of the warnings do not depend on the workers. The texts of the loose problems render in batches when their pages render (problems), and they leave b.rendered after their pages, so the memory does not keep the HTML of all the loose problems.
 func (b *builder) prerender() error {
+	var placed []*content.Problem
+	for _, p := range b.corpus.All() {
+		if p.Primary() != nil {
+			placed = append(placed, p)
+		}
+	}
+	b.renderTexts(placed)
+	return nil
+}
+
+// renderTexts renders the texts of ps that are not in b.rendered, with one worker for each CPU, and adds them to b.rendered. It gives the new texts.
+func (b *builder) renderTexts(ps []*content.Problem) []string {
 	var texts []string
 	seen := map[string]bool{}
 	add := func(s, file string) {
 		s = b.text(s, file)
-		if s != "" && !seen[s] {
+		if _, ok := b.rendered[s]; s != "" && !ok && !seen[s] {
 			seen[s] = true
 			texts = append(texts, s)
 		}
 	}
-	for _, ps := range [][]*content.Problem{b.corpus.All(), b.corpus.Loose} {
-		for _, p := range ps {
-			add(p.Statement, p.Path)
-			add(p.Answer, p.Path)
-			for _, s := range p.Solutions {
-				add(s.Body, s.Path)
-			}
+	for _, p := range ps {
+		add(p.Statement, p.Path)
+		add(p.Answer, p.Path)
+		for _, s := range p.Solutions {
+			add(s.Body, s.Path)
 		}
 	}
 	out := make([]renderedText, len(texts))
@@ -455,7 +490,7 @@ func (b *builder) prerender() error {
 	for i, t := range texts {
 		b.rendered[t] = out[i]
 	}
-	return nil
+	return texts
 }
 
 // parallel calls f for each i from 0 to n-1, with at most workers calls at the same time.
@@ -881,13 +916,26 @@ func (b *builder) problems() error {
 			}
 		}
 	}
-	for _, p := range b.corpus.Loose {
-		if err := b.problem(b.view(p)); err != nil {
-			return err
+	// A loose problem shows only on its own page. Its texts render in a batch just before the pages of the batch, and leave b.rendered after them. A text that renders again later gives the same HTML and the same errors.
+	loose := b.corpus.Loose
+	for len(loose) > 0 {
+		batch := loose[:min(LooseBatch, len(loose))]
+		loose = loose[len(batch):]
+		texts := b.renderTexts(batch)
+		for _, p := range batch {
+			if err := b.problem(b.view(p)); err != nil {
+				return err
+			}
+		}
+		for _, t := range texts {
+			delete(b.rendered, t)
 		}
 	}
 	return nil
 }
+
+// LooseBatch is the number of loose problems whose texts render at the same time, and so the most loose problems with their HTML in memory.
+var LooseBatch = 4096
 
 func (b *builder) problem(v *problemView) error {
 	p := problemPath(v.Problem)
@@ -1190,16 +1238,23 @@ func (b *builder) searchIndex() error {
 	for i, p := range b.corpus.Loose {
 		parts[1+i/SearchChunk] = append(parts[1+i/SearchChunk], p)
 	}
+	// Each entry is encoded on its own, so the memory holds the bytes of one file and not also all its entries. The bytes are the same as json.Marshal of the list.
+	var buf bytes.Buffer
 	for i, ps := range parts {
-		entries := make([]searchEntry, 0, len(ps))
-		for _, p := range ps {
-			entries = append(entries, entry(p))
+		buf.Reset()
+		buf.WriteByte('[')
+		for j, p := range ps {
+			data, err := json.Marshal(entry(p))
+			if err != nil {
+				return err
+			}
+			if j > 0 {
+				buf.WriteByte(',')
+			}
+			buf.Write(data)
 		}
-		data, err := json.Marshal(entries)
-		if err != nil {
-			return err
-		}
-		if err := b.write(files[i], data); err != nil {
+		buf.WriteByte(']')
+		if err := b.write(files[i], bytes.Clone(buf.Bytes())); err != nil {
 			return err
 		}
 	}

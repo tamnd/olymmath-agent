@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -214,5 +215,84 @@ func TestPackFilesSameAsPack(t *testing.T) {
 	same(t, "packs", files(t, b), files(t, a))
 	if _, err := PackFiles(map[string][]byte{"top.html": nil}, b, b); err == nil {
 		t.Error("a file that is not in a folder gave no error")
+	}
+}
+
+// TestReleaseSpoolSameAsRelease builds the test content with RenderTo into a spool, and wants PlanPaths and ReleaseSpool to give the same plan and the same files, byte for byte, as Render, PlanSplit and Release in memory. It also wants the release to read each file of the spool once, so that a file is in memory only while it is written.
+func TestReleaseSpoolSameAsRelease(t *testing.T) {
+	corpus, findings := content.Load("../content/testdata/valid")
+	if len(findings) != 0 {
+		t.Fatal(findings)
+	}
+	opts := site.Options{URL: "https://example.org", Commit: "0123456789abcdef", Version: "test", Date: time.Date(2026, 11, 3, 0, 0, 0, 0, time.UTC)}
+	mem, _, err := site.Render(corpus, opts)
+	if err != nil {
+		t.Fatal(err)
+	}
+	spool, err := NewSpool(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = spool.Remove() }()
+	if _, err := site.RenderTo(corpus, opts, spool.Put); err != nil {
+		t.Fatal(err)
+	}
+	if err := spool.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if spool.Len() != len(mem) {
+		t.Fatalf("the spool has %d files and Render gives %d", spool.Len(), len(mem))
+	}
+	for f, data := range mem {
+		got, err := spool.Read(f)
+		if err != nil || string(got) != string(data) {
+			t.Fatalf("%s: the spool gives other data (%v)", f, err)
+		}
+	}
+	redirects, err := spool.Read("redirects.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tiers := Tiers{Groups: []string{"international"}}
+	want, err := PlanSplit(mem, corpus, tiers, len(mem))
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := PlanPaths(spool.Paths(), redirects, corpus, tiers, len(mem))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !maps.Equal(plan.Places, want.Places) || plan.Deleted != want.Deleted || plan.Moved != want.Moved {
+		t.Fatalf("PlanPaths gives %d deleted and %d moved, PlanSplit gives %d and %d", plan.Deleted, plan.Moved, want.Deleted, want.Moved)
+	}
+	a, b := t.TempDir(), t.TempDir()
+	ra, err := Release(mem, want, filepath.Join(a, "site"), filepath.Join(a, "pack"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	reads := map[string]int{}
+	var mu sync.Mutex
+	counted := func(f string) ([]byte, error) {
+		mu.Lock()
+		reads[f]++
+		mu.Unlock()
+		return spool.Read(f)
+	}
+	rb, err := release(spool.Paths(), counted, plan, filepath.Join(b, "site"), filepath.Join(b, "pack"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ra != rb || rb.Files == 0 {
+		t.Fatalf("Release gives %+v and the spool gives %+v", ra, rb)
+	}
+	same(t, "site", files(t, filepath.Join(b, "site")), files(t, filepath.Join(a, "site")))
+	same(t, "pack", files(t, filepath.Join(b, "pack")), files(t, filepath.Join(a, "pack")))
+	for f, place := range plan.Places {
+		if n := reads[f]; (place == Gone && n != 0) || (place != Gone && n != 1) {
+			t.Errorf("%s: the release read it %d times", f, n)
+		}
+	}
+	if _, err := spool.Read("no/such/file.html"); err == nil {
+		t.Error("a missing file gave no error")
 	}
 }

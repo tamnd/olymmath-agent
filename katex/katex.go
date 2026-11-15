@@ -80,6 +80,10 @@ type Renderer struct {
 
 	mu    sync.Mutex
 	cache map[key]result
+
+	dict    []byte    // KaTeX markup that the compressor of the cache starts from
+	writers sync.Pool // *flate.Writer with dict
+	readers sync.Pool // flate readers with dict
 }
 
 // engine is one JavaScript runtime with KaTeX loaded.
@@ -95,7 +99,8 @@ type key struct {
 }
 
 type result struct {
-	html    string
+	html    []byte // the HTML, compressed with squeeze
+	size    int    // the length of the HTML
 	err     error
 	timeout bool // the render took too long. This depends on the load of the machine, so the cache file does not keep it
 	used    bool // the formula was asked for since New, so the cache file keeps it
@@ -116,6 +121,11 @@ func New(macros map[string]string) (*Renderer, error) {
 	e, err := r.newEngine()
 	if err != nil {
 		return nil, err
+	}
+	// The HTML of two formulas is the dictionary of the compressor. Most of the markup of a formula is the same tags and classes, so the dictionary makes each formula in the cache smaller.
+	for _, display := range []bool{false, true} {
+		html, _ := e.run(dictTeX, display)
+		r.dict = append(r.dict, html...)
 	}
 	r.idle <- e
 	return r, nil
@@ -165,37 +175,46 @@ func (r *Renderer) Render(tex string, display bool) (string, error) {
 	}
 	r.mu.Unlock()
 	if ok {
-		return res.html, res.err
+		html, err := r.expand(res)
+		if err != nil {
+			return "", err
+		}
+		return html, res.err
 	}
 	e, err := r.get()
 	if err != nil {
 		return "", err
 	}
-	res = e.run(tex, display)
-	res.used = true
+	html, res := e.run(tex, display)
 	r.idle <- e
+	if res.html, err = r.squeeze(html); err != nil {
+		return "", err
+	}
+	res.size, res.used = len(html), true
 	r.mu.Lock()
 	r.cache[k] = res
 	r.mu.Unlock()
-	return res.html, res.err
+	return html, res.err
 }
 
-func (e *engine) run(tex string, display bool) result {
+// run renders tex. The result has the error, and the HTML is the first value.
+func (e *engine) run(tex string, display bool) (string, result) {
 	t := time.AfterFunc(Timeout, func() { e.vm.Interrupt("timeout") })
 	v, err := e.render(goja.Undefined(), e.vm.ToValue(tex), e.vm.ToValue(display), e.macros)
 	t.Stop()
 	e.vm.ClearInterrupt()
 	var res result
+	var html string
 	switch {
 	case err == nil:
-		res.html = v.String()
+		html = v.String()
 	case isInterrupt(err):
 		res.err = &Error{TeX: tex, Message: fmt.Sprintf("KaTeX took more than %s", Timeout)}
 		res.timeout = true
 	default:
 		res.err = &Error{TeX: tex, Message: message(err)}
 	}
-	return res
+	return html, res
 }
 
 func isInterrupt(err error) bool {
