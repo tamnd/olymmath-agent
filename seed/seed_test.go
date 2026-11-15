@@ -304,6 +304,39 @@ func TestProfiles(t *testing.T) {
 			t.Errorf("wiki page %s: %v %+v", c.link, ok, row)
 		}
 	}
+	page := Record{"link": {"https://artofproblemsolving.com/wiki/index.php/2013_AMC_8_Problems/Problem_1"}, "letter": {"A"}, "answer": {"1"},
+		"problem": {`How many more cars? $\textbf{(A)}\ 3 \qquad \textbf{(B)}\ 2 \qquad \textbf{(C)}\ 1 \qquad \textbf{(D)}\ 4 \qquad \textbf{(E)}\ 533$`}}
+	if row, ok := wp.Map(page); !ok || row.Answer != "" {
+		t.Errorf("a letter against the value of another choice gives no answer: %+v", row)
+	}
+	page["letter"] = []string{"C"}
+	if row, ok := wp.Map(page); !ok || row.Answer != "C" {
+		t.Errorf("a letter that agrees with the value: %+v", row)
+	}
+	page["answer"] = []string{"7"}
+	if row, ok := wp.Map(page); !ok || row.Answer != "C" {
+		t.Errorf("a value that is no choice keeps the letter: %+v", row)
+	}
+	page["letter"], page["answer"] = []string{""}, []string{"533"}
+	if row, ok := wp.Map(page); !ok || row.Answer != "E" {
+		t.Errorf("a value that is a choice gives its letter: %+v", row)
+	}
+	two := `$\textbf{(A)}\ 1{,}000 \qquad\textbf{(B)}\ 3\qquad\textbf{(C)}\ 2\qquad\textbf{(D)}\ 2\qquad\textbf{(E)}\ 5$`
+	for _, c := range [][3]string{{two, "1,000", "A"}, {two, "2", ""}, {two, "7", ""}, {two, "B", ""}, {`$\textbf{(A)}\ 1000 \qquad\textbf{(B)}\ 3$`, "1000", ""}} {
+		if got := ChoiceLetter(c[0], c[1]); got != c[2] {
+			t.Errorf("ChoiceLetter(%s, %s) = %q, want %q", c[0], c[1], got, c[2])
+		}
+	}
+	if got := ChoiceLetter(`$\mathrm{(A)}\ \dfrac{1}{2} \qquad \mathrm{(B)}\ 1 \qquad \mathrm{(C)}\ 2 \qquad \mathrm{(D)}\ 3 \qquad \mathrm{(E)}\ 4$`, `\frac{1}{2}`); got != "A" {
+		t.Errorf("ChoiceLetter of a fraction = %q, want A", got)
+	}
+	if got := ChoiceLetter(`$\mathrm{(A) \ } 250 \mathrm{(B) \ } 300 \mathrm{(C) \ } 350 \mathrm{(D) \ } 400 \mathrm{(E) \ } 500$`, "350"); got != "C" {
+		t.Errorf("ChoiceLetter of a mark with a space = %q, want C", got)
+	}
+	page["problem"] = []string{"problem_id 3199    Five positive consecutive integers starting wi... Name: Text, dtype: object"}
+	if _, ok := wp.Map(page); ok {
+		t.Error("a pandas print is not a statement")
+	}
 	row, ok = Profiles["hf-mathnet"].Map(Record{"problem_markdown": {"Problem:\nShow it."}, "competition": {"IRL_ABooklet_2023"}, "country": {"Ireland"}})
 	if !ok || row.Statement != "Show it." || row.Year != 2023 {
 		t.Errorf("mathnet row %+v", row)

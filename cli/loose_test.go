@@ -100,6 +100,53 @@ func TestImportLoose(t *testing.T) {
 	}
 }
 
+func TestImportJoinsExisting(t *testing.T) {
+	floor := "Determine all real numbers $\\alpha$ such that, for every positive integer $n$, the integer\n$$\\lfloor \\alpha \\rfloor + \\lfloor 2\\alpha \\rfloor + \\cdots + \\lfloor n\\alpha \\rfloor$$\nis a multiple of $n$."
+	ans := "All even integers $\\alpha$."
+	rows := []seed.Row{
+		{Labels: []string{"IMO"}, Year: 2024, Number: "1", Statement: floor, Answer: ans},
+		{Labels: []string{"USAMO"}, Year: 2024, Number: "1", Statement: floor, Answer: ans},
+	}
+	root, dir := looseFixture(t, rows)
+	usamo := "\n- code: usamo\n  name: United States of America Mathematical Olympiad\n  short: USAMO\n  group: national\n  level: high-school\n  organizer: MAA\n  url: https://maa.org/\n  first_year: 1972\n  sources: [hf-test]\n  description: The olympiad of the United States.\n"
+	f, err := os.OpenFile(filepath.Join(root, "registers", "competitions.yaml"), os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString(usamo); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errs := run("import", "-content", root, "-seed", dir, "-raw", t.TempDir())
+	if code != ExitOK {
+		t.Fatalf("exit %d: %s", code, errs)
+	}
+	if !strings.Contains(out, "0 new problems, 1 merged appearances") {
+		t.Errorf("the counts:\n%s", out)
+	}
+	c, fs := content.Load(root)
+	if fs.Errors() > 0 {
+		t.Fatalf("findings:\n%v", fs)
+	}
+	p := c.ByTag("0HVHSDNNMY")
+	if p == nil || len(p.Appearances) != 2 || p.Appearances[1].At != "usamo/2024/p1" {
+		t.Fatalf("the USAMO position does not join imo/2024/p1: %+v", p)
+	}
+	b, err := os.ReadFile(filepath.Join(root, "registers", "merges.tsv"))
+	if err != nil || !strings.Contains(string(b), "usamo/2024/p1\timo/2024/p1\t") {
+		t.Errorf("merges.tsv: %v\n%s", err, b)
+	}
+	// A second run adds no appearance and no row.
+	if code, out, errs = run("import", "-content", root, "-seed", dir, "-raw", t.TempDir()); code != ExitOK || !strings.Contains(out, "0 merged appearances") {
+		t.Errorf("second run, exit %d:\n%s\n%s", code, out, errs)
+	}
+	if b2, _ := os.ReadFile(filepath.Join(root, "registers", "merges.tsv")); string(b2) != string(b) {
+		t.Errorf("the second run changed merges.tsv:\n%s", b2)
+	}
+}
+
 func TestWrongList(t *testing.T) {
 	ibero := &content.Competition{Code: "ibero", Name: "Iberoamerican Mathematical Olympiad"}
 	isl := &content.Competition{Code: "isl", Name: "IMO Shortlist"}

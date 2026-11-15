@@ -18,6 +18,7 @@ import (
 
 	"github.com/tamnd/olymmath-agent/canon"
 	"github.com/tamnd/olymmath-agent/content"
+	"github.com/tamnd/olymmath-agent/locator"
 	"github.com/tamnd/olymmath-agent/match"
 	"github.com/tamnd/olymmath-agent/normalize"
 	"github.com/tamnd/olymmath-agent/official"
@@ -216,6 +217,18 @@ func runImport(env Env, args []string) int {
 	// filled holds the problems that got a text from -fill, so that a problem with two appearances gets one text.
 	filled := map[string]bool{}
 	var mergeRows []string
+	// A merge that the register has already does not get a second row.
+	known := map[string]bool{}
+	if !*dry {
+		olds, err := review.Merges(*root)
+		if err != nil {
+			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
+			return ExitFailure
+		}
+		for _, m := range olds {
+			known[m.At+"\x00"+m.Into] = true
+		}
+	}
 	var newRecs []*canon.Record
 	for _, r := range recs {
 		if p := owner[r.Primary.At]; p != nil {
@@ -240,6 +253,17 @@ func runImport(env Env, args []string) int {
 				// A fill pass changes only the problems that get a text.
 				continue
 			}
+			// An appearance that merges into the record of an existing problem joins that problem, as the AMC 10 position of a problem that the AMC 12 paper of the same edition has too. An appearance that a problem has already stays out. So does one of a paper that the problem has already, because two problems of one paper are two problems, and a review item names the pair.
+			var joins []canon.Merge
+			for _, m := range r.Merged {
+				switch {
+				case owner[m.At] != nil:
+				case hasPaper(p, m.At):
+					items = append(items, canon.Item{ID: canon.ItemID("pair", r.Primary.At, m.At), Kind: "pair", At: r.Primary.At, With: m.At, T: math.Round(m.Signals.T*1000) / 1000, Text: p.Statement, Other: m.Choice.Best.Text})
+				default:
+					joins = append(joins, m)
+				}
+			}
 			if give {
 				filled[p.Tag] = true
 				fills++
@@ -249,13 +273,14 @@ func runImport(env Env, args []string) int {
 			if add.Better != nil && !up {
 				items = append(items, canon.Item{ID: "better-" + p.Tag, Kind: "canonical", At: r.Primary.At, Source: add.Better.Source, Ref: add.Better.Ref, Text: p.Statement, Other: add.Better.Text})
 			}
-			if len(add.Statements) == 0 && !give {
+			if len(add.Statements) == 0 && !give && len(joins) == 0 {
 				continue
 			}
 			if len(add.Statements) > 0 {
 				updated++
 			}
 			if *dry {
+				merged += len(joins)
 				continue
 			}
 			full := filepath.Join(*root, filepath.FromSlash(p.Path))
@@ -271,12 +296,26 @@ func runImport(env Env, args []string) int {
 				b, err = canon.Promote(b, p.Canonical.Statement, add.ID(add.Better), add.Better.Text, rule)
 				promoted++
 			}
+			if err == nil && len(joins) > 0 {
+				ats := make([]string, len(joins))
+				for i, m := range joins {
+					ats[i] = m.At
+				}
+				b, err = canon.AddAppearances(b, ats...)
+			}
 			if err == nil {
 				err = os.WriteFile(full, b, 0o644) // #nosec G306 G703 -- content files are public.
 			}
 			if err != nil {
 				fmt.Fprintf(env.Stderr, "om import: %s: %v\n", p.Path, err)
 				return ExitFailure
+			}
+			for _, m := range joins {
+				owner[m.At] = p
+				merged++
+				if !known[m.At+"\x00"+m.Into] {
+					mergeRows = append(mergeRows, mergeRow(m))
+				}
 			}
 			continue
 		}
@@ -300,16 +339,6 @@ func runImport(env Env, args []string) int {
 			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
 			return ExitFailure
 		}
-		// A merge that the register has already does not get a second row.
-		known := map[string]bool{}
-		olds, err := review.Merges(*root)
-		if err != nil {
-			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
-			return ExitFailure
-		}
-		for _, m := range olds {
-			known[m.At+"\x00"+m.Into] = true
-		}
 		for i, r := range newRecs {
 			comp := strings.SplitN(r.Primary.At, "/", 2)[0]
 			b, err := canon.Render(r, tags[i], canon.TypeOf(comp, r.Primary.Answer))
@@ -326,12 +355,8 @@ func runImport(env Env, args []string) int {
 				if known[m.At+"\x00"+m.Into] {
 					continue
 				}
-				mergeRows = append(mergeRows, fmt.Sprintf("%s\t%s\t%s\t%.3f\t%s\t%s\t-", m.At, m.Into, keyName(m), m.Signals.T, answerName(m), cmpOr(m.Rule, "text")))
+				mergeRows = append(mergeRows, mergeRow(m))
 			}
-		}
-		if err := appendLines(*root, review.MergesFile, "# Each appearance that an import merged into a problem of another appearance: the appearance, the primary appearance, the signals K, T and A, the rule and the review. Rule D03 reads this file.\n", mergeRows); err != nil {
-			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
-			return ExitFailure
 		}
 	} else {
 		for _, r := range newRecs {
@@ -339,6 +364,10 @@ func runImport(env Env, args []string) int {
 		}
 	}
 	if !*dry {
+		if err := appendLines(*root, review.MergesFile, "# Each appearance that an import merged into a problem of another appearance: the appearance, the primary appearance, the signals K, T and A, the rule and the review. Rule D03 reads this file.\n", mergeRows); err != nil {
+			fmt.Fprintf(env.Stderr, "om import: %v\n", err)
+			return ExitFailure
+		}
 		// The items of om anchor stay, because an import does not make them. The items of the competitions that this import did not read also stay.
 		old, err := review.Queue(*root)
 		if err != nil {
@@ -520,6 +549,10 @@ func wikiPlaces(dir string, sources []string, corpus *content.Corpus, al *seed.A
 		r.Labels = append(labels, r.Labels...)
 		r.Year, r.Number = p.Year, strconv.Itoa(p.Number)
 		r.Answer = wikiAnswer(r.Answer)
+		// The content keeps the letter of a multiple choice problem, and the wiki pages give the letter, so a value that is one of the choices becomes its letter.
+		if l := seed.ChoiceLetter(r.Statement, r.Answer); l != "" {
+			r.Answer = l
+		}
 		if p.Anchored {
 			anchored++
 			// Agent decision: an anchored row sits next to the numbered row that anchors it, which gives the choice letter. A value as the answer, such as 66, cannot match that letter, so the row keeps only a choice letter.
@@ -670,6 +703,25 @@ func appendLines(root, rel, header string, lines []string) error {
 		return err
 	}
 	return f.Close()
+}
+
+// mergeRow gives the row of the merge m in the register of merges.
+func mergeRow(m canon.Merge) string {
+	return fmt.Sprintf("%s\t%s\t%s\t%.3f\t%s\t%s\t-", m.At, m.Into, keyName(m), m.Signals.T, answerName(m), cmpOr(m.Rule, "text"))
+}
+
+// hasPaper tells if the problem p has an appearance in the paper of the locator at, as amc10/2002a/p3 for amc10/2002a/p5.
+func hasPaper(p *content.Problem, at string) bool {
+	l, err := locator.Parse(at)
+	if err != nil {
+		return false
+	}
+	for _, a := range p.Appearances {
+		if m, err := locator.Parse(a.At); err == nil && m.Comp == l.Comp && m.Edition == l.Edition {
+			return true
+		}
+	}
+	return false
 }
 
 func keyName(m canon.Merge) string {
