@@ -45,6 +45,8 @@ The canonical statement of a problem is chosen by this precedence. The first rul
 
 A source that changed the wording of each problem on purpose, such as Kalva, has `reworded: true` in the source register. Its texts come after all other texts, whatever their class, so a text with the original wording wins. When a reworded text is not canonical, its key and its answer decide alone: a low text match is expected, so it is kept as a link unless its answer disagrees.
 
+Inside one rank, the texts of hf-aops-wiki-pages come after the texts of every other source (`canon.Last`). The scrape of the AoPS wiki pages lost the punctuation after a formula, as in "lengths $4$ $6$ , and $x$" with no question mark at the end. Without the rule these texts won over NuminaMath on the order of the source names in 735 of the AMC records of the first import. They stay canonical where no other source of the rank has the problem.
+
 The site shows the canonical statement in the language of the reader when one exists at the same rank, and otherwise the canonical statement with a translation below it. A model translation is always labelled as such.
 
 ## 6.4 Normalization

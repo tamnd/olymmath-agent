@@ -68,9 +68,15 @@ func Rank(c *Candidate, original string) (int, string) {
 // Curated is the order of the curated sources inside the rule "curated" (spec 06.3). A source that is not in the list goes after the listed sources.
 var Curated = []string{"imo-compendium", "usa-tst-archive", "problems-ru", "kedlaya-putnam", "evanchen", "aops-wiki", "aops-collections"}
 
+// Last are the sources whose texts lose characters, so that inside one rank another text of the problem wins. The texts of hf-aops-wiki-pages lose the punctuation after a formula, as in "lengths $4$ $6$ , and $x$" with no question mark at the end, but they still give the problems that no other source has.
+var Last = []string{"hf-aops-wiki-pages"}
+
 func priority(src string) int {
 	if i := slices.Index(Curated, src); i >= 0 {
 		return i
+	}
+	if slices.Contains(Last, src) {
+		return len(Curated) + 1
 	}
 	return len(Curated)
 }
