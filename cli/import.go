@@ -520,6 +520,10 @@ func wikiPlaces(dir string, sources []string, corpus *content.Corpus, al *seed.A
 		r.Labels = append(labels, r.Labels...)
 		r.Year, r.Number = p.Year, strconv.Itoa(p.Number)
 		r.Answer = wikiAnswer(r.Answer)
+		// The content keeps the letter of a multiple choice problem, and the wiki pages give the letter, so a value that is one of the choices becomes its letter.
+		if l := seed.ChoiceLetter(r.Statement, r.Answer); l != "" {
+			r.Answer = l
+		}
 		if p.Anchored {
 			anchored++
 			// Agent decision: an anchored row sits next to the numbered row that anchors it, which gives the choice letter. A value as the answer, such as 66, cannot match that letter, so the row keeps only a choice letter.

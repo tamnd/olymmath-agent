@@ -318,7 +318,8 @@ var Profiles = map[string]Profile{
 			link := strings.TrimSpace(r.Get("link"))
 			m := wikiPageRE.FindStringSubmatch(link)
 			st := strings.TrimSpace(r.Get("problem"))
-			if m == nil || st == "" {
+			// About 90 rows hold the print of a pandas Series instead of the problem, as "problem_id 3199... Five positive consecutive integers starting wi... Name: Text, dtype: object".
+			if m == nil || st == "" || strings.Contains(st, "Name: Text, dtype: object") {
 				return Row{}, false
 			}
 			y, _ := strconv.Atoi(m[1])
@@ -332,12 +333,16 @@ var Profiles = map[string]Profile{
 				// The two papers of the fall of 2021, as 2021_Fall_AMC_10A.
 				paper, name = paper+" Fall", name+" Fall"
 			}
-			ans := strings.TrimSpace(r.Get("letter"))
-			if ans == "" {
-				ans = strings.TrimSpace(r.Get("answer"))
+			letter, value := strings.TrimSpace(r.Get("letter")), strings.TrimSpace(r.Get("answer"))
+			ans := wikiLetter(st, letter, value)
+			if letter == "" {
+				ans = value
 				// An AIME answer has three digits, as in 059.
 				if n, err := strconv.Atoi(ans); err == nil && n >= 0 {
 					ans = strconv.Itoa(n)
+				}
+				if l := ChoiceLetter(st, ans); l != "" {
+					ans = l
 				}
 			}
 			return Row{
@@ -389,6 +394,57 @@ var Profiles = map[string]Profile{
 		},
 	},
 }
+
+// wikiLetter gives the choice letter of a row of hf-aops-wiki-pages, or "" when the value of the row is another choice of the statement. The letter and the value come from different parts of the page, and in about 65 rows of the AMC pages they disagree: either can be the wrong one, as the letter A of 2013 AMC 8 problem 1 with the value 1 of choice C, or the value 2 of 2022 AMC 10B problem 1 that lost the minus of choice A. Such a row gives no answer.
+func wikiLetter(st, letter, value string) string {
+	if l := ChoiceLetter(st, value); letter != "" && l != "" && l != letter {
+		return ""
+	}
+	return letter
+}
+
+// ChoiceLetter gives the letter of the only choice of a multiple choice statement whose value is the value, as C for the value 1 and the choices $\textbf{(A)}\ 3 \qquad \textbf{(B)}\ 2 \qquad \textbf{(C)}\ 1 ...$. It gives "" when the statement has not the five choices A to E in order, when no choice or more than one has the value, and when the value is a letter A to E.
+func ChoiceLetter(st, value string) string {
+	if value == "" || (len(value) == 1 && value[0] >= 'A' && value[0] <= 'E') {
+		return ""
+	}
+	ms := wikiChoiceRE.FindAllStringSubmatchIndex(st, -1)
+	if len(ms) != 5 {
+		return ""
+	}
+	v := wikiChoiceValue(value)
+	hit := ""
+	for i, m := range ms {
+		l := st[m[2]:m[3]]
+		if l != string(rune('A'+i)) {
+			return ""
+		}
+		end := len(st)
+		if i+1 < len(ms) {
+			end = ms[i+1][0]
+		}
+		if wikiChoiceValue(st[m[1]:end]) == v {
+			if hit != "" {
+				return ""
+			}
+			hit = l
+		}
+	}
+	return hit
+}
+
+// wikiChoiceValue gives the form of a choice value or of an answer value that wikiLetter compares: with no spacing, dollars, thousands commas or words in \text, and with one form of \frac.
+func wikiChoiceValue(s string) string {
+	s = wikiChoiceForm.ReplaceAllString(s, "")
+	s = strings.NewReplacer(`\dfrac`, `\frac`, `\tfrac`, `\frac`).Replace(s)
+	return strings.Trim(s, "{}.")
+}
+
+var (
+	// wikiChoiceRE finds the marks of the choices of an AMC statement, as \textbf{(A)}, \mathrm{(B)} or \mathrm{(C) \ }.
+	wikiChoiceRE   = regexp.MustCompile(`\\(?:textbf|mathbf|mathrm|textrm|text)\s*\{\s*\(([A-E])\)\s*(?:\\\s*)?\}`)
+	wikiChoiceForm = regexp.MustCompile(`\\(?:qquad|quad|[ ,:;!])|\$|\{,\}|\\(?:text|mathrm|textbf)\s*\{[^{}]*\}|\s|~|,`)
+)
 
 // wikiPageRE reads the link of a problem page of the AoPS wiki, such as .../2021_Fall_AMC_10A_Problems/Problem_3: the year, the fall mark, the competition, the paper and the number. The AIME papers are _I and _II.
 var wikiPageRE = regexp.MustCompile(`/(\d{4})_(Fall_)?(AHSME|AJHSME|AMC_8|AMC_10|AMC_12|AIME|USAMO|USAJMO)(A|B|_I|_II)?_Problems/Problem_(\d{1,2})$`)
