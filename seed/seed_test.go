@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -282,6 +283,26 @@ func TestProfiles(t *testing.T) {
 	row, _ = Profiles["hf-amc12-full"].Map(Record{"problem_id": {"2001A-P3"}, "question": {"x"}})
 	if row.Labels[0] != "AMC 12" || row.Number != "3" {
 		t.Errorf("amc12 2001 row %+v", row)
+	}
+	wp := Profiles["hf-aops-wiki-pages"]
+	for _, c := range []struct {
+		link, letter, answer string
+		ok                   bool
+		labels               []string
+		year                 int
+		number, ans          string
+	}{
+		{"https://artofproblemsolving.com/wiki/index.php/2003_AMC_10A_Problems/Problem_11", "E", "14", true, []string{"AMC 10A", "AMC 10"}, 2003, "11", "E"},
+		{"https://artofproblemsolving.com/wiki/index.php/2021_Fall_AMC_12B_Problems/Problem_7", "C", "3", true, []string{"AMC 12B Fall", "AMC 12 Fall"}, 2021, "7", "C"},
+		{"https://artofproblemsolving.com/wiki/index.php/1961_AHSME_Problems/Problem_35", "D", "3", true, []string{"AHSME"}, 1961, "35", "D"},
+		{"https://artofproblemsolving.com/wiki/index.php/2019_AIME_II_Problems/Problem_1", "", "059", true, []string{"AIME II", "AIME"}, 2019, "1", "59"},
+		{"https://artofproblemsolving.com/wiki/index.php/1995_AJHSME_Problems/Problem_4", "A", "", true, []string{"AJHSME"}, 1995, "4", "A"},
+		{"https://artofproblemsolving.com/wiki/index.php/2002_AMC_12P_Problems/Problem_4", "A", "", false, nil, 0, "", ""},
+	} {
+		row, ok := wp.Map(Record{"link": {c.link}, "problem": {"Find $x$."}, "letter": {c.letter}, "answer": {c.answer}})
+		if ok != c.ok || (ok && (!slices.Equal(row.Labels, c.labels) || row.Year != c.year || row.Number != c.number || row.Answer != c.ans || row.Ref != c.link)) {
+			t.Errorf("wiki page %s: %v %+v", c.link, ok, row)
+		}
 	}
 	row, ok = Profiles["hf-mathnet"].Map(Record{"problem_markdown": {"Problem:\nShow it."}, "competition": {"IRL_ABooklet_2023"}, "country": {"Ireland"}})
 	if !ok || row.Statement != "Show it." || row.Year != 2023 {
