@@ -311,6 +311,41 @@ var Profiles = map[string]Profile{
 			}, true
 		},
 	},
+	// The AoPS wiki pages of the AMC, AIME and USAMO problems. The link of each row names its page, as in 2003_AMC_10A_Problems/Problem_11, which gives the competition, the year, the paper and the number. The column letter is the answer letter of a multiple choice problem, and the column answer is the value of the answer. A row of another page, such as the AMC 12P of 2002, gives no row.
+	"hf-aops-wiki-pages": {
+		Columns: []string{"problem_id", "link", "problem", "solution", "letter", "answer"},
+		Map: func(r Record) (Row, bool) {
+			link := strings.TrimSpace(r.Get("link"))
+			m := wikiPageRE.FindStringSubmatch(link)
+			st := strings.TrimSpace(r.Get("problem"))
+			if m == nil || st == "" {
+				return Row{}, false
+			}
+			y, _ := strconv.Atoi(m[1])
+			name := strings.ReplaceAll(m[3], "_", " ")
+			paper := name + m[4]
+			if roman, ok := strings.CutPrefix(m[4], "_"); ok {
+				// AIME_II gives the label AIME II.
+				paper = name + " " + roman
+			}
+			if m[2] != "" {
+				// The two papers of the fall of 2021, as 2021_Fall_AMC_10A.
+				paper, name = paper+" Fall", name+" Fall"
+			}
+			ans := strings.TrimSpace(r.Get("letter"))
+			if ans == "" {
+				ans = strings.TrimSpace(r.Get("answer"))
+				// An AIME answer has three digits, as in 059.
+				if n, err := strconv.Atoi(ans); err == nil && n >= 0 {
+					ans = strconv.Itoa(n)
+				}
+			}
+			return Row{
+				ID: r.Get("problem_id"), Labels: labels(paper, name), Year: y, Number: m[5], Lang: "en",
+				Statement: st, Answer: ans, Solutions: count(r, "solution"), Ref: link,
+			}, true
+		},
+	},
 	// The three sets below hold problems that their authors wrote for the set, under an open licence (zone Z1). Each set is one edition: the label names the set, the year is the year of the set and the number is the position.
 	"hf-amo-bench": {
 		Columns: []string{"question_id", "prompt", "solution", "answer"},
@@ -354,6 +389,9 @@ var Profiles = map[string]Profile{
 		},
 	},
 }
+
+// wikiPageRE reads the link of a problem page of the AoPS wiki, such as .../2021_Fall_AMC_10A_Problems/Problem_3: the year, the fall mark, the competition, the paper and the number. The AIME papers are _I and _II.
+var wikiPageRE = regexp.MustCompile(`/(\d{4})_(Fall_)?(AHSME|AJHSME|AMC_8|AMC_10|AMC_12|AIME|USAMO|USAJMO)(A|B|_I|_II)?_Problems/Problem_(\d{1,2})$`)
 
 // amcIDRE reads an id of the AMC 12 set, such as 2019A-P15: the year, the paper and the problem.
 var amcIDRE = regexp.MustCompile(`^(\d{4})([AB])-P?(\d{1,2})$`)
