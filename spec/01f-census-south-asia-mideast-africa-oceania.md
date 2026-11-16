@@ -48,7 +48,7 @@ The register rows are in tamnd/olymmath: `registers/competitions.yaml`, `registe
 | ir-combinatorics | Iranian Combinatorics Olympiad (new) | high-school | AoPS. | [S] |
 | ir-ourmo | Iranian Our MO (new) | high-school | AoPS. Set by students. | [S] |
 | igo | IGO, all three levels | junior (Elementary paper), high-school | igo-official.com, booklets with solutions. The junior and senior labels map to igo. | [P] |
-| belarus-iran, india-iran, iran-taiwan | Friendly competitions (new) | high-school | AoPS. | [S] |
+| by-iran-friendly (from #246), india-iran, iran-taiwan | Friendly competitions (India-Iran and Iran-Taiwan new) | high-school | AoPS. | [S] |
 | (none) | Iran junior olympiad | - | Not found. | [S] |
 | il-gillis | Gillis olympiad | high-school | weizmann.ac.il/math/gillis/node/11: 53 PDF links, papers of 1983 to 1998 (no 1995) and Hebrew years 5759 to 5786 (no 5764, 5765), many with solutions. | [P] |
 | il-grossman | Grossman olympiad (Technion) | high-school | No source. | [S] |
@@ -115,8 +115,8 @@ The register rows are in tamnd/olymmath: `registers/competitions.yaml`, `registe
 
 ## 2. Census numbers
 
-- New competitions: 28. By highest level: high-school 24, undergraduate 3, junior 1. By country: India 7, international 6, Australia 4, Iran 4, Israel 2, Pakistan, Sri Lanka, Nepal, Morocco and Burkina Faso 1 each.
-- Changed rows: 18, among them nz-nzmo, which gets the shape of 2019 on and the first year 2019 (13 positions a year, so 104 expected positions for 2019 to 2026).
+- New competitions: 27. By highest level: high-school 23, undergraduate 3, junior 1. By country: India 7, international 5, Australia 4, Iran 4, Israel 2, Pakistan, Sri Lanka, Nepal, Morocco and Burkina Faso 1 each.
+- Changed rows: 19, among them by-iran-friendly and nz-nzmo. by-iran-friendly came to main in #246 and replaces the belarus-iran row that this census first added; it gets the shape of 2022 to 2024 and the first year 2022. nz-nzmo gets the shape of 2019 on and the first year 2019 (13 positions a year, so 104 expected positions for 2019 to 2026).
 - Expected positions added: 291. Each new row gets the shape of the years that papers show, and no other years:
 
 | Code | Expected | Evidence |
@@ -127,12 +127,12 @@ The register rows are in tamnd/olymmath: `registers/competitions.yaml`, `registe
 | ir-combinatorics | 21 | AoPS papers of 2020, 2021 and 2025, 7 problems each. |
 | au-aimo | 20 | AMT papers of 2017 and 2018, 10 problems each. |
 | il-revenge | 20 | AoPS papers of 2021 to 2025, 4 problems each. |
-| belarus-iran | 18 | AoPS papers of 2022 to 2024, 6 problems each. |
+| by-iran-friendly | 18 | AoPS papers of 2022 to 2024, 6 problems each. |
 | in-egmo-tst | 18 | AoPS tests of 2022 to 2024, 6 problems each. |
 
   No paper shows the shape of the other 21 new rows. Their papers do not agree from year to year (india-iran, ir-rmm-tst, np-tst, in-stems, in-limit, pamo-sl), AoPS has one year only (iran-taiwan, ir-mo-r1, ir-ourmo, il-oral, pk-tst, lk-slmc, in-mtrp, safest), or no paper is online (in-nmtc, in-kvjmo, au-amoc-senior, au-wajo, eamo, ma-mmc, bf-mo).
 - New sources: 15 (Z1: 1, Z2: 14), and gulf-official gets terms and robots facts.
-- Labels mapped: 80 alias lines, which cover 98 labels and 1,233 rows of the unknown-competitions report (306 of them map to `-`). The label hungaryisrael_binational is left to the hungary-israel row that #255 added.
+- Labels mapped: 79 alias lines, which cover 97 labels and 1,215 rows of the unknown-competitions report (306 of them map to `-`). The label hungaryisrael_binational is left to the hungary-israel row that #255 added. The label "Belarus - Iran Friendly Competition" is left to by-iran-friendly.
 - Gaps: 33 new no-source entries, and the za-samo entry gets a new note.
 - Levels follow the scope PR (#260). `level` is the highest level, and `levels` lists all levels, lowest first, when there are two or more. A paper for two levels takes the higher one. 12 rows get `levels`: au-amc, au-mcyb, bd-bdmo, igo, in-nmtc, in-mtrp, in-stems, in-limit, in-assam, za-samo, ng-mo and ke-mo. The Elementary paper of igo gets `level: junior`. au-amc had no level and gets high-school.
 
