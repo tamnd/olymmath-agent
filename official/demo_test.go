@@ -184,3 +184,24 @@ func TestDemoSymbols(t *testing.T) {
 		t.Errorf("text %q, want %q", ps[0].Text, want)
 	}
 }
+
+func TestDemoLowPrime(t *testing.T) {
+	items := ParsePDFXML([]byte(`<?xml version="1.0" encoding="UTF-8"?>
+<pdf2xml>
+<page number="1" position="absolute" top="0" left="0" height="1262" width="892">
+	<fontspec id="0" size="15" family="IDCCAA+LMRoman10" color="#000000"/>
+	<fontspec id="5" size="15" family="NBBQIW+LMMathItalic10" color="#000000"/>
+	<fontspec id="9" size="10" family="VNRXCH+LMMathSymbols7" color="#000000"/>
+<text top="437" left="95" width="108" height="13" font="0">Aufgabe 021235:</text>
+<text top="460" left="95" width="80" height="13" font="0">Es sei</text>
+<text top="460" left="180" width="8" height="13" font="5"><i>z</i></text>
+<text top="466" left="188" width="4" height="9" font="9">0</text>
+<text top="460" left="198" width="40" height="13" font="0">gegeben.</text>
+</page>
+</pdf2xml>
+`))
+	ps := DemoPDF(items, nil)
+	if len(ps) != 1 || !slices.Contains(ps[0].Flags, "layout") {
+		t.Fatalf("a low prime gives %+v, want the layout flag", ps)
+	}
+}
