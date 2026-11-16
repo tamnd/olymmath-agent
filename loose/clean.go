@@ -626,7 +626,7 @@ func byWords(text string) (string, map[string]int) {
 		}
 	}
 	best, next := "", 0
-	for _, lang := range []string{"en", "es", "pt", "fr", "de", "vi", "hr", "nl"} {
+	for _, lang := range []string{"en", "es", "pt", "fr", "de", "vi", "id", "hr", "nl"} {
 		switch c := counts[lang]; {
 		case best == "" || c > counts[best]:
 			next = counts[best]
