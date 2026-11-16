@@ -2,17 +2,19 @@
 
 ## 2.1 One sentence
 
-**olymmath is the complete, deduplicated, source-traced corpus of olympiad mathematics: every problem ever set at an olympiad-level competition, with its best human text, every human solution we may show or link, honestly labelled AI solutions, and, over time, faithful Lean statements and checked proofs, published as a fast, linkable website at https://olymmath.tamnd.com and as open data.**
+**olymmath is the complete, deduplicated, source-traced corpus of competition mathematics: every problem ever set at a mathematics competition for students, from primary school to university, with its best human text, every human solution we may show or link, honestly labelled AI solutions, and, over time, faithful Lean statements and checked proofs, published as a fast, linkable website at https://olymmath.tamnd.com and as open data.**
 
-## 2.2 What counts as an olympiad problem
+## 2.2 What counts as a competition problem
 
-A problem is in scope when it meets one of these:
+In scope are the problems of every mathematics competition for students at elementary (primary), junior (middle or lower secondary) and high-school level, worldwide: international, national, regional, city and invitational contests and all their rounds, correspondence contests, and the problem sections of journals for students. The undergraduate competitions stay in scope too. The levels are defined in 05.2. A problem is in scope when it meets one of these:
 
-1. **Register competitions.** It was set in a competition of the register (`registers/competitions.yaml`, document 05.2): international and regional olympiads, national olympiads and their final rounds, team selection tests, shortlists and longlists, the strong short-answer contests (AMC 10/12, AIME, HMMT, PUMaC, ARML, …), undergraduate competitions (Putnam, IMC, Schweitzer, SEEMOUS, …), and the strong regional and invitational contests (Tournament of Towns, Sharygin, ELMO, USEMO, Tuymaada, RMM, …).
-2. **Olympiad problem sections** of journals: Kvant Задачник, KöMaL (A and B problems; the C and K problems are school level and are kept but marked `level: school`), Crux Mathematicorum, Mathematical Reflections, Mathematical Excalibur, AMM problems, Gazeta Matematică, Tzaloa, Eureka!.
-3. **Olympiad-level forum and book problems** with a human author: the AoPS olympiad forums (not the contest collections only), Diễn đàn Toán học, Math StackExchange `contest-math`, and well-known problem books (metadata and links only, document 11).
+1. **Register competitions.** It was set in a competition of the register (`registers/competitions.yaml`, document 05.2), at any level and in any round: international and regional olympiads, national olympiads and all their rounds (school, district, regional, final), team selection tests, shortlists and longlists, the short-answer and multiple choice contests (AMC 8/10/12, AIME, MATHCOUNTS at every round, Kangaroo at every level, the UKMT challenges, HMMT, PUMaC, ARML, …), city and invitational contests and tournaments, correspondence contests, undergraduate competitions (Putnam, IMC, Schweitzer, SEEMOUS, …), and the strong regional contests (Tournament of Towns, Sharygin, ELMO, USEMO, Tuymaada, RMM, …).
+2. **Problem sections of journals** for students, at every level: Kvant Задачник, KöMaL (the A, B, C and K problems), Crux Mathematicorum, Mathematical Reflections, Mathematical Excalibur, AMM problems, Gazeta Matematică, Tzaloa, Eureka!, Parabola, and the like.
+3. **Forum and book problems** with a human author: the AoPS forums for olympiad and school contest problems (not the contest collections only), Diễn đàn Toán học, Math StackExchange `contest-math`, and well-known problem books (metadata and links only, document 11).
 
-Out of scope: school textbook exercises, gaokao and K-12 exam items (kept only as a negative filter for dedup), MATHCOUNTS below the national round (kept in a separate `level: school` band, not in the default views), Kangaroo multiple choice below the top level, programming olympiads, physics and other sciences, research problems (they belong to math2), and every synthetic problem.
+Out of scope: textbook exercises, school exams and entrance exams (gaokao, national school-leaving exams, university entrance exams and similar; kept only as a negative filter for dedup), programming contests, physics and the other sciences, research problems (they belong to math2), and every synthetic problem. A school exam is not a competition: it grades the work of a school year, and it has no ranking of contestants.
+
+The level of a competition does not change how its problems are kept. An elementary problem gets the same record, the same sources and the same checks as an IMO problem. Only the site treats the levels apart: the contests of primary school have their own list, so that they do not crowd the olympiads in the default views (10.3).
 
 ## 2.3 The quality promise
 
@@ -24,7 +26,7 @@ Out of scope: school textbook exercises, gaokao and K-12 exam items (kept only a
 
 ## 2.4 The reference scale
 
-From the research (01a, 01b, 01c):
+From the research (01a, 01b, 01c). These numbers were made for the olympiad scope that 2.2 had before it took in every school level. They count the olympiad part only:
 
 | Part | Estimated distinct problems | Basis |
 |---|---|---|
@@ -35,6 +37,8 @@ From the research (01a, 01b, 01c):
 | human solutions | ~1 to 2 million, most of them AoPS replies | |
 
 Cross-checks: MathNet has 30,676 problems from official booklets; AI-MO/aops has 80,661 AoPS problems; NuminaMath-1.5 has about 316k non-synthetic olympiad-like rows before dedup. The total is planned at 400,000 problems for capacity (storage, site, search), with margin.
+
+The wider scope of 2.2 makes the corpus larger, and we do not know yet by how much. Junior and elementary contests are many: lower rounds of national olympiads, city olympiads, multiple choice contests with several levels a year, and journal sections for young students. A census of the competitions of each region adds them to the register. The coverage report (14.3) then gives the expected positions by level, and this table gets the numbers of the census. Until then the capacity plan of 400,000 problems stands, and it is checked again when the census is done.
 
 ## 2.5 Who it is for
 

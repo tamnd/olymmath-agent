@@ -1,6 +1,6 @@
 # The olymmath specification
 
-**All olympiad mathematics problems and their solutions in one place.** Human-written text comes first. AI solutions are labelled and graded. Formal Lean statements are added later. Everything is published at https://olymmath.tamnd.com (Cloudflare) and mirrored on GitHub Pages.
+**All competition mathematics problems and their solutions in one place, from primary school to the olympiads.** Human-written text comes first. AI solutions are labelled and graded. Formal Lean statements are added later. Everything is published at https://olymmath.tamnd.com (Cloudflare) and mirrored on GitHub Pages.
 
 - Repositories: `tamnd/olymmath` (content) and `tamnd/olymmath-agent` (the Go toolchain, binary `om`). This follows the pattern of math2 and kvant.
 - Date: 2026-10-31. Status: accepted for M1. Later milestones can change it.
@@ -12,7 +12,7 @@
 | 00 | README | this index |
 | 01 | research | the summary of the research and the numbers behind the design |
 | 01a to 01e | research notes | datasets, competitions, web sources, formal sources, AI and site |
-| 02 | the goal | scope, quality promise, scale (200 to 300k problems, capacity 400k) |
+| 02 | the goal | scope (competition problems at every school level), quality promise, scale (200 to 300k olympiad problems, capacity 400k, the census gives the rest) |
 | 03 | architecture | two repos, the stores, packages, the four flows |
 | 04 | object model | record kinds, tags, locators, files |
 | 05 | sources and harvest | competition and source registers, waves 0 to 3, polite fetching, AoPS stance, OCR |

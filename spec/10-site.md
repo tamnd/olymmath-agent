@@ -14,7 +14,7 @@ math2 and kvant use Pages Free with a 19,500-file guard. olymmath cannot. It nee
 | URL | Page |
 |---|---|
 | `/` | home: search box, counts, competition map, latest problems, featured problem |
-| `/c/` | all competitions, grouped by level (international, national, regional, university) and by country, with a world map |
+| `/c/` | all competitions, by group (international, undergraduate, USA, national, journals, problem sets) and by country, with a world map; the primary school contests last, in their own group (10.3) |
 | `/c/<comp>/` | one competition: description, organizer, editions as a year grid with coverage colours |
 | `/<comp>/<edition>/` | one edition: all papers and problems, the official PDF links, statistics |
 | `/<comp>/<edition>/<pos>` | an appearance; it renders the problem page (and is the canonical URL for the primary appearance) |
@@ -67,11 +67,19 @@ Rules:
 
 The browse views are the core of "nice linking":
 
-- **Competition tree**: level → country → competition → edition → paper → problem.
+- **Competition tree**: group → country → competition → edition → paper → problem.
 - **Year grid** for each competition: rows are years, columns are positions, cells coloured by status (has canonical H1/H2 text, has human solution, has AI solution, has formal proof).
 - **Faceted list** (like the Codeforces problem set): filters for competition, country, year range, topic, difficulty band, type (proof/answer), "has human solution", "has AI solution", "human-verified", "has Lean statement"; sort by difficulty, year, popularity.
 - **Graph links** on each problem: appearances, variants, same idea, uses, same author.
 - **Collections**: curated lists in `registers/collections/` (for example "Classic inequalities", "ISL geometry 2000 to 2024"), each a page.
+
+**Levels in the default views.** The register has contests at every school level (02.2, 05.2), and the primary school contests will be many. So that they do not crowd the olympiads, the default views leave out a competition whose `level` is `elementary`, which means that all its papers are for primary school:
+
+- the list `/c/` shows such competitions in their own group, "Primary school", after all other groups, by country;
+- the home page does not take its latest papers or its problem of the day from them;
+- tier 1 (10.6) does not take them by group or by country, only by code.
+
+Each of their pages, search and the faceted list still have them. Junior contests stay in the default views, because the junior olympiads (JBMO, USAJMO, AMC 8, Euler) have long been part of the olympiad core. A competition with papers at several levels is in the default views when its highest level is above `elementary`. A level filter for the faceted list and for random practice is planned; it needs the level of each paper in the search index.
 
 ## 10.4 Search
 
@@ -98,7 +106,7 @@ The generator renders **every** page to HTML. The outlets differ only in which f
 | **R2 + a small Worker** (same host) | every other page, as prebuilt HTML objects at their URL path | a request that misses the static assets goes to the Worker, which reads `r2://olymmath-site/<path>.html`, sets headers and caches at the edge. The Worker does no templating |
 | **GitHub Pages** (mirror, `tamnd.github.io/olymmath`) | the tier-1 subset that fits under 900 MB, with Pagefind search | the mirror for people who cannot reach Cloudflare; it says which competitions it leaves out |
 
-Tier 1 is decided by a rule in `registers/site-tiers.yaml` (initially: international olympiads, ISL, USAMO/USAJMO/TST, AMC/AIME, Putnam, and the national olympiads of the 30 strongest IMO countries). Moving a competition between tiers changes no URL.
+Tier 1 is decided by a rule in `registers/site-tiers.yaml` (initially: international olympiads, ISL, USAMO/USAJMO/TST, AMC/AIME, Putnam, and the national olympiads of the 30 strongest IMO countries). A competition is in tier 1 when its code is listed, or when its group or its country is listed and its level is not `elementary`. Moving a competition between tiers changes no URL.
 
 Storage cost at full scale: about 1 million pages (problems, solutions, indexes) × 15 KB ≈ 15 GB in R2 ≈ $0.23/month, plus Workers Paid $5/month. Reads are well inside the included 10 million requests a month at the expected traffic.
 

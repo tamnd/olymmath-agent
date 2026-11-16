@@ -14,20 +14,20 @@ import (
 
 // Competition is one row of the competition register (spec 05.2).
 type Competition struct {
-	Code      string            `yaml:"code"`
-	Name      string            `yaml:"name"`
-	Short     string            `yaml:"short"`
-	Names     map[string]string `yaml:"names"`
-	Group     string            `yaml:"group"`
+	Code  string            `yaml:"code"`
+	Name  string            `yaml:"name"`
+	Short string            `yaml:"short"`
+	Names map[string]string `yaml:"names"`
+	Group string            `yaml:"group"`
 	// Level is the highest level of the papers of the competition, one of Levels (spec 05.2).
 	Level string `yaml:"level"`
 	// Levels lists every level of the papers, lowest first, when the papers are at more than one level. Its last level is Level. It is empty for a competition at one level.
-	Levels    []string          `yaml:"levels"`
-	Country   string            `yaml:"country"`
-	Organizer string            `yaml:"organizer"`
-	URL       string            `yaml:"url"`
-	FirstYear int               `yaml:"first_year"`
-	LastYear  int               `yaml:"last_year"`
+	Levels    []string `yaml:"levels"`
+	Country   string   `yaml:"country"`
+	Organizer string   `yaml:"organizer"`
+	URL       string   `yaml:"url"`
+	FirstYear int      `yaml:"first_year"`
+	LastYear  int      `yaml:"last_year"`
 	// Gaps are the years with no edition between the first year and the last year, for example 1980 for the IMO.
 	Gaps        []int  `yaml:"gaps"`
 	EditionForm string `yaml:"edition_form"`
