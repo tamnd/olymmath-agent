@@ -132,7 +132,7 @@ The register rows are in tamnd/olymmath: `registers/competitions.yaml`, `registe
 
   No paper shows the shape of the other 21 new rows. Their papers do not agree from year to year (india-iran, ir-rmm-tst, np-tst, in-stems, in-limit, pamo-sl), AoPS has one year only (iran-taiwan, ir-mo-r1, ir-ourmo, il-oral, pk-tst, lk-slmc, in-mtrp, safest), or no paper is online (in-nmtc, in-kvjmo, au-amoc-senior, au-wajo, eamo, ma-mmc, bf-mo).
 - New sources: 15 (Z1: 1, Z2: 14), and gulf-official gets terms and robots facts.
-- Labels mapped: 81 alias lines.
+- Labels mapped: 80 alias lines, which cover 98 labels and 1,233 rows of the unknown-competitions report (306 of them map to `-`). The label hungaryisrael_binational is left to the hungary-israel row that #255 added.
 - Gaps: 33 new no-source entries, and the za-samo entry gets a new note.
 - Levels follow the scope PR (#260). `level` is the highest level, and `levels` lists all levels, lowest first, when there are two or more. A paper for two levels takes the higher one. 12 rows get `levels`: au-amc, au-mcyb, bd-bdmo, igo, in-nmtc, in-mtrp, in-stems, in-limit, in-assam, za-samo, ng-mo and ke-mo. The Elementary paper of igo gets `level: junior`. au-amc had no level and gets high-school.
 
