@@ -32,6 +32,8 @@ type ocrOptions struct {
 	lanes, dpi, local                            string
 	limit                                        int
 	dry, sequence, check                         bool
+	// layoutLink makes each problem of a page with FlagLayout a link only, see linkLayout.
+	layoutLink bool
 }
 
 func runOCR(env Env, args []string) int {
@@ -53,6 +55,7 @@ func runOCR(env Env, args []string) int {
 	fs.StringVar(&o.dpi, "dpi", "200,300", "the resolutions of the page images. A page whose text has a flag is read again at the next one")
 	fs.BoolVar(&o.dry, "dry", false, "print the problems and write no file")
 	fs.BoolVar(&o.sequence, "sequence", false, "number the problems 1, 2, 3 in the order of the paper, for a paper whose days each start at problem 1")
+	fs.BoolVar(&o.layoutLink, "layout-link", false, "make each problem of a page whose text layer loses exponents or indices (the flag layout) a link only, for a paper whose text layer drops them in most problems")
 	pos, err := parseMixed(fs, args)
 	if err != nil {
 		return ExitUsage
@@ -163,6 +166,9 @@ func finishOCR(env Env, o ocrOptions, corpus *content.Corpus, e *content.Edition
 		return ExitFailure
 	}
 	news := planScans(corpus, e, paper, read, o.sequence, textAllowed(src), markup)
+	if o.layoutLink {
+		linkLayout(news, read)
+	}
 	if o.images != "" {
 		// A crop is not a page of the paper, so the statement gives no page.
 		for i := range news {
