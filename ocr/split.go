@@ -17,8 +17,8 @@ type Problem struct {
 	Flags []string
 }
 
-// words are the words that can come before the number of a problem, in the languages of the papers.
-const words = `Problem|Problema|Problème|Probleme|Aufgabe|Zadanie|Zadatak|Задатак|Opgave|Uppgift|Oppgave|Úloha|Uloha|Задача|Feladat|Exercice|Question|Bài|Soru`
+// words are the words that can come before the number of a problem, in the languages of the papers. Some papers set the word in capitals, as PROBLEMA 1 in the papers of the May Olympiad.
+const words = `Problem|Problema|PROBLEM|PROBLEMA|Problème|Probleme|Aufgabe|Zadanie|Zadatak|Задатак|Opgave|Uppgift|Oppgave|Úloha|Uloha|Задача|Feladat|Exercice|Question|Bài|Soru`
 
 // num is the number of a problem: one or two digits. The digits can be Western, Eastern Arabic or Persian, as in the Iranian papers, where the problems are **۱.** to **۶.**
 const num = `([0-9\x{0660}-\x{0669}\x{06F0}-\x{06F9}]{1,2})`
