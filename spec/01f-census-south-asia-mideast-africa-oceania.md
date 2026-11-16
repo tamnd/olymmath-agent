@@ -115,6 +115,8 @@ The register rows are in tamnd/olymmath: `registers/competitions.yaml`, `registe
 
 ## 2. Census numbers
 
+The register rows are merged in tamnd/olymmath#243 (South Asia, Iran and Israel), #244 (the Middle East and Africa) and #245 (Australia and New Zealand). Each one passed the targeted check (tcheck) with no new lines, and the slim check with no errors apart from the T03 lines of the partial tree.
+
 - New competitions: 27. By highest level: high-school 23, undergraduate 3, junior 1. By country: India 7, international 5, Australia 4, Iran 4, Israel 2, Pakistan, Sri Lanka, Nepal, Morocco and Burkina Faso 1 each.
 - Changed rows: 19, among them by-iran-friendly and nz-nzmo. by-iran-friendly came to main in #246 and replaces the belarus-iran row that this census first added; it gets the shape of 2022 to 2024 and the first year 2022. nz-nzmo gets the shape of 2019 on and the first year 2019 (13 positions a year, so 104 expected positions for 2019 to 2026).
 - Expected positions added: 291. Each new row gets the shape of the years that papers show, and no other years:
