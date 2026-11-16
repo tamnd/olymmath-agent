@@ -215,6 +215,8 @@ var pxSymbols = map[rune]string{
 	'⊇': `\supseteq`, '⊃': `\supset`, '↦': `\mapsto`, 'Ψ': `\Psi`, 'Ξ': `\Xi`, 'ϑ': `\vartheta`, 'ϱ': `\varrho`, 'ϖ': `\varpi`, 'ϰ': `\varkappa`,
 	'ℕ': `\mathbb{N}`, 'ℤ': `\mathbb{Z}`, 'ℚ': `\mathbb{Q}`, 'ℝ': `\mathbb{R}`, 'ℂ': `\mathbb{C}`, 'ℬ': `\mathcal{B}`, 'ℰ': `\mathcal{E}`, 'ℱ': `\mathcal{F}`,
 	'ℋ': `\mathcal{H}`, 'ℐ': `\mathcal{I}`, 'ℒ': `\mathcal{L}`, 'ℳ': `\mathcal{M}`, 'ℛ': `\mathcal{R}`,
+	// The backslash of a math font is the set difference, as in R \ {0}.
+	'\\': `\setminus`,
 }
 
 // The capital letters of the script and the double-struck alphabets of Unicode math are \mathcal and \mathbb.
@@ -244,7 +246,8 @@ func pxMath(s string, roman bool) (string, bool) {
 		switch {
 		case r == ' ':
 			continue
-		case r == '√' || r == '∑' || r == '∫' || r == '∏':
+		// %, # and " of a math font are no TeX: they stand for glyphs of another font, as the bar over a segment or a power, that the text layer lost.
+		case r == '√' || r == '∑' || r == '∫' || r == '∏' || r == '%' || r == '#' || r == '"':
 			ok = false
 			t = string(r)
 		case known && pxBinary[t]:

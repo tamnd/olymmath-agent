@@ -211,6 +211,9 @@ func TestHrBroken(t *testing.T) {
 	for s, want := range map[string]bool{
 		"Na tabuli je napísaný zlomok . Určte číslo $q$.":     true,
 		"Pre $x$ . platí $y$.":                                false,
+		"Riješite jednadžbu $(a - 1)x^2 + ax+=0$.":            true,
+		"Zbroj svih pet faktora iznosi $40_$.":                true,
+		"Za $x^2$ i $y_{n}$ vrijedi $x -1 = y$.":              false,
 		"Postupnosť $(a_n)_n^\\infty_{=0}$ celých čísel":      true,
 		"Ak $P(t)=$ = 0, tak $P(t + 1) = 1$.":                 true,
 		"Neka je $ABC$ trokut i $a_n = 3a_{n - 1}$.":          false,
@@ -255,5 +258,21 @@ func TestHrPDFDrop(t *testing.T) {
 	ps = HrPDF(ParsePDFXML([]byte(strings.Replace(fixture, "IDCCAA+LMRoman10", "IDCCAA+Cambria", 1))), nil, rules)
 	if len(ps) == 0 || !slices.Contains(ps[0].Flags, "glyph") {
 		t.Errorf("a problem of a lossy paper has no flag glyph: %+v", ps)
+	}
+}
+
+func TestPxMathFonts(t *testing.T) {
+	for s, want := range map[string]struct {
+		tex string
+		ok  bool
+	}{
+		`R\{0}`:  {`R \setminus \{0\}`, true},
+		`%%%%BC`: {"", false},
+		`n"`:     {"", false},
+	} {
+		tex, ok := pxMath(s, false)
+		if ok != want.ok || want.ok && tex != want.tex {
+			t.Errorf("pxMath(%q) = %q, %v, want %q, %v", s, tex, ok, want.tex, want.ok)
+		}
 	}
 }

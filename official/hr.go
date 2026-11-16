@@ -135,8 +135,8 @@ var (
 	hrLoose = regexp.MustCompile(`\\[A-Za-z]|[\^_{}]|[+=]\s*[.,?;:)]|[+=]\s*$`)
 	// hrStacked is a display that holds only short words, as "x y", the parts of fractions set one over the other.
 	hrStacked = regexp.MustCompile(`^\s*[A-Za-z0-9]{1,3}(?:\s+[A-Za-z0-9]{1,3})+\s*[.,]?\s*$`)
-	// hrHole is a formula with a hole, as $A ,-1$ for A(1/2, -1), $30^{()}$ or $,1$, or with a script that lost its place, as the index of $(a_n)_{n=0}^\infty$ in $(a_n)_n^\infty_{=0}$.
-	hrHole    = regexp.MustCompile(`\s,\s*[-\d]|^,|\{\s*\}|\{\(\)\}|\(\s*\)|_\{?=`)
+	// hrHole is a formula with a hole, as $A ,-1$ for A(1/2, -1), $30^{()}$, $,1$, $ax+=0$ or $40_$, or with a script that lost its place, as the index of $(a_n)_{n=0}^\infty$ in $(a_n)_n^\infty_{=0}$.
+	hrHole    = regexp.MustCompile(`\s,\s*[-\d]|^,|\{\s*\}|\{\(\)\}|\(\s*\)|_\{?=|[+-]\s*=|[_^]\s*$`)
 	hrCommand = regexp.MustCompile(`\\[A-Za-z]+`)
 	// hrBare is a word and a stop with a hole between them, as "napísaný zlomok . Určte", where a fraction set over two lines went astray.
 	hrBare = regexp.MustCompile(`\p{L} [.,;:](?:\s|$)`)
