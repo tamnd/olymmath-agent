@@ -1,0 +1,24 @@
+- id: imo-board
+  holder: IMO Board
+  country: international
+  competitions: [imo]
+  sources: [imo-official]
+  languages: [en]
+  contact:
+    url: https://www.imo-official.org/contact.aspx
+  scope: {statements: true, solutions: true, years: all, uses: [site, export]}
+  priority: P0
+  state: draft
+  dates: {drafted: 2026-11-16}
+- id: evan-chen
+  holder: Evan Chen
+  country: US
+  sources: [evanchen]
+  contact:
+    url: https://web.evanchen.cc/
+  scope: {statements: true, years: 2010-2024, uses: [site]}
+  priority: P1
+  state: refused
+  dates: {drafted: 2026-11-01, sent: 2026-11-02, answered: 2026-11-10}
+  letter: sha256:0f343b0931126a20f133d67c2b018a3b5b6a9c1e2f3d4c5b6a7980716253443f
+  answer: No; links only.

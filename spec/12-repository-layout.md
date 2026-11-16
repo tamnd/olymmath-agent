@@ -16,6 +16,7 @@ olymmath/
 │   ├── aliases.tsv           merged tags: old → new
 │   ├── redirects.tsv         old locator → new locator
 │   ├── gaps.yaml             the reason of expected positions that can get no record: link-only, robots, no-source (14.3)
+│   ├── permissions.yaml      the permission requests to rights holders: holder, scope, contact, state, letter hash (11.4.1)
 │   ├── loose-removed.tsv     dataset rows that a review took out of the content: capture → reason (06.8)
 │   └── tags.reg              every tag ever minted, with the commit
 ├── problems/
@@ -50,6 +51,7 @@ olymmath-agent/
 ├── cmd/om/                   main
 ├── cli/                      the cobra tree
 ├── spec/                     this specification, 00 to 15
+├── docs/                     documents for people: the permission letter template (11.4)
 ├── source/                   the registry and one package per adapter
 │   ├── aops/  aopswiki/  imoofficial/  compendium/  problemsru/  komal/  ukmt/  maa/
 │   ├── putnam/  hf/  github/  pdf/  stackexchange/  kvant/  ...

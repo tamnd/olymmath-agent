@@ -44,6 +44,8 @@ func runCheck(env Env, args []string) int {
 			findings = append(findings, content.Finding{Path: "registers/competitions.yaml", Level: content.Warning, Message: fmt.Sprintf("the competition %q has no level. Give one of %s", c.Code, strings.Join(content.Levels, ", "))})
 		}
 	}
+	// A granted permission is applied by its own change of the source register (spec 11.4).
+	findings = append(findings, content.PermissionWarnings(corpus)...)
 	// Each statement and each answer must render. KaTeX finds the formulas that do not parse.
 	for _, p := range corpus.Problems() {
 		for _, text := range []string{p.Statement, p.Answer} {

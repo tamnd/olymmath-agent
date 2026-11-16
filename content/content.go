@@ -566,6 +566,8 @@ type Corpus struct {
 	FidelityReviews map[string]*FidelityReview
 	// People are the persons of registers/people.yaml, by id.
 	People map[string]*Person
+	// Permissions are the rows of registers/permissions.yaml, by id (spec 11.4).
+	Permissions map[string]*Permission
 	// Rubrics are the rubrics, by the locator of their problem.
 	Rubrics map[string]*Rubric
 	// Runs are the run records of runs/, by id.
@@ -584,6 +586,7 @@ func newCorpus() *Corpus {
 		Tags:            map[string]string{},
 		FidelityReviews: map[string]*FidelityReview{},
 		People:          map[string]*Person{},
+		Permissions:     map[string]*Permission{},
 		Rubrics:         map[string]*Rubric{},
 		Runs:            map[string]*RunRecord{},
 		byCode:          map[string]*Competition{},
