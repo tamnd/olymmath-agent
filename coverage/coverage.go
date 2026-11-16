@@ -463,7 +463,7 @@ func (out *Comp) add(yr *Year, expected []string, e *content.Edition, cand map[s
 }
 
 // reason counts the reason of an expected position with no record. A seed candidate is a source to check, so a position with a candidate is open when the entry says that it has no allowed source.
-func (out *Totals) reason(yr *Year, p string, g *Gap, cand bool) {
+func (t *Totals) reason(yr *Year, p string, g *Gap, cand bool) {
 	r := Open
 	if g != nil && (g.Reason != NoSource || !cand) {
 		r = g.Reason
@@ -475,13 +475,13 @@ func (out *Totals) reason(yr *Year, p string, g *Gap, cand bool) {
 	}
 	switch r {
 	case LinkOnly:
-		out.LinkOnly++
+		t.LinkOnly++
 	case Robots:
-		out.Robots++
+		t.Robots++
 	case NoSource:
-		out.NoSource++
+		t.NoSource++
 	default:
-		out.Open++
+		t.Open++
 	}
 }
 
