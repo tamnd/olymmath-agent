@@ -209,7 +209,20 @@ var pxSymbols = map[rune]string{
 	'{': `\{`, '}': `\}`, '◦': `\circ`, '∗': `*`, '′': `'`, '∼': `\sim`, '÷': `\div`, '⊆': `\subseteq`, '∅': `\varnothing`, '∤': `\nmid`,
 	'θ': `\theta`, 'ϕ': `\phi`, 'σ': `\sigma`, 'τ': `\tau`, 'ρ': `\rho`, 'ν': `\nu`, 'ξ': `\xi`, 'η': `\eta`, 'ζ': `\zeta`, 'κ': `\kappa`,
 	'ψ': `\psi`, 'χ': `\chi`, 'ϵ': `\epsilon`, 'Γ': `\Gamma`, 'Λ': `\Lambda`, 'Σ': `\Sigma`, 'Φ': `\Phi`, 'Π': `\Pi`, 'Θ': `\Theta`,
-	'⩽': `\leqslant`, '⩾': `\geqslant`, 'ℓ': `\ell`, '•': `\bullet`, '∉': `\notin`, '̸': `\not`, 'Ω': `\Omega`,
+	'⩽': `\leqslant`, '⩾': `\geqslant`, '≦': `\leqq`, '≧': `\geqq`, '∆': `\Delta`, '⋮': `\vdots`, 'ℓ': `\ell`, '•': `\bullet`, '∉': `\notin`, '̸': `\not`, 'Ω': `\Omega`,
+	'∢': `\sphericalangle`, '∡': `\measuredangle`, '□': `\square`, '∘': `\circ`, '∖': `\setminus`, '∀': `\forall`, '∃': `\exists`,
+	'⇒': `\Rightarrow`, '⇔': `\Leftrightarrow`, '⟨': `\langle`, '⟩': `\rangle`, '‖': `\|`, '∣': `\mid`, '⋯': `\cdots`, '≅': `\cong`,
+	'⊇': `\supseteq`, '⊃': `\supset`, '↦': `\mapsto`, 'Ψ': `\Psi`, 'Ξ': `\Xi`, 'ϑ': `\vartheta`, 'ϱ': `\varrho`, 'ϖ': `\varpi`, 'ϰ': `\varkappa`,
+	'ℕ': `\mathbb{N}`, 'ℤ': `\mathbb{Z}`, 'ℚ': `\mathbb{Q}`, 'ℝ': `\mathbb{R}`, 'ℂ': `\mathbb{C}`, 'ℬ': `\mathcal{B}`, 'ℰ': `\mathcal{E}`, 'ℱ': `\mathcal{F}`,
+	'ℋ': `\mathcal{H}`, 'ℐ': `\mathcal{I}`, 'ℒ': `\mathcal{L}`, 'ℳ': `\mathcal{M}`, 'ℛ': `\mathcal{R}`,
+}
+
+// The capital letters of the script and the double-struck alphabets of Unicode math are \mathcal and \mathbb.
+func init() {
+	for i := range rune(26) {
+		pxSymbols[0x1D49C+i] = `\mathcal{` + string('A'+i) + `}`
+		pxSymbols[0x1D538+i] = `\mathbb{` + string('A'+i) + `}`
+	}
 }
 
 // pxMath gives the TeX of the glyphs of one run of a math font, and false when a glyph has no known TeX form or is a part of a formula that a line cannot hold, as a root sign or a large symbol.
@@ -249,7 +262,7 @@ func pxMath(s string, roman bool) (string, bool) {
 }
 
 // pxBinary are the commands of the relations and the operations, which get a space on each side.
-var pxBinary = map[string]bool{`\times`: true, `\cdot`: true, `\le`: true, `\ge`: true, `\ne`: true, `\leqslant`: true, `\geqslant`: true, `\pm`: true, `\approx`: true, `\equiv`: true, `\in`: true, `\to`: true, `\perp`: true, `\parallel`: true, `\sim`: true, `\subset`: true, `\subseteq`: true, `\cup`: true, `\cap`: true, `\div`: true}
+var pxBinary = map[string]bool{`\times`: true, `\cdot`: true, `\le`: true, `\ge`: true, `\ne`: true, `\leqslant`: true, `\geqslant`: true, `\pm`: true, `\approx`: true, `\equiv`: true, `\in`: true, `\to`: true, `\perp`: true, `\parallel`: true, `\sim`: true, `\subset`: true, `\subseteq`: true, `\cup`: true, `\cap`: true, `\div`: true, `\Rightarrow`: true, `\Leftrightarrow`: true, `\setminus`: true, `\mid`: true, `\cong`: true, `\supseteq`: true, `\supset`: true, `\mapsto`: true}
 
 var pxNot = strings.NewReplacer("̸=", "≠", "̸ =", "≠", "̸∈", "∉", "̸ ∈", "∉")
 

@@ -87,6 +87,9 @@ var (
 	// demoPart starts a part of a problem: "a)", "(1)" or "1.".
 	demoPart    = regexp.MustCompile(`^(?:\(?[a-z]\)|\(\d+\)|\d+\.)\s`)
 	demoEndPunc = regexp.MustCompile(`[.?!:]$`)
+	// demoLabelRE is the label of an equation or of a part, as (1); demoLineLabelRE is a label at the start of a line, as 2).
+	demoLabelRE     = regexp.MustCompile(`^\(\d{1,2}\)$`)
+	demoLineLabelRE = regexp.MustCompile(`^\(?\d{1,2}\)$`)
 )
 
 // DemoPDF reads the problems of a paper PDF of the archive of the German olympiad from the runs of text that pdftohtml -xml gives. Each problem starts at its heading, as "Aufgabe 341042:", and ends at the next heading or at the end of the paper; the cover page and the note before the first problem are left out. ink finds the drawings of a page.
@@ -193,13 +196,30 @@ type demoLine struct {
 	display, part bool
 }
 
-// demoProblem reads the text of a problem from its lines; the first line starts at the item from.
+// paperFonts are the fonts of a paper: the fonts of math, whose runs become formulas, and the fonts of text. A run of another font makes the problem link-only. part starts a line that is a part of a problem and a paragraph of its own; it is demoPart when it is nil.
+type paperFonts struct {
+	math, text, part *regexp.Regexp
+}
+
+// demoFonts are the fonts of the papers of the German olympiad.
+var demoFonts = paperFonts{math: demoMathFont, text: demoTextFont}
+
+// demoProblem reads the text of a problem of a German paper from its lines; the first line starts at the item from.
 func demoProblem(lines []*pxLine, from int) DemoProblem {
+	return paperProblem(demoFonts, lines, from)
+}
+
+// paperProblem reads the text of a problem from its lines, with the fonts of the paper; the first line starts at the item from.
+func paperProblem(fonts paperFonts, lines []*pxLine, from int) DemoProblem {
 	var p DemoProblem
 	flag := func(f string) {
 		if !slices.Contains(p.Flags, f) {
 			p.Flags = append(p.Flags, f)
 		}
+	}
+	partRE := fonts.part
+	if partRE == nil {
+		partRE = demoPart
 	}
 	var parts []demoLine
 	textLeft := 1 << 20
@@ -235,7 +255,7 @@ func demoProblem(lines []*pxLine, from int) DemoProblem {
 				gap := it.Left - prev
 				space = gap > 2
 				// The comma of the math font in 4,5 has a thin space after it, which is no space of the text.
-				if pi := l.items[i-1]; gap <= 3 && strings.TrimSpace(pi.Text) == "," && demoMathFont.MatchString(pi.Family) {
+				if pi := l.items[i-1]; gap <= 3 && strings.TrimSpace(pi.Text) == "," && fonts.math.MatchString(pi.Family) {
 					space = false
 				}
 				// A wide gap is a column of a table or the side of a figure.
@@ -244,13 +264,13 @@ func demoProblem(lines []*pxLine, from int) DemoProblem {
 				}
 			}
 			switch {
-			case demoMathFont.MatchString(it.Family):
+			case fonts.math.MatchString(it.Family):
 				tex, ok := demoMathTeX(it.Text)
 				if !ok {
 					flag("glyph")
 				}
 				atoms = append(atoms, demoAtom{s: tex, kind: demoMath, space: space})
-			case demoTextFont.MatchString(it.Family):
+			case fonts.text.MatchString(it.Family):
 				lead := strings.HasPrefix(it.Text, " ")
 				for k, w := range strings.Fields(it.Text) {
 					a := demoAtom{s: w, space: (k == 0 && (space || lead)) || k > 0}
@@ -303,7 +323,7 @@ func demoProblem(lines []*pxLine, from int) DemoProblem {
 			// A line of text far right of the others is beside a figure.
 			flag("layout")
 		}
-		parts = append(parts, demoLine{text: text, left: left, right: l.right(), display: display && left > textLeft+20, part: demoPart.MatchString(text + " ")})
+		parts = append(parts, demoLine{text: text, left: left, right: l.right(), display: display && left > textLeft+20, part: partRE.MatchString(text + " ")})
 	}
 	var b strings.Builder
 	for i, pt := range parts {
@@ -418,8 +438,8 @@ func demoRender(atoms []demoAtom) (text string, display bool) {
 			i = j
 			continue
 		}
-		// Punctuation before the formula stays text.
-		for len(run) > 0 && run[0].kind == demoPunc && run[0].script == "" {
+		// Punctuation before the formula stays text, and so does a label of a part or of an equation, as (1), at the start of the line.
+		for len(run) > 0 && run[0].script == "" && (run[0].kind == demoPunc || (run[0].kind == demoNum && (demoLabelRE.MatchString(run[0].s) || (b.Len() == 0 && demoLineLabelRE.MatchString(run[0].s))))) {
 			if run[0].space && b.Len() > 0 {
 				b.WriteString(" ")
 			}
@@ -442,14 +462,24 @@ func demoRender(atoms []demoAtom) (text string, display bool) {
 			pxAppend(&m, r.script)
 		}
 		tex := strings.TrimSpace(m.String())
-		tail := ""
-		for tex != "" && strings.ContainsAny(tex[len(tex)-1:], ".,;:!?") && !strings.HasSuffix(tex, `\`+tex[len(tex)-1:]) {
-			tail = tex[len(tex)-1:] + tail
+		// Punctuation after the formula stays text, and so does a bracket that the formula does not open, as the ) of "(für x > 0)"; a bracket that it does not close is text before it.
+		tail, lead := "", ""
+		for tex != "" {
+			c := tex[len(tex)-1:]
+			if (!strings.ContainsAny(c, ".,;:!?") || strings.HasSuffix(tex, `\`+c)) && (c != ")" || strings.Count(tex, "(") >= strings.Count(tex, ")")) {
+				break
+			}
+			tail = c + tail
 			tex = strings.TrimSpace(tex[:len(tex)-1])
+		}
+		for strings.HasPrefix(tex, "(") && strings.Count(tex, "(") > strings.Count(tex, ")") {
+			lead += "("
+			tex = strings.TrimSpace(tex[1:])
 		}
 		if len(run) > 0 && run[0].space && b.Len() > 0 {
 			b.WriteString(" ")
 		}
+		b.WriteString(lead)
 		tex = PDFTidy(tex)
 		switch {
 		case tex == "":
