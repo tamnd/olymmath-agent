@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc)", runPapers})
+	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc|purple-comet)", runPapers})
 }
 
 func runPapers(env Env, args []string) int {
@@ -31,8 +31,8 @@ func runPapers(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc"}, pos[0]) {
-		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc")
+	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc", "purple-comet"}, pos[0]) {
+		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc|purple-comet")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -55,7 +55,7 @@ func runPapers(env Env, args []string) int {
 	switch pos[0] {
 	case "usa-tst-archive":
 		return tstPapers(ctx, env, fc, corpus, *root, *from, *to)
-	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc":
+	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc", "purple-comet":
 		return nationalPapers(ctx, env, fc, corpus, *root, pos[0], *from, *to)
 	}
 	comp := corpus.Competition("imo")
@@ -161,6 +161,7 @@ var nationals = map[string]struct {
 	"maths-olympiques":  {[]string{official.POFMListing}, content.OfficialPaper{Lang: "French", Code: "fr"}, official.POFMPapers},
 	"berkeley-mt":       {official.BMTListings, content.OfficialPaper{Lang: "English", Code: "en"}, official.BMTPapers},
 	"nzmoc":             {[]string{official.NZMOListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.NZMOPapers},
+	"purple-comet":      {official.PurpleCometListings, content.OfficialPaper{Lang: "English", Code: "en"}, official.PurpleCometPapers},
 }
 
 // nationalPapers records the papers of a national source from its listing page. It writes the edition file when the corpus does not have the edition. The papers of one edition replace the papers of the source in the edition file, and the papers of other sources stay. Then om fetch SOURCE gets the papers into the store.
