@@ -58,3 +58,30 @@ func TestCoverageGaps(t *testing.T) {
 		t.Errorf("a bad gap register gave exit %d: %s", code, errs)
 	}
 }
+
+// om check warns on a competition with no level and gives an error for a level that is not one of the levels of spec 05.2.
+func TestCheckLevels(t *testing.T) {
+	root := copyContent(t)
+	reg := filepath.Join(root, "registers", "competitions.yaml")
+	b, err := os.ReadFile(reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		level string
+		code  int
+		want  string
+	}{
+		{"", ExitOK, `registers/competitions.yaml: warning: the competition "imo" has no level. Give one of elementary, junior, high-school, undergraduate, open`},
+		{"  level: school\n", ExitFindings, `registers/competitions.yaml: the competition "imo": the level "school" is not one of elementary, junior, high-school, undergraduate, open`},
+		{"  level: elementary\n", ExitOK, "0 findings"},
+	} {
+		if err := os.WriteFile(reg, []byte(strings.Replace(string(b), "  level: high-school\n", tc.level, 1)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		code, out, errs := run("check", "-content", root)
+		if code != tc.code || !strings.Contains(out, tc.want) {
+			t.Errorf("level %q: exit %d, want %d, %q in:\n%s%s", tc.level, code, tc.code, tc.want, out, errs)
+		}
+	}
+}

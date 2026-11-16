@@ -114,6 +114,10 @@ func (l *loader) competitions() {
 			if msg := shapeError(c); msg != "" {
 				l.add(rel, "", "the competition %q: %s", c.Code, msg)
 			}
+			// A competition with no level is a warning of om check, not a finding of the load, because a build of the site needs content with no finding.
+			if msg := levelError(c); c.Level != "" && msg != "" {
+				l.add(rel, "", "the competition %q: %s", c.Code, msg)
+			}
 			if c.Short == "" {
 				c.Short = strings.ToUpper(c.Code)
 			}
@@ -558,6 +562,44 @@ func shapeError(c *Competition) string {
 		}
 		if msg := layoutError([]Layout{{Positions: ps}}, 0); msg != "" {
 			return fmt.Sprintf("the override of %d: %s", y, msg)
+		}
+	}
+	return ""
+}
+
+// levelError gives the first error of the levels of a competition, or "". Level must be one of Levels. Levels, when it is there, must list two or more levels in the order of Levels and end with Level. The level of a paper must be one of the levels of the competition.
+func levelError(c *Competition) string {
+	if !slices.Contains(Levels, c.Level) {
+		return fmt.Sprintf("the level %q is not one of %s", c.Level, strings.Join(Levels, ", "))
+	}
+	if len(c.Levels) > 0 {
+		last := -1
+		for _, lv := range c.Levels {
+			i := slices.Index(Levels, lv)
+			switch {
+			case i < 0:
+				return fmt.Sprintf("the level %q of levels is not one of %s", lv, strings.Join(Levels, ", "))
+			case i <= last:
+				return fmt.Sprintf("levels must list each level once, lowest first, in the order %s", strings.Join(Levels, ", "))
+			}
+			last = i
+		}
+		switch {
+		case len(c.Levels) == 1:
+			return "levels lists one level. Give it only for a competition with papers at two or more levels"
+		case c.Levels[len(c.Levels)-1] != c.Level:
+			return fmt.Sprintf("the last of levels is %q, but level is %q. level is the highest level", c.Levels[len(c.Levels)-1], c.Level)
+		}
+	}
+	layouts := [][]Layout{c.Layout}
+	for _, e := range c.Eras {
+		layouts = append(layouts, e.Layout)
+	}
+	for _, ls := range layouts {
+		for _, l := range ls {
+			if l.Level != "" && !slices.Contains(c.AllLevels(), l.Level) {
+				return fmt.Sprintf("the level %q of the paper %q is not one of the levels of the competition (%s)", l.Level, l.Paper, strings.Join(c.AllLevels(), ", "))
+			}
 		}
 	}
 	return ""

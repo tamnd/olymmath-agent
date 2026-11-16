@@ -14,17 +14,20 @@ import (
 
 // Competition is one row of the competition register (spec 05.2).
 type Competition struct {
-	Code      string            `yaml:"code"`
-	Name      string            `yaml:"name"`
-	Short     string            `yaml:"short"`
-	Names     map[string]string `yaml:"names"`
-	Group     string            `yaml:"group"`
-	Level     string            `yaml:"level"`
-	Country   string            `yaml:"country"`
-	Organizer string            `yaml:"organizer"`
-	URL       string            `yaml:"url"`
-	FirstYear int               `yaml:"first_year"`
-	LastYear  int               `yaml:"last_year"`
+	Code  string            `yaml:"code"`
+	Name  string            `yaml:"name"`
+	Short string            `yaml:"short"`
+	Names map[string]string `yaml:"names"`
+	Group string            `yaml:"group"`
+	// Level is the highest level of the papers of the competition, one of Levels (spec 05.2).
+	Level string `yaml:"level"`
+	// Levels lists every level of the papers, lowest first, when the papers are at more than one level. Its last level is Level. It is empty for a competition at one level.
+	Levels    []string `yaml:"levels"`
+	Country   string   `yaml:"country"`
+	Organizer string   `yaml:"organizer"`
+	URL       string   `yaml:"url"`
+	FirstYear int      `yaml:"first_year"`
+	LastYear  int      `yaml:"last_year"`
 	// Gaps are the years with no edition between the first year and the last year, for example 1980 for the IMO.
 	Gaps        []int  `yaml:"gaps"`
 	EditionForm string `yaml:"edition_form"`
@@ -53,6 +56,8 @@ type Layout struct {
 	Paper     string   `yaml:"paper"`
 	Name      string   `yaml:"name"`
 	Positions []string `yaml:"positions"`
+	// Level is the level of the paper when it is not the level of the competition. It is one of the levels of the competition.
+	Level string `yaml:"level"`
 	// Days is the number of days of a paper that is written over several days with the same number of problems each day, such as a league of the Tuymaada Olympiad. A title such as "Senior League Second Day P1" then counts the problem from 1 in the day. It is 0 for a paper of one day.
 	Days int `yaml:"days"`
 }
@@ -177,8 +182,32 @@ func (c *Competition) HasShape() bool {
 // Groups are the groups of the competition register, in the order of the site.
 var Groups = []string{"international", "undergraduate", "usa", "national", "journal", "benchmark"}
 
-// Levels are the levels of the competition register.
-var Levels = []string{"junior", "high-school", "undergraduate", "open"}
+// Levels are the levels of the competition register, lowest first (spec 05.2). The level of a paper is the school stage of the students it is for: elementary is primary school, about grades 1 to 5; junior is lower secondary or middle school, about grades 6 to 9; high-school is upper secondary, about grades 10 to 12; undergraduate is university students; open is a paper for anyone, such as the problem section of a journal. A paper for the grades of two levels has the higher level.
+var Levels = []string{"elementary", "junior", "high-school", "undergraduate", "open"}
+
+// Elementary is the level of primary school. A competition with this level has only papers for primary school.
+const Elementary = "elementary"
+
+// AllLevels gives every level of the papers of the competition, lowest first: Levels, or Level alone when Levels is empty. It gives nil when the competition has no level.
+func (c *Competition) AllLevels() []string {
+	if len(c.Levels) > 0 {
+		return c.Levels
+	}
+	if c.Level == "" {
+		return nil
+	}
+	return []string{c.Level}
+}
+
+// PositionLevel gives the level of the position pos in the year: the level of the paper of the layout of the year that has the position, or the level of the competition.
+func (c *Competition) PositionLevel(year int, pos string) string {
+	for _, l := range c.Shape(year).Layout {
+		if l.Level != "" && slices.Contains(l.Positions, pos) {
+			return l.Level
+		}
+	}
+	return c.Level
+}
 
 // SourceRecord is one row of the source register (spec 05.3).
 type SourceRecord struct {

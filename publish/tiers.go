@@ -21,7 +21,7 @@ import (
 	"github.com/tamnd/olymmath-agent/content"
 )
 
-// Tiers is registers/site-tiers.yaml. A competition is in tier 1 when its group, its country or its code is in the lists. The problem pages of tier 1 are static assets. The problem pages of the other competitions go to R2.
+// Tiers is registers/site-tiers.yaml. A competition is in tier 1 when its code is in the lists, or when its group or its country is and its level is not elementary. The problem pages of tier 1 are static assets. The problem pages of the other competitions go to R2.
 type Tiers struct {
 	Groups    []string `yaml:"groups"`
 	Countries []string `yaml:"countries"`
@@ -43,9 +43,15 @@ func LoadTiers(file string) (Tiers, error) {
 	return t, nil
 }
 
-// First tells if the competition is in tier 1.
+// First tells if the competition is in tier 1. A competition with only papers for primary school (level elementary) is in tier 1 only by its code, because tier 1 is the olympiad core (spec 10.6).
 func (t Tiers) First(c *content.Competition) bool {
-	return slices.Contains(t.Groups, c.Group) || (c.Country != "" && slices.Contains(t.Countries, c.Country)) || slices.Contains(t.Codes, c.Code)
+	if slices.Contains(t.Codes, c.Code) {
+		return true
+	}
+	if c.Level == content.Elementary {
+		return false
+	}
+	return slices.Contains(t.Groups, c.Group) || (c.Country != "" && slices.Contains(t.Countries, c.Country))
 }
 
 // Split takes out of the site directory dir the files that are not static assets. It deletes each redirect page of redirects.json, because the Worker answers these paths. It moves to out, at the same relative path, each file of a competition that is not in tier 1 and each machine copy of a problem page and each API record. The index pages stay. It gives the number of deleted and moved files.

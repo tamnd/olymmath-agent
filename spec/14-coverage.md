@@ -9,7 +9,8 @@
 ```yaml
 - code: imo
   names: {en: International Mathematical Olympiad, fr: Olympiade internationale de mathématiques}
-  level: international
+  group: international
+  level: high-school
   organizer: IMO Board
   url: https://www.imo-official.org/
   first: 1959
@@ -27,7 +28,7 @@
 
 The register also says which positions cannot exist: a gap year, a year out of the range of the competition, or a position that is not in the shape of its year. Audit rule C04 (9.3) warns on each appearance at such a position, so a record that a source put at the wrong competition or year shows up. When the position is real, the register or the edition file is wrong and gets the fix, with a source in a comment.
 
-The register starts with the ~210 competitions of 01b (157 table rows plus ~56 grouped countries), each with its first year and positions. Lower rounds of national olympiads are added as separate competitions when a source holds them. The register is the denominator of every closed-universe measure.
+The register starts with the ~210 competitions of 01b (157 table rows plus ~56 grouped countries), each with its first year and positions. Lower rounds of national olympiads are added as separate competitions when a source holds them. Since 02.2 takes in every school level, a census of the competitions of each region adds the junior and elementary contests too. The register is the denominator of every closed-universe measure.
 
 **How we find missing competitions.** The register is not trusted to be complete. Each source adapter reports every competition label it sees (AoPS category names, NuminaMath and Omni-MATH source strings, MathNet `competition` values, problems.ru sources, imomath and imogeometry directories). A label that does not resolve through `competition-aliases.tsv` goes to the queue "unknown competition". The coverage report lists these labels with their row counts. The register is complete when this queue is empty.
 
@@ -64,7 +65,9 @@ Some expected positions can get no record under the rules of the project. The ga
 - `robots`: robots.txt blocks the source.
 - `no-source`: no allowed source was found. A position with a seed candidate stays open, because the candidate is a source to check.
 
-A position with no record that no entry names is open. The allowed positions are the expected positions less the positions with one of these reasons. The report gives C0 against the expected positions and against the allowed positions ("C0 allowed"), for each competition, for all competitions and for the national competitions of tier 1 (`registers/site-tiers.yaml`). It lists each entry with the number of positions it names now. Two entries must not name the same position.
+A position with no record that no entry names is open. The allowed positions are the expected positions less the positions with one of these reasons. The report gives C0 against the expected positions and against the allowed positions ("C0 allowed"), for each competition, for all competitions, for each level and for the national competitions of tier 1 (`registers/site-tiers.yaml`).
+
+The table of levels has one row for each level of 05.2, in order, then a row for each other value the register uses, then a row "no level" for the competitions with none. A row gives the competitions with papers at the level, the expected positions, C0, the allowed positions and C0 allowed. A position counts at the level of its paper in the layout of its year, or at the level of its competition when the paper has none. A competition counts once at each of its levels. A row for an empty level stays, with zeros, so that the table has the same rows in each report. It lists each entry with the number of positions it names now. Two entries must not name the same position.
 
 ## 14.4 Targets by phase
 

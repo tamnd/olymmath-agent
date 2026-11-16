@@ -27,6 +27,17 @@ type Report struct {
 	Tier1 *Totals `json:"tier1_national,omitempty"`
 	// Gaps are the entries of the gap register, each with the number of positions it gives the reason of.
 	Gaps []*Gap `json:"gaps,omitempty"`
+	// Levels sums the positions by level: the levels of spec 05.2 in their order, then any other level of the register, then the positions of the competitions with no level.
+	Levels []*Level `json:"levels"`
+}
+
+// Level sums the expected positions at one level. The level of a position is the level of its paper in the register, or the level of its competition.
+type Level struct {
+	// Level is the level, or "" for the competitions with no level.
+	Level string `json:"level"`
+	// Competitions counts the competitions with papers at the level.
+	Competitions int `json:"competitions"`
+	Totals
 }
 
 // Totals sums the measures of all competitions.
@@ -84,6 +95,21 @@ type Comp struct {
 	// Shape is false when the register gives no positions for the competition. Then Expected is 0 and the year list shows only the positions that the seed rows give.
 	Shape bool    `json:"shape"`
 	Years []*Year `json:"years,omitempty"`
+	// byLevel sums the expected positions of each level.
+	byLevel map[string]*Totals
+}
+
+// level gives the sums of the level lv, and makes them when there are none.
+func (out *Comp) level(lv string) *Totals {
+	if out.byLevel == nil {
+		out.byLevel = map[string]*Totals{}
+	}
+	t := out.byLevel[lv]
+	if t == nil {
+		t = &Totals{}
+		out.byLevel[lv] = t
+	}
+	return t
 }
 
 // Year lists the positions of one edition by state. A competition with two papers in a year, such as the AMC 10 with the papers A and B, has one Year for each paper.
@@ -195,6 +221,7 @@ func Build(corpus *content.Corpus, al *seed.Aliases, gaps *Gaps, thisYear int, r
 		rep.Competitions = append(rep.Competitions, measure(c, cand[c.Code], seen[c.Code], paperless[c.Code], compRows[c.Code], thisYear, gaps))
 	}
 	rep.Totals = rep.Sum(func(*Comp) bool { return true })
+	rep.Levels = levels(corpus.Competitions, rep.Competitions)
 	for _, s := range srcs {
 		rep.Sources = append(rep.Sources, s)
 	}
@@ -206,6 +233,55 @@ func Build(corpus *content.Corpus, al *seed.Aliases, gaps *Gaps, thisYear int, r
 		return cmp.Or(b.Rows-a.Rows, strings.Compare(a.Source, b.Source), strings.Compare(a.Label, b.Label))
 	})
 	return rep, nil
+}
+
+// levels sums the positions of the competitions by level. comps are the coverage of the competitions cs, in the same order.
+func levels(cs []*content.Competition, comps []*Comp) []*Level {
+	by := map[string]*Level{}
+	get := func(lv string) *Level {
+		l := by[lv]
+		if l == nil {
+			l = &Level{Level: lv}
+			by[lv] = l
+		}
+		return l
+	}
+	for i, c := range cs {
+		lvs := c.AllLevels()
+		if len(lvs) == 0 {
+			lvs = []string{""}
+		}
+		for _, lv := range lvs {
+			get(lv).Competitions++
+		}
+		for lv, t := range comps[i].byLevel {
+			get(lv).add(*t)
+		}
+	}
+	var out []*Level
+	for _, lv := range content.Levels {
+		if l := by[lv]; l != nil {
+			out = append(out, l)
+		} else {
+			out = append(out, &Level{Level: lv})
+		}
+		delete(by, lv)
+	}
+	var rest []*Level
+	for _, l := range by {
+		rest = append(rest, l)
+	}
+	// The other levels in the order of their names, and the competitions with no level last.
+	slices.SortFunc(rest, func(a, b *Level) int {
+		switch {
+		case a.Level == "":
+			return 1
+		case b.Level == "":
+			return -1
+		}
+		return strings.Compare(a.Level, b.Level)
+	})
+	return append(out, rest...)
 }
 
 // paperOf gives the edition of a row of the year: the year, or the edition of the paper that the labels of the row name when the register lists the papers of the year. The result known is false when the year has more than one paper and the labels do not name one, or name a season that has no papers in the year.
@@ -305,15 +381,15 @@ func measure(c *content.Competition, cand map[string]map[string]bool, seen map[s
 			if i == 0 {
 				yr.Rows += paperless[y]
 			}
-			out.add(yr, Expected(c, y, pp.edition), pp.edition, cand[pp.id], gaps)
+			out.add(yr, Expected(c, y, pp.edition), pp.edition, cand[pp.id], gaps, func(p string) string { return c.PositionLevel(y, p) })
 			out.Years = append(out.Years, yr)
 		}
 	}
 	return out
 }
 
-// add measures one edition: the positions that the edition expects, the problems of the edition e, which is nil when the content has none, and the positions with a seed candidate. gaps gives the reason of each expected position with no record.
-func (out *Comp) add(yr *Year, expected []string, e *content.Edition, cand map[string]bool, gaps *Gaps) {
+// add measures one edition: the positions that the edition expects, the problems of the edition e, which is nil when the content has none, and the positions with a seed candidate. gaps gives the reason of each expected position with no record, and level gives the level of each position.
+func (out *Comp) add(yr *Year, expected []string, e *content.Edition, cand map[string]bool, gaps *Gaps, level func(p string) string) {
 	have := map[string]*content.Problem{}
 	if e != nil {
 		for _, p := range e.Problems {
@@ -346,42 +422,48 @@ func (out *Comp) add(yr *Year, expected []string, e *content.Edition, cand map[s
 	}
 	slices.SortFunc(extra, comparePos)
 	for _, p := range append(slices.Clone(expected), extra...) {
+		// d counts the position. It goes to the sums of the competition and of the level of the position.
+		var d Totals
 		counted := set[p]
 		if counted {
-			out.Expected++
+			d.Expected++
 		}
 		if pr := have[p]; pr != nil {
 			yr.Record = append(yr.Record, p)
 			if counted {
-				out.C0++
+				d.C0++
 				if s := pr.CanonicalStatement(); s != nil {
 					if c := pr.Class(s); c == "H1" || c == "H2" {
-						out.C1++
+						d.C1++
 					}
 					if pr.Class(s) == "H1" {
-						out.C2++
+						d.C2++
 					}
 				}
 			}
-			continue
-		}
-		if cand[p] {
-			yr.Candidate = append(yr.Candidate, p)
-			if counted {
-				out.Candidate++
+		} else {
+			if cand[p] {
+				yr.Candidate = append(yr.Candidate, p)
+				if counted {
+					d.Candidate++
+				}
+			} else if counted {
+				yr.Missing = append(yr.Missing, p)
+				d.NoCandidate++
 			}
-		} else if counted {
-			yr.Missing = append(yr.Missing, p)
-			out.NoCandidate++
+			if counted {
+				d.reason(yr, p, gaps.entry(out.Code, yr.Year, p), cand[p])
+			}
 		}
 		if counted {
-			out.reason(yr, p, gaps.entry(out.Code, yr.Year, p), cand[p])
+			out.Totals.add(d)
+			out.level(level(p)).add(d)
 		}
 	}
 }
 
 // reason counts the reason of an expected position with no record. A seed candidate is a source to check, so a position with a candidate is open when the entry says that it has no allowed source.
-func (out *Comp) reason(yr *Year, p string, g *Gap, cand bool) {
+func (t *Totals) reason(yr *Year, p string, g *Gap, cand bool) {
 	r := Open
 	if g != nil && (g.Reason != NoSource || !cand) {
 		r = g.Reason
@@ -393,13 +475,13 @@ func (out *Comp) reason(yr *Year, p string, g *Gap, cand bool) {
 	}
 	switch r {
 	case LinkOnly:
-		out.LinkOnly++
+		t.LinkOnly++
 	case Robots:
-		out.Robots++
+		t.Robots++
 	case NoSource:
-		out.NoSource++
+		t.NoSource++
 	default:
-		out.Open++
+		t.Open++
 	}
 }
 
@@ -448,6 +530,16 @@ func (r *Report) Markdown(w io.Writer, maxUnknown int) error {
 	reasons(p, "All competitions", t)
 	if r.Tier1 != nil {
 		reasons(p, "Tier 1 nationals", *r.Tier1)
+	}
+	p("\n")
+	p("## Levels\n\nThe levels of spec 05.2. The level of a position is the level of its paper in the register, or the level of its competition. A competition counts at each level of its papers. A competition with no shape has no expected positions yet.\n\n")
+	p("| Level | Competitions | Expected | C0 | Allowed | C0 allowed |\n|---|---:|---:|---:|---:|---:|\n")
+	for _, l := range r.Levels {
+		name := l.Level
+		if name == "" {
+			name = "no level"
+		}
+		p("| %s | %d | %d | %s | %d | %s |\n", name, l.Competitions, l.Expected, Pct(l.C0, l.Expected), l.Allowed(), Pct(l.C0, l.Allowed()))
 	}
 	p("\n")
 	if r.Tier1 != nil {

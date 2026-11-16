@@ -102,6 +102,7 @@ func TestLoadFindings(t *testing.T) {
 		{"unplaced position", "problems/_loose/0J8/0J8TP3MFS9.md", "at: imo/2024\n", "at: imo/2024/p1\n", "is not a competition or an edition"},
 		{"unplaced competition", "problems/_loose/0J8/0J8TP3MFS9.md", "at: imo/2024\n", "at: imx/2024\n", "names a competition that is not in the register"},
 		{"unplaced placed", "problems/imo/2024/p2.md", "kind: problem\n", "kind: problem\nunplaced:\n  - at: imo\n", "has a primary appearance and unplaced entries"},
+		{"unknown level", "registers/competitions.yaml", "level: high-school", "level: school", `the level "school" is not one of elementary, junior, high-school, undergraduate, open`},
 		{"bad tsv", "registers/redirects.tsv", "imo/2024/q1\timo/2024/p1", "imo/2024/q1", "line 2 has 1 fields"},
 	}
 	for _, tc := range cases {
@@ -266,6 +267,59 @@ func TestShapeError(t *testing.T) {
 		if (tc.want == "") != (got == "") || !strings.Contains(got, tc.want) {
 			t.Errorf("shapeError(%+v) = %q, want %q", tc.c, got, tc.want)
 		}
+	}
+}
+
+func TestLevelError(t *testing.T) {
+	paper := func(lv string) []Layout {
+		return []Layout{{Paper: "junior", Level: lv, Positions: []string{"j1"}}, {Paper: "senior", Positions: []string{"s1"}}}
+	}
+	for _, tc := range []struct {
+		c    Competition
+		want string
+	}{
+		{Competition{Level: "elementary"}, ""},
+		{Competition{Level: "high-school", Levels: []string{"elementary", "junior", "high-school"}}, ""},
+		{Competition{Level: "high-school", Levels: []string{"junior", "high-school"}, Layout: paper("junior")}, ""},
+		{Competition{Level: "high-school", Levels: []string{"junior", "high-school"}, Eras: []Era{{From: 2000, Layout: paper("junior")}}}, ""},
+		{Competition{Level: "middle"}, `the level "middle" is not one of`},
+		{Competition{Level: "high-school", Levels: []string{"primary", "high-school"}}, `the level "primary" of levels`},
+		{Competition{Level: "high-school", Levels: []string{"high-school", "junior"}}, "lowest first"},
+		{Competition{Level: "junior", Levels: []string{"junior", "junior"}}, "lowest first"},
+		{Competition{Level: "junior", Levels: []string{"junior"}}, "two or more levels"},
+		{Competition{Level: "junior", Levels: []string{"junior", "high-school"}}, `level is "junior"`},
+		{Competition{Level: "high-school", Layout: paper("junior")}, `the level "junior" of the paper "junior" is not one of the levels of the competition (high-school)`},
+		{Competition{Level: "high-school", Levels: []string{"junior", "high-school"}, Eras: []Era{{From: 2000, Layout: paper("elementary")}}}, `the level "elementary" of the paper "junior"`},
+	} {
+		got := levelError(&tc.c)
+		if (tc.want == "") != (got == "") || !strings.Contains(got, tc.want) {
+			t.Errorf("levelError(%+v) = %q, want %q", tc.c, got, tc.want)
+		}
+	}
+}
+
+func TestPositionLevel(t *testing.T) {
+	c := &Competition{
+		Level: "high-school", Levels: []string{"junior", "high-school"},
+		Layout: []Layout{{Paper: "junior", Level: "junior", Positions: []string{"j1", "j2"}}, {Paper: "senior", Positions: []string{"s1"}}},
+		Eras:   []Era{{From: 1990, To: 1999, PerYear: 3}},
+	}
+	for _, tc := range []struct {
+		year      int
+		pos, want string
+	}{{2020, "j2", "junior"}, {2020, "s1", "high-school"}, {2020, "p9", "high-school"}, {1995, "j1", "high-school"}} {
+		if got := c.PositionLevel(tc.year, tc.pos); got != tc.want {
+			t.Errorf("PositionLevel(%d, %s) = %q, want %q", tc.year, tc.pos, got, tc.want)
+		}
+	}
+	if got := strings.Join(c.AllLevels(), " "); got != "junior high-school" {
+		t.Errorf("AllLevels = %q", got)
+	}
+	if got := (&Competition{Level: "open"}).AllLevels(); len(got) != 1 || got[0] != "open" {
+		t.Errorf("AllLevels of one level = %q", got)
+	}
+	if got := (&Competition{}).AllLevels(); got != nil {
+		t.Errorf("AllLevels of no level = %q", got)
 	}
 }
 

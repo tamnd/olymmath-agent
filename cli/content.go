@@ -38,6 +38,12 @@ func runCheck(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om check: %v\n", err)
 		return ExitFailure
 	}
+	// Each competition should have a level (spec 05.2). The load checks a level that is there.
+	for _, c := range corpus.Competitions {
+		if c.Level == "" {
+			findings = append(findings, content.Finding{Path: "registers/competitions.yaml", Level: content.Warning, Message: fmt.Sprintf("the competition %q has no level. Give one of %s", c.Code, strings.Join(content.Levels, ", "))})
+		}
+	}
 	// Each statement and each answer must render. KaTeX finds the formulas that do not parse.
 	for _, p := range corpus.Problems() {
 		for _, text := range []string{p.Statement, p.Answer} {

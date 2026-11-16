@@ -14,7 +14,7 @@ The harvest goes in this order of value: primary and curated first, so that deri
 
 ## 5.2 The competition register
 
-The register (`registers/competitions.yaml`, 14.1) starts from the catalogue in 01b: about 210 competitions in groups.
+The register (`registers/competitions.yaml`, 14.1) starts from the catalogue in 01b: about 210 competitions in groups. A census of the competitions of each region adds the junior and elementary contests of 02.2, so the register grows to many hundreds of rows. The group says where a competition is held (international, national, …). The level says who it is for.
 
 | Group | Count | Examples (code) |
 |---|---|---|
@@ -24,7 +24,41 @@ The register (`registers/competitions.yaml`, 14.1) starts from the catalogue in 
 | national olympiads + TSTs | ~135 | `ru-allrussian`, `ru-moscow`, `ru-spb`, `cn-mo`, `cn-tst`, `cn-wmo`, `cn-gmo`, `cn-league`, `vn-vmo`, `vn-tst`, `ro-nmo`, `ro-tst`, `ir-mo`, `ir-tst`, `in-inmo`, `in-rmo`, `jp-jmo`, `kr-kmo`, `tw-tst`, `uk-bmo1`, `uk-bmo2`, `ca-cmo`, `de-bundeswettbewerb`, `de-mo`, `hu-oktv`, `pl-om`, `bg-mo`, `tr-mo`, `br-obm`, `fr-tst`, … |
 | journals (source kind, not competition) | ~10 | `journal-crux`, `journal-komal`, `journal-kvant`, `journal-mr`, `journal-excalibur`, `journal-amm`, `journal-gazeta`, `journal-tzaloa`, `journal-eureka`, `journal-parabola` |
 
-Each row has the slug, the names in each language, first year, gaps, the positions per paper, the official URL, whether official solutions are published, the copyright note, and the sources that hold it. Lower rounds become their own competition codes when a source holds them (`ru-allrussian-regional`, `de-mo-r3`).
+Each row has the slug, the names in each language, the group, the level, first year, gaps, the positions per paper, the official URL, whether official solutions are published, the copyright note, and the sources that hold it. Lower rounds become their own competition codes when a source holds them (`ru-allrussian-regional`, `de-mo-r3`).
+
+**Levels.** The level of a paper is the school stage of the students it is for. The values, lowest first, are:
+
+| Level | Students | Examples |
+|---|---|---|
+| `elementary` | primary school, about grades 1 to 5 (ages 6 to 11) | Kangaroo Écolier, MOEMS Division E, the primary rounds of national olympiads |
+| `junior` | lower secondary or middle school, about grades 6 to 9 (ages 11 to 15) | AMC 8, MATHCOUNTS, JBMO, USAJMO, Euler Olympiad |
+| `high-school` | upper secondary, about grades 10 to 12 (ages 15 to 18), and contests for all secondary students | IMO, AMC 12, All-Russian MO, most national olympiads |
+| `undergraduate` | university students | Putnam, IMC, SEEMOUS |
+| `open` | anyone, or no one school stage | the problem sections of journals, problem sets |
+
+The grades are a guide. The school system of the country decides: a paper for the last year of lower secondary is `junior`, also when that year is called grade 9 in one country and grade 8 in another. A paper for the grades of two levels has the higher level, so the AMC 10 (grade 10 and below) is `high-school`. A junior olympiad such as the JBMO is `junior`, whatever its difficulty: the level is about the students, not about how hard the problems are.
+
+A competition whose papers are all at one level has `level` only. A competition with papers at several levels says so in three keys:
+
+- `level` is the highest level of its papers. It is required.
+- `levels` lists every level of its papers, lowest first, and ends with `level`. It is there only when the papers are at two or more levels.
+- A paper of `layout` (or of the `layout` of an era) can have `level`, when the paper is at a lower level than the competition. It must be one of `levels`. A paper with no `level` is at the level of the competition.
+
+```yaml
+- code: tuymaada
+  level: high-school                # the highest level
+  levels: [junior, high-school]     # all the levels, lowest first
+  layout:
+    - {paper: junior, name: Junior, level: junior, days: 2, positions: [j1, j2, j3, j4, j5, j6, j7, j8]}
+    - {paper: senior, name: Senior, days: 2, positions: [s1, s2, s3, s4, s5, s6, s7, s8]}   # high-school, the level of the competition
+- code: kangaroo                    # no layout yet: levels alone says that it has papers at three levels
+  level: high-school
+  levels: [elementary, junior, high-school]
+- code: amc8
+  level: junior                     # one level
+```
+
+This follows 04.1: a level or a grade is a paper of an edition, not a competition of its own. The per-paper level is optional, so a row of the census can give `levels` before anyone writes the layout. `om check` reports a competition with no level (a warning) and a level, a `levels` list or a paper level that breaks these rules (an error). The coverage report counts each expected position at the level of its paper (14.3).
 
 The positions of an edition come from `layout` (papers with positions) or from `per_year` (p1 to pN). When the format changed over the years, `eras` gives the format of a range of years, and `overrides` gives the positions of one year. The top-level `layout` and `per_year` are the default for the years that no era and no override covers. An era with no `to` did not end. An era with no `layout` and no `per_year` says that the format of its years is not known: the import accepts any valid position, and the coverage report expects no position. Eras must not overlap.
 
@@ -109,7 +143,7 @@ Wave 0 also builds the alias table: every `source`, `exam`, `competition`, AoPS 
 | `aops-collections` (full c13 tree + threads) | ~80k contest problems, their reply threads (est. 1M+ posts) | AJAX JSON behind a Cloudflare challenge (5.6) | the biggest source of human solutions; Z2 |
 | `imomath` | ~8.5k problems, 42 countries | HTML behind a JS proof-of-work gate | ask the owner (5.6) |
 | `kalva` (prase.cz mirror) | ~4,100 olympiad problems, ~2,300 with solutions | static HTML | old IMO/USAMO/Putnam/APMO second sources; Z2 |
-| `komal` | 20 to 30k (A, B olympiad level; C, K school) | HTML (current) + scans 1893 to 2001 | English statements for 40+ years; Hungarian solutions |
+| `komal` | 20 to 30k (A, B olympiad level; C, K school level; all in scope) | HTML (current) + scans 1893 to 2001 | English statements for 40+ years; Hungarian solutions |
 | `crux` | ~5k proposals + Olympiad Corner, 1975 to 2026 | open PDFs; old volumes are scans | OCR; personal use only → ask CMS |
 | `mathreflections` | ~3k, 2006 to 2026 | born-digital PDFs | ask AwesomeMath |
 | `excalibur`, `parabola`, `pme`, `ssmrmh`, `gazeta`, `tzaloa`, `eureka` | hundreds to thousands each | PDF | OCR where scanned |
