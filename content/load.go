@@ -29,6 +29,8 @@ func Load(root string) (*Corpus, Findings) {
 	l.competitions()
 	l.editions()
 	l.registers()
+	l.permissions()
+	l.zoneBasis()
 	l.people()
 	l.problems()
 	l.solutions()
