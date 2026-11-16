@@ -116,7 +116,21 @@ The register rows are in tamnd/olymmath: `registers/competitions.yaml`, `registe
 ## 2. Census numbers
 
 - New competitions: 28. By highest level: high-school 24, undergraduate 3, junior 1. By country: India 7, international 6, Australia 4, Iran 4, Israel 2, Pakistan, Sri Lanka, Nepal, Morocco and Burkina Faso 1 each.
-- Changed rows: 18, among them nz-nzmo, which gets the shape of 2019 on (13 positions a year, so 104 expected positions for 2019 to 2026).
+- Changed rows: 18, among them nz-nzmo, which gets the shape of 2019 on and the first year 2019 (13 positions a year, so 104 expected positions for 2019 to 2026).
+- Expected positions added: 291. Each new row gets the shape of the years that papers show, and no other years:
+
+| Code | Expected | Evidence |
+|---|---|---|
+| nz-nzmo | 104 | NZMOC papers of 2019 to 2026: Round One 8, Round Two 5. The existing Round One records cover 56. |
+| in-assam | 55 | AAM papers of 2023: Category I 18, Category II 19, Category III 18 questions. The 2018 Category III paper has 12, so other years have no shape. |
+| au-unsw | 35 | UNSW papers: 2012 and 2022 have 6 Junior and 6 Senior problems, 2019 has 6 and 5. |
+| ir-combinatorics | 21 | AoPS papers of 2020, 2021 and 2025, 7 problems each. |
+| au-aimo | 20 | AMT papers of 2017 and 2018, 10 problems each. |
+| il-revenge | 20 | AoPS papers of 2021 to 2025, 4 problems each. |
+| belarus-iran | 18 | AoPS papers of 2022 to 2024, 6 problems each. |
+| in-egmo-tst | 18 | AoPS tests of 2022 to 2024, 6 problems each. |
+
+  No paper shows the shape of the other 21 new rows. Their papers do not agree from year to year (india-iran, ir-rmm-tst, np-tst, in-stems, in-limit, pamo-sl), AoPS has one year only (iran-taiwan, ir-mo-r1, ir-ourmo, il-oral, pk-tst, lk-slmc, in-mtrp, safest), or no paper is online (in-nmtc, in-kvjmo, au-amoc-senior, au-wajo, eamo, ma-mmc, bf-mo).
 - New sources: 15 (Z1: 1, Z2: 14), and gulf-official gets terms and robots facts.
 - Labels mapped: 81 alias lines.
 - Gaps: 33 new no-source entries, and the za-samo entry gets a new note.
