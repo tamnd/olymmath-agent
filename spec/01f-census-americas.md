@@ -15,16 +15,16 @@ Research date: 2026-11-16. Scope: the competitions of the United States, Canada,
 - 107 new competitions: 40 in the United States, 13 in Canada, 10 international, 10 in Mexico, 7 in Brazil, 5 in Chile, 3 each in Argentina, Ecuador, Peru and Bolivia, 2 each in Paraguay and Colombia, and 1 each in Costa Rica, Honduras, El Salvador, Panama, Puerto Rico and Uruguay.
 - By highest level: 77 high-school, 27 junior, 2 elementary, 1 undergraduate. By every level they cover: 14 have elementary papers, 38 have junior papers.
 - Source marks of the new competitions: 44 [P], 61 [S] and 2 with no source. By region: international 7 [P], 2 [S], 1 none; United States 15 [P], 25 [S]; Canada 11 [P], 2 [S]; Latin America and the Caribbean 11 [P], 32 [S], 1 none.
-- Updated rows: `kangaroo` (level, levels, Math Kangaroo USA source), `tot` (levels), `br-obmep` (level, levels, url, source), `pe-mo`, `co-mo` and `ve-mo` (organizer and primary source).
+- Updated rows: `kangaroo` (level, levels, Math Kangaroo USA source), `tot` (levels), `br-obmep` (level, levels, url, source, layout of 2026), `mathcounts` (layout of 2026), `pe-mo`, `co-mo` and `ve-mo` (organizer and primary source).
 - 26 new sources: 4 international, 12 United States, 10 Latin America. By zone: 20 Z2 and 6 Z3. Updated sources: `mathcounts-official` (now Z3), `cemc`, `oma`, `aops-collections`, `aops-wiki`, `hmmt-official` and `cmimc-official`.
-- 3 gap entries: 1 robots (`noetic`), 2 no-source (`pmwc`, `mx-omm-state`).
-- Expected positions added: 0. No new row has a confirmed shape, so no row has `per_year` or a layout. The rule is "When the shape is unknown, use an era with no layout; do not guess positions." Phase 2 must read sample papers to set the shapes.
+- 4 gap entries: 2 robots (`noetic`, `br-obmep`), 2 no-source (`pmwc`, `mx-omm-state`).
+- Expected positions added: 7,394, in 14 competitions: United States 5,980, international 1,320, Latin America 94. The ten CEMC contests and the COMC have shapes from 2016 (2011 for the COMC) but no confirmed first year, so they count 0 until content arrives. Section 8 gives the shape and the count of each competition.
 
 ## 2. Source rules that this census followed
 
 1. A site whose terms forbid copying or reuse is Z3, link only: MOEMS, Math Prize for Girls, SEAMO, MATHCOUNTS and the Colombian olympiads of the Universidad Antonio Nariño. Math League and SIMCC sell their papers, so they are Z3 by agent decision.
 2. A site with a copyright line but no licence and no ban on reuse is Z2, the spec default for competition statements (spec 11).
-3. A path that robots.txt disallows is not harvested. The Noetic Learning papers are PDF files, and the robots.txt disallows `/*.pdf$`, so `noetic` has a gap with the reason robots.
+3. A path that robots.txt disallows is not harvested. The Noetic Learning papers are PDF files, and the robots.txt disallows `/*.pdf$`, so `noetic` has a gap with the reason robots. The OBMEP papers of 2005 to 2025 are Google Drive files. The robots.txt of drive.google.com allows the view pages, but they carry no text, and the robots.txt of drive.usercontent.google.com, which serves the files, disallows all paths. So `br-obmep` has a gap with the reason robots.
 4. Some sites allow all agents but block named AI crawlers (ClaudeBot, anthropic-ai, claude-web, GPTBot, CCBot, Google-Extended, Bytespider, cohere-ai, meta-externalagent) and say `Content-Signal: search=yes,ai-train=no,use=reference`. This is the Cloudflare managed robots.txt. It applies to artofproblemsolving.com, hmmt.org, simcc.org, sasmo.simcc.org and holbrook.bcamathteam.org. The owner has not decided the rule for these sites yet. The notes of each source record the facts and say that the decision is pending. No gap was written for them.
 5. No login, paywall, Cloudflare challenge or robots rule was bypassed, and no full text was harvested.
 
@@ -197,10 +197,11 @@ Each source below is primary. The robots.txt column gives the facts read on 2026
 | `pmwc` | all | no-source | No official archive. The domain pmwc.org was parked on 2026-11-16. |
 | `mx-omm-state` | all | no-source | The 32 state rounds of the OMM have no common archive. |
 | `noetic` | all | robots | The robots.txt of noetic-learning.com disallows `/mathcontest/documents/` and `/*.pdf$`, which hold the papers. |
+| `br-obmep` | all | robots | The papers are Google Drive files, and the robots.txt of drive.usercontent.google.com disallows all paths. |
 
 ## 6. Label mapping
 
-The labels of `reports/coverage/unknown-competitions.tsv` that belong to this region now have a line in `registers/competition-aliases.tsv`. A label goes to `-` when it is a mock contest, a forum contest, a collection of problems by topic or a contest for another subject. This census maps 278 labels: 241 new lines and 37 existing lines that now point to a new code. They cover 249 lines of the file and 3,716 rows: 2,557 rows go to a code and 1,159 rows go to `-`. Some new codes have no layout yet. Agent decision, not a person's review: such a code must get a layout before `om import` takes its numbered rows, because the problem numbers restart in each paper.
+The labels of `reports/coverage/unknown-competitions.tsv` that belong to this region now have a line in `registers/competition-aliases.tsv`. A label goes to `-` when it is a mock contest, a forum contest, a collection of problems by topic or a contest for another subject. This census maps 275 labels: 238 new lines and 37 existing lines that now point to a new code. They cover 246 lines of the file and 3,662 rows: 2,533 rows go to a code and 1,129 rows go to `-`. Three labels of the first plan are not in this census, because the Europe census or an earlier PR maps them already: "Selected Problems from Open Contests" (to `ee-open`), "Olimpiada Iberoamericana de Matemáticas" (to `ibero`) and "Olimpiada Internacional de Matemáticas" (to `imo`). Some new codes have no layout yet (section 8). Agent decision, not a person's review: such a code must get a layout before `om import` takes its numbered rows, because the problem numbers restart in each paper.
 
 ## 7. Phase 2: ranked harvest list
 
@@ -208,17 +209,46 @@ The counts are estimates from the archive pages that this census read. They are 
 
 | Rank | Source | Competitions | Estimated problems | Access | Licence and zone |
 |---|---|---|---|---|---|
-| 1 | `obmep` | OBMEP levels 1 to 3 and Mirim | 3,000 | public PDF archive, 2005 onward | no licence; Z2 |
-| 2 | `oma` | May Olympiad, Ñandú, OMA levels | 2,000 | public HTML and PDF pages | no licence; Z2 |
-| 3 | `lhsmath` | LMT | 1,500 | public PDF archive, 2010 onward | no licence; Z2 |
-| 4 | `chiuchang` | IMAS, EMIC, IWYMIC | 1,500 | public PDF files | no licence; Z2 |
-| 5 | `purple-comet` | Purple Comet | 1,400 | public PDF archive, 2003 onward | no licence; Z2 |
-| 6 | `acm-ve` | Venezuela OJM | 1,000 | public PDF books | no licence; Z2 |
-| 7 | `omapa` | Paraguay olympiads | 800 | public PDF files | no licence; Z2 |
-| 8 | `usamts` | USAMTS | 700 | public PDF archive, 1989 onward | no licence; Z2 |
-| 9 | `cemc` | Gauss, Pascal, Cayley, Fermat, Euclid, Fryer, Galois, Hypatia, CIMC, CSMC, CTMC | 3,000 | public PDF archive (the past-contests page lists 2016 to 2026) | CC BY-NC 4.0; Z3, so phase 2 gives links and match keys, not text |
-| 10 | `mathkangaroo-usa` | Kangaroo (US edition) | 300 | sample papers only | no licence; Z2 |
-| 11 | `mathhour-uw` | Math Hour Olympiad | 150 | public PDF archive | no licence; Z2 |
-| 12 | `bamo` | BAMO | 120 | public PDF archive, 1999 onward | no licence; Z2 |
+| 1 | `oma` | May Olympiad, Ñandú, OMA levels | 2,000 (May Olympiad: 220 expected positions) | public HTML and PDF pages | no licence; Z2 |
+| 2 | `lhsmath` | LMT | 1,500 | public PDF archive, 2010 onward | no licence; Z2 |
+| 3 | `chiuchang` | IMAS, EMIC, IWYMIC | 1,500 (EMIC and IWYMIC: 1,100 expected positions) | public PDF files | no licence; Z2 |
+| 4 | `purple-comet` | Purple Comet | 1,100 (1,050 expected positions) | public PDF archive and answer lists, 2003 onward | no licence; Z2 |
+| 5 | `acm-ve` | Venezuela OJM | 1,000 | public PDF books | no licence; Z2 |
+| 6 | `omapa` | Paraguay olympiads | 800 | public PDF files | no licence; Z2 |
+| 7 | `usamts` | USAMTS | 490 (480 expected positions) | public PDF archive, 1998 onward | no licence; Z2 |
+| 8 | `cemc` | Gauss, Pascal, Cayley, Fermat, Euclid, Fryer, Galois, Hypatia, CIMC, CSMC, CTMC | 3,000 | public PDF archive (the past-contests page lists 2016 to 2026) | CC BY-NC 4.0; Z3, so phase 2 gives links and match keys, not text |
+| 9 | `mathkangaroo-usa` | Kangaroo (US edition) | 300 | sample papers only | no licence; Z2 |
+| 10 | `bamo` | BAMO | 207 expected positions | public PDF archive, 1999 onward | no licence; Z2 |
+| 11 | `mathhour-uw` | Math Hour Olympiad | 182 expected positions | public PDF archive, 2012 onward | no licence; Z2 |
+| 12 | `obmep` | OBMEP levels 1 to 3 and Mirim | 3,000 | Google Drive files; robots.txt of the file host disallows all paths, so no harvest until an allowed copy is found | no licence; Z2 |
 
 Each harvest must first read a few sample papers to set the layout of each competition. The rows of a paper whose numbering restarts must not be placed by number alone.
+
+## 8. Shapes and expected positions
+
+The coordinator asked on 2026-11-16 for the shape of each new competition wherever a primary source shows it. A shape came only from an official paper, the official rules or archive page, or a sample of papers from several years, all read on 2026-11-16. The years whose format is not confirmed get an era with no layout, and the note of the row names them. Expected positions are the positions of the shape of each year from `first_year` to 2026, less the `gaps` years.
+
+| Code | Shape | Primary source | Years with no shape | Expected |
+|---|---|---|---|---|
+| `purple-comet` | middle school m1-m20, high school h1-h30; 15 and 25 in 2005-2009 | answer lists of 2005-2013, 2017, 2021 and 2026 | 2003-2004 | 1,050 |
+| `moems` | 5 olympiads of 5 problems (a to e) in division E and in division M | contest rules, problems of 2025-2026 | 1979-2024 | 100 |
+| `math-league` | grades 4-5 (30), grades 6-8 (35), Algebra Course 1 (30), 6 high school contests of 6 | samples of 2012-2013 and 2018-2019 | 1977-2011 | 3,465 |
+| `usamts` | 3 rounds of 5; 4 rounds of 5 in 1998-2009 | round papers of 8 years | 1989-1997, 2010 | 480 |
+| `bamo` | BAMO-8 A-E (m1-m5), BAMO-12 1-5; 5 problems in 1999-2007, 7 in 2008-2013 | archive and papers of 11 years | 2021 | 207 |
+| `mpfg` | 20 problems; gap 2020 | resources page, papers of 5 years | none | 340 |
+| `mpfg-olympiad` | 4 problems; gaps 2020 and 2021 | resources page, papers of 3 years | none | 60 |
+| `math-hour` | 5 problems and 2 extra for grades 6-7 and for grades 8-10; gaps 2020 and 2021 | archive, papers of 5 years | 2010-2011 | 182 |
+| `mathcounts` | chapter and state sprint (30), target (8), team (10) | the 2026 papers and answer key | 1983-2025 | 96 |
+| `may-olympiad` | level 1 and level 2, 5 problems each | OMA archive, papers of 5 years | 1995-2004 | 220 |
+| `emic` | individual i1-i15, team t1-t10; first year 2003, gap 2020 | IMC archive, papers of 5 years | none | 575 |
+| `iwymic` | individual a1-a12 and b1-b3, team t1-t10; gaps 2003 and 2020 | IMC archive, papers of 4 years | 1999-2004 | 525 |
+| `br-obmep` | phase 1: 20 questions, phase 2: 6 questions, for levels 1, 2 and 3 | the 2026 rules | 2005-2025 | 78 |
+| `br-tm2` | level A a1-a4, level B b1-b4 | papers of 2023 and 2024 | the other years | 16 |
+| `ca-gauss` | grade 7 p71-p725, grade 8 p81-p825 | CEMC papers of 2016 and 2025 | before 2016 | 0 (no first year) |
+| `ca-pascal`, `ca-cayley`, `ca-fermat` | 25 problems | CEMC papers of 2016 and 2025 | before 2016 | 0 (no first year) |
+| `ca-fryer`, `ca-galois`, `ca-hypatia` | 4 problems | CEMC papers of 2016 and 2025 | before 2016 | 0 (no first year) |
+| `ca-cimc`, `ca-csmc` | part A a1-a6, part B b1-b3 | CEMC papers of 2016 and 2025 | before 2016 | 0 (no first year) |
+| `ca-comc` | parts A, B and C, 4 problems each | CMS papers of 6 years | before 2011 | 0 (no first year) |
+| **Total** | | | | **7,394** |
+
+The other new codes have no shape. Their notes give the reason: the rounds change from year to year (BMMT), the round sizes were not sampled (LMT), robots.txt blocks the papers (Noetic), the site carries `ai-train=no` (JHMMC, SASMO), the site is a script page (OMMC), the source is Z3 and was not read (SEAMO), the official level pages gave 404 (OBM), or the competition is [S] only.
