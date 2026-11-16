@@ -282,6 +282,10 @@ func demoProblem(lines []*pxLine, from int) DemoProblem {
 					flag("layout")
 				}
 				for _, g := range pxScriptGroups(ss) {
+					if !g.sup && strings.Contains(g.text, "′") {
+						// A prime that pdftohtml sets low has lost its place: the primes of the problem cannot be trusted.
+						flag("layout")
+					}
 					st, ok := demoMathTeX(g.text)
 					if !ok {
 						flag("glyph")
