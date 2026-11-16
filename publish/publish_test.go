@@ -194,6 +194,20 @@ func TestLoadTiers(t *testing.T) {
 	if err != nil || !tiers.First(&content.Competition{Code: "ru-spb", Country: "RU"}) || tiers.First(&content.Competition{Code: "nz-nzmo", Country: "NZ"}) || !tiers.First(&content.Competition{Code: "aime"}) {
 		t.Errorf("%+v %v", tiers, err)
 	}
+	// A primary school contest is in tier 1 only by its code.
+	for _, tc := range []struct {
+		c    content.Competition
+		want bool
+	}{
+		{content.Competition{Code: "ru-kids", Country: "RU", Level: "elementary"}, false},
+		{content.Competition{Code: "kangaroo-kids", Group: "international", Level: "elementary"}, false},
+		{content.Competition{Code: "ru-euler", Country: "RU", Level: "junior"}, true},
+		{content.Competition{Code: "aime", Level: "elementary"}, true},
+	} {
+		if got := tiers.First(&tc.c); got != tc.want {
+			t.Errorf("First(%s) = %v, want %v", tc.c.Code, got, tc.want)
+		}
+	}
 	write(t, dir, "bad.yaml", "group: [x]\n")
 	if _, err := LoadTiers(filepath.Join(dir, "bad.yaml")); err == nil {
 		t.Error("an unknown key was accepted")

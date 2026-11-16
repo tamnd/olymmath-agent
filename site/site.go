@@ -678,18 +678,32 @@ type homeData struct {
 	Daily        *problemView
 }
 
+// defaultView tells if the competition is in the default views of the site: the latest editions and the problem of the day on the home page, and the main groups of the competition list. A competition with only papers for primary school is not, so that the many primary school contests do not crowd the olympiads (spec 10.3). It still has all its pages.
+func defaultView(c *content.Competition) bool { return c.Level != content.Elementary }
+
 func (b *builder) home() error {
 	ps := b.corpus.Problems()
 	d := homeData{Problems: len(ps), Competitions: len(b.corpus.Competitions), Editions: len(b.corpus.Editions())}
-	es := b.corpus.Editions()
-	if len(es) > 6 {
-		es = es[:6]
+	var es []*content.Edition
+	for _, e := range b.corpus.Editions() {
+		if len(es) < 6 && defaultView(e.Competition) {
+			es = append(es, e)
+		}
 	}
 	d.Latest = es
-	if len(ps) > 0 {
+	var daily []*content.Problem
+	for _, p := range ps {
+		if p.Edition == nil || defaultView(p.Edition.Competition) {
+			daily = append(daily, p)
+		}
+	}
+	if len(daily) == 0 {
+		daily = ps
+	}
+	if len(daily) > 0 {
 		// The problem of the day changes each day, and each build of one day shows the same problem.
 		day := int(b.opts.Date.Unix() / 86400)
-		d.Daily = b.view(ps[day%len(ps)])
+		d.Daily = b.view(daily[day%len(daily)])
 	}
 	return b.render("home.html", page{
 		Title:       "olymmath: olympiad mathematics problems and solutions",
@@ -732,24 +746,32 @@ var groupTitles = map[string]string{
 	"national":      "National olympiads",
 	"journal":       "Journals",
 	"benchmark":     "Problem sets",
+	"elementary":    "Primary school",
 }
 
-// competitionsData puts the competitions in the groups of the register. The national group is split by country. In each list, the competitions with problems come first, and then the order of the register.
+// competitionsData puts the competitions in the groups of the register. A competition that is not in the default views goes to the group of primary school at the end, whatever its group. The national group and the group of primary school are split by country. In each list, the competitions with problems come first, and then the order of the register.
 func (b *builder) competitionsData() competitionsView {
 	v := competitionsView{Total: len(b.corpus.Competitions)}
 	byGroup := map[string][]*content.Competition{}
 	for _, c := range b.corpus.Competitions {
-		byGroup[c.Group] = append(byGroup[c.Group], c)
+		g := c.Group
+		if !defaultView(c) {
+			g = "elementary"
+		}
+		byGroup[g] = append(byGroup[g], c)
 		if competitionProblems(c) > 0 {
 			v.WithProblems++
 		}
 	}
 	groups := append([]string{}, content.Groups...)
+	var other []string
 	for g := range byGroup {
 		if _, ok := groupTitles[g]; !ok {
-			groups = append(groups, g)
+			other = append(other, g)
 		}
 	}
+	sort.Strings(other)
+	groups = append(append(groups, other...), "elementary")
 	for _, g := range groups {
 		cs := byGroup[g]
 		if len(cs) == 0 {
@@ -761,7 +783,7 @@ func (b *builder) competitionsData() competitionsView {
 			title = g
 		}
 		gv := groupView{ID: g, Title: title, Count: len(cs)}
-		if g != "national" {
+		if g != "national" && g != "elementary" {
 			gv.Countries = []countryView{{Rows: cs}}
 		} else {
 			byCountry := map[string][]*content.Competition{}

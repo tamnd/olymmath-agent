@@ -322,3 +322,67 @@ func TestReadBy(t *testing.T) {
 		}
 	}
 }
+
+// A competition with only papers for primary school is not in the default views: it has its own group at the end of the competition list, by country, and the home page does not show its editions.
+func TestElementaryNotInDefaultViews(t *testing.T) {
+	root := t.TempDir()
+	if err := os.CopyFS(root, os.DirFS("../content/testdata/valid")); err != nil {
+		t.Fatal(err)
+	}
+	reg := filepath.Join(root, "registers", "competitions.yaml")
+	b, err := os.ReadFile(reg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b = append(b, []byte(`
+- code: ru-kids
+  name: Kids Olympiad
+  group: national
+  level: elementary
+  country: RU
+  first_year: 2020
+- code: ru-junior
+  name: Junior Olympiad
+  group: national
+  level: junior
+  country: RU
+  first_year: 2020
+`)...)
+	files := map[string]string{reg: string(b), filepath.Join(root, "editions", "ru-kids", "2030.yaml"): "year: 2030\nplace: Kidtown\n"}
+	for p, s := range files {
+		if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(s), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	corpus, fs := content.Load(root)
+	if len(fs) != 0 {
+		t.Fatal(fs)
+	}
+	v := (&builder{corpus: corpus}).competitionsData()
+	var groups []string
+	for _, g := range v.Groups {
+		var rows []string
+		for _, c := range g.Countries {
+			for _, r := range c.Rows {
+				rows = append(rows, c.Name+":"+r.Code)
+			}
+		}
+		groups = append(groups, g.ID+"="+strings.Join(rows, ","))
+	}
+	if got, want := strings.Join(groups, " "), "international=:imo national=Russia:ru-junior elementary=Russia:ru-kids"; got != want {
+		t.Errorf("groups %q, want %q", got, want)
+	}
+	out := t.TempDir()
+	if _, err := Build(corpus, Options{Out: out, URL: "https://example.org", Base: "/", Version: "test", Date: time.Date(2026, 10, 31, 0, 0, 0, 0, time.UTC)}); err != nil {
+		t.Fatal(err)
+	}
+	if home := read(t, out, "index.html"); strings.Contains(home, "ru-kids/2030") || !strings.Contains(home, "imo/2024/") {
+		t.Errorf("the home page shows the primary school edition, or not the IMO:\n%s", home)
+	}
+	if c := read(t, out, "c/index.html"); !strings.Contains(c, `id="elementary"`) || !strings.Contains(c, "Primary school") {
+		t.Errorf("c/index.html has no primary school group")
+	}
+}

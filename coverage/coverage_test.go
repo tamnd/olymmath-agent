@@ -2,6 +2,7 @@ package coverage
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -114,6 +115,11 @@ func TestBuild(t *testing.T) {
 	var md, js, tsv bytes.Buffer
 	if err := rep.Markdown(&md, 10); err != nil || !strings.Contains(md.String(), "International Mathematical Olympiad") {
 		t.Errorf("markdown %v", err)
+	}
+	for _, want := range []string{"| elementary | 0 | 0 | - | 0 | - |\n", "| high-school | 1 | 2 | 100.0% | 2 | 100.0% |\n", "| open | 0 | 0 | - | 0 | - |\n"} {
+		if !strings.Contains(md.String(), want) {
+			t.Errorf("markdown has no level row %q:\n%s", want, md.String())
+		}
 	}
 	if err := rep.JSON(&js); err != nil || !strings.Contains(js.String(), `"c0": 2`) && !strings.Contains(js.String(), `"c0":2`) {
 		t.Errorf("json %v", err)
@@ -230,5 +236,36 @@ func TestMeasurePapers(t *testing.T) {
 	}
 	if y := years["20212021-fall-a"]; y.Rows != 3 || len(y.Candidate) != 1 {
 		t.Errorf("2021-fall-a %+v", y)
+	}
+}
+
+// The level of a position is the level of its paper, or the level of the competition. The report lists the levels of spec 05.2 in order, then the other levels, then the competitions with no level.
+func TestLevels(t *testing.T) {
+	tot := &content.Competition{
+		Code: "tot", Name: "Tournament", FirstYear: 2020, LastYear: 2021,
+		Level: "high-school", Levels: []string{"junior", "high-school"},
+		Layout: []content.Layout{{Paper: "junior", Level: "junior", Positions: []string{"j1", "j2"}}, {Paper: "senior", Positions: []string{"s1", "s2", "s3"}}},
+	}
+	kids := &content.Competition{Code: "kids", Name: "Kids", FirstYear: 2021, LastYear: 2021, Level: "elementary", PerYear: 4}
+	odd := &content.Competition{Code: "odd", Name: "Odd", FirstYear: 2021, LastYear: 2021, Level: "school", PerYear: 1}
+	none := &content.Competition{Code: "none", Name: "None", FirstYear: 2021, LastYear: 2021, PerYear: 2}
+	cs := []*content.Competition{tot, kids, odd, none}
+	gaps, err := parseGaps([]byte("- {competition: kids, positions: [p1], reason: no-source, note: No paper.}\n"), func(string) bool { return true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	var comps []*Comp
+	for _, c := range cs {
+		comps = append(comps, measure(c, nil, nil, nil, 0, 2026, gaps))
+	}
+	if tot := comps[0]; tot.Expected != 10 || tot.byLevel["junior"].Expected != 4 || tot.byLevel["high-school"].Expected != 6 {
+		t.Errorf("tot: expected %d, by level %+v", tot.Expected, tot.byLevel)
+	}
+	var got []string
+	for _, l := range levels(cs, comps) {
+		got = append(got, fmt.Sprintf("%s:%d:%d:%d", l.Level, l.Competitions, l.Expected, l.Allowed()))
+	}
+	if want := "elementary:1:4:3 junior:1:4:4 high-school:1:6:6 undergraduate:0:0:0 open:0:0:0 school:1:1:1 :1:2:2"; strings.Join(got, " ") != want {
+		t.Errorf("levels %q, want %q", strings.Join(got, " "), want)
 	}
 }
