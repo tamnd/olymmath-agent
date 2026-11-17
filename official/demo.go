@@ -199,6 +199,8 @@ type demoLine struct {
 // paperFonts are the fonts of a paper: the fonts of math, whose runs become formulas, and the fonts of text. A run of another font makes the problem link-only. part starts a line that is a part of a problem and a paragraph of its own; it is demoPart when it is nil.
 type paperFonts struct {
 	math, text, part *regexp.Regexp
+	// gap is a run that may stand after a wide gap in a line that is no table, as the letter of an option of a multiple choice question.
+	gap *regexp.Regexp
 }
 
 // demoFonts are the fonts of the papers of the German olympiad.
@@ -259,7 +261,7 @@ func paperProblem(fonts paperFonts, lines []*pxLine, from int) DemoProblem {
 					space = false
 				}
 				// A wide gap is a column of a table or the side of a figure.
-				if gap > 40 {
+				if gap > 40 && (fonts.gap == nil || !fonts.gap.MatchString(it.Text)) {
 					flag("layout")
 				}
 			}
