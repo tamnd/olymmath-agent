@@ -37,6 +37,32 @@ type HrRules struct {
 	Titled bool
 	// First tells that the first problem of a part is 1, so that a date as "26. siječnja 2026." is no heading.
 	First bool
+	// Math and Text are fonts of math and of text beyond those of hrFonts, as the TeX Gyre and NewTX fonts of the papers of the UKMT.
+	Math, Text *regexp.Regexp
+	// Gap is a run that may stand after a wide gap in a line that is no table, as the letter of an option of a multiple choice question, "B" in "A 12   B 24   C 36".
+	Gap *regexp.Regexp
+	// Part starts a line that is a paragraph of its own, as the options of a multiple choice question; with none it is the part of hrFonts.
+	Part *regexp.Regexp
+	// Shift are the fonts whose runs pdftohtml sets a little lower than their line, as the = of txmiaX: such a run gets the top and the height of the run before it on its line.
+	Shift *regexp.Regexp
+	// FirstPage is the first page that holds problems, as 2 for a paper whose first page holds its numbered instructions: the pages before it are no part of any problem. A paper with fewer pages holds its problems from its first page.
+	FirstPage int
+}
+
+// fonts are the fonts of the papers of the rules: hrFonts with the fonts of Math and Text.
+func (r HrRules) fonts() paperFonts {
+	f := hrFonts
+	if r.Math != nil {
+		f.math = regexp.MustCompile(`(?:` + hrFonts.math.String() + `)|(?:` + r.Math.String() + `)`)
+	}
+	if r.Text != nil {
+		f.text = regexp.MustCompile(`(?:` + hrFonts.text.String() + `)|(?:` + r.Text.String() + `)`)
+	}
+	f.gap = r.Gap
+	if r.Part != nil {
+		f.part = r.Part
+	}
+	return f
 }
 
 // HrProblem is one problem of a Croatian paper: Code is its label, as 3 or K-1.3, N its number in the part of the paper, and Section the name of the part of the paper it is in.
@@ -284,6 +310,18 @@ func HrPDF(items []PDFItem, ink DemoInk, rules HrRules) []HrProblem {
 	if letters == "" {
 		letters = hrLetters
 	}
+	fonts := rules.fonts()
+	if rules.FirstPage > 1 && slices.ContainsFunc(items, func(it PDFItem) bool { return it.Page >= rules.FirstPage }) {
+		items = slices.DeleteFunc(slices.Clone(items), func(it PDFItem) bool { return it.Page < rules.FirstPage })
+	}
+	if rules.Shift != nil {
+		items = slices.Clone(items)
+		for i := 1; i < len(items); i++ {
+			if it, pi := items[i], items[i-1]; rules.Shift.MatchString(it.Family) && pi.Page == it.Page && it.Top > pi.Top && it.Top-pi.Top <= pi.Height/2 && it.Left >= pi.Right()-2 && it.Left <= pi.Right()+20 {
+				items[i].Top, items[i].Height = pi.Top, pi.Height
+			}
+		}
+	}
 	items = hrJoinAccents(items)
 	for i, it := range items {
 		items[i].Text = HrText(it.Text)
@@ -292,7 +330,7 @@ func HrPDF(items []PDFItem, ink DemoInk, rules HrRules) []HrProblem {
 			items[i].Width = max(items[i].Width-max(it.Size*(len(items[i].Text)-len(t))/4, 3), 1)
 			items[i].Text = t
 		}
-		if hrFonts.math.MatchString(it.Family) {
+		if fonts.math.MatchString(it.Family) {
 			items[i].Text = hrLegacy(it.Family, hrMath(items[i].Text))
 			if hrBarRE.MatchString(items[i].Text) {
 				// The bar of a segment, as the bar over AD, which Word sets as a run of its own over the letters: the problem keeps its link.
@@ -387,7 +425,7 @@ func HrPDF(items []PDFItem, ink DemoInk, rules HrRules) []HrProblem {
 			title = RuPlain(tb.String())
 			from = len(ls[0].items)
 		}
-		p := HrProblem{DemoProblem: paperProblem(hrFonts, ls, from), N: st.n, Section: st.section}
+		p := HrProblem{DemoProblem: paperProblem(fonts, ls, from), N: st.n, Section: st.section}
 		p.Text = hrDj(p.Text)
 		if rules.Tail != nil {
 			if loc := rules.Tail.FindStringIndex(p.Text); loc != nil {
