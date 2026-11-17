@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc|purple-comet|oma|imosuisse)", runPapers})
+	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc|purple-comet|oma|imosuisse|lhsmath|usamts)", runPapers})
 }
 
 func runPapers(env Env, args []string) int {
@@ -31,8 +31,8 @@ func runPapers(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc", "purple-comet", "oma", "imosuisse"}, pos[0]) {
-		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc|purple-comet|oma|imosuisse")
+	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc", "purple-comet", "oma", "imosuisse", "lhsmath", "usamts"}, pos[0]) {
+		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc|purple-comet|oma|imosuisse|lhsmath|usamts")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -55,7 +55,7 @@ func runPapers(env Env, args []string) int {
 	switch pos[0] {
 	case "usa-tst-archive":
 		return tstPapers(ctx, env, fc, corpus, *root, *from, *to)
-	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc", "purple-comet", "oma", "imosuisse":
+	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc", "purple-comet", "oma", "imosuisse", "lhsmath", "usamts":
 		return nationalPapers(ctx, env, fc, corpus, *root, pos[0], *from, *to)
 	}
 	comp := corpus.Competition("imo")
@@ -130,6 +130,11 @@ func tstPapers(ctx context.Context, env Env, fc *fetch.Client, corpus *content.C
 	return ExitOK
 }
 
+// editionOf gives the edition of a paper of a national source whose editions are not years, such as the spring tournaments of the LMT. The edition of a paper of the other sources is its year.
+var editionOf = map[string]func(official.National) string{
+	"lhsmath": official.LHSMathEdition,
+}
+
 // nationals gives the listing page of each national source and the function that reads the papers from it.
 var nationals = map[string]struct {
 	listings []string
@@ -162,7 +167,9 @@ var nationals = map[string]struct {
 	"berkeley-mt":       {official.BMTListings, content.OfficialPaper{Lang: "English", Code: "en"}, official.BMTPapers},
 	"nzmoc":             {[]string{official.NZMOListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.NZMOPapers},
 	"purple-comet":      {official.PurpleCometListings, content.OfficialPaper{Lang: "English", Code: "en"}, official.PurpleCometPapers},
-	"oma":               {[]string{official.OMAListing}, content.OfficialPaper{Lang: "Spanish", Code: "es"}, official.OMAPapers},
+	"lhsmath":           {official.LHSMathListings, content.OfficialPaper{Lang: "English", Code: "en"}, official.LHSMathPapers},
+	"usamts":            {official.USAMTSListings, content.OfficialPaper{Lang: "English", Code: "en"}, official.USAMTSPapers},
+	"oma":               {[]string{official.OMAListing}, content.OfficialPaper{Lang: "Spanish", Code: "es"}, official.OMAAllPapers},
 	"imosuisse":         {[]string{official.ImosuisseListing}, content.OfficialPaper{Lang: "German", Code: "de"}, official.ImosuissePapers},
 }
 
@@ -189,6 +196,9 @@ func nationalPapers(ctx context.Context, env Env, fc *fetch.Client, corpus *cont
 			return ExitUsage
 		}
 		key := fmt.Sprintf("%s/%d", p.Competition, p.Year)
+		if f := editionOf[source]; f != nil {
+			key = p.Competition + "/" + f(p)
+		}
 		if byEdition[key] == nil {
 			keys = append(keys, key)
 		}
