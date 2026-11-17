@@ -33,10 +33,10 @@ const (
 // hrCodes are the competitions that om hr writes.
 var hrCodes = []string{"hr-city", "hr-county", "hr-state", "hr-mo", "hr-tst", "hr-jmo", "hr-girls", "hr-cadets", "hr-cadets-r1", "hr-medo"}
 
-// hrPaper is one paper PDF of the site: kind is the competition of the page that links it (hr-city, hr-county, hr-state, hr-mo, hr-jmo, hr-girls, hmok or medo), year its year, or the year in which the season of MEDO starts, and variant the column of the table (o for the primary school, a and b for the variants of the secondary school) or the round (prvo, drugo, ...).
+// hrPaper is one paper PDF of the site: kind is the competition of the page that links it (hr-city, hr-county, hr-state, hr-mo, hr-jmo, hr-girls, hmok or medo), year its year, or the year in which the season of MEDO starts, and variant the column of the table (o for the primary school, a and b for the variants of the secondary school) or the round (prvo, drugo, ...). A paper that a zip file of a site holds has the url of the zip file and the name of the PDF in it as its member.
 type hrPaper struct {
-	kind, variant, url string
-	year               int
+	kind, variant, url, member string
+	year                       int
 }
 
 var (
@@ -591,6 +591,11 @@ func hrRun(ctx context.Context, fc *fetch.Client, source string, p hrPaper, rule
 	if err != nil {
 		return nil, err
 	}
+	if p.member != "" {
+		if raw, err = zipMember(raw, p.member); err != nil {
+			return nil, err
+		}
+	}
 	dir, err := os.MkdirTemp("", "om-hr-")
 	if err != nil {
 		return nil, err
@@ -605,7 +610,11 @@ func hrRun(ctx context.Context, fc *fetch.Client, source string, p hrPaper, rule
 		return nil, err
 	}
 	items := official.ParsePDFXML(b)
-	return official.HrPDF(items, demoInk(ctx, f, items), rules), nil
+	ink := demoInk(ctx, f, items)
+	if rules.Columns {
+		ink = columnInk(ctx, f, items)
+	}
+	return official.HrPDF(items, ink, rules), nil
 }
 
 // hrCandidate is the statement of the paper of r.
