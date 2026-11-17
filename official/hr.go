@@ -47,6 +47,12 @@ type HrRules struct {
 	Shift *regexp.Regexp
 	// FirstPage is the first page that holds problems, as 2 for a paper whose first page holds its numbered instructions: the pages before it are no part of any problem. A paper with fewer pages holds its problems from its first page.
 	FirstPage int
+	// Columns tells that each page of the paper is set in two columns: HrColumns reads the right column of a page after its left column.
+	Columns bool
+	// Roman tells that the text of the paper is set in Computer Modern Roman, as CMR10, which pxMainSize takes for a font of formulas: the main size counts the runs of every font that is no font of formulas of the rules.
+	Roman bool
+	// Accents are the letters with their accents that the fonts of the paper set as an accent and a letter, as HrAccentsIt.
+	Accents map[string]string
 }
 
 // fonts are the fonts of the papers of the rules: hrFonts with the fonts of Math and Text.
@@ -311,6 +317,9 @@ func HrPDF(items []PDFItem, ink DemoInk, rules HrRules) []HrProblem {
 		letters = hrLetters
 	}
 	fonts := rules.fonts()
+	if rules.Columns {
+		items = HrColumns(items)
+	}
 	if rules.FirstPage > 1 && slices.ContainsFunc(items, func(it PDFItem) bool { return it.Page >= rules.FirstPage }) {
 		items = slices.DeleteFunc(slices.Clone(items), func(it PDFItem) bool { return it.Page < rules.FirstPage })
 	}
@@ -323,6 +332,9 @@ func HrPDF(items []PDFItem, ink DemoInk, rules HrRules) []HrProblem {
 		}
 	}
 	items = hrJoinAccents(items)
+	if rules.Accents != nil {
+		items = hrJoinLetters(items, rules.Accents)
+	}
 	for i, it := range items {
 		items[i].Text = HrText(it.Text)
 		// Word ends a run with the space before the next run, as "Broj je " before the italic "palindrom", and the width of the run takes it in: the run ends before its spaces, so that the gap shows the space.
@@ -339,6 +351,9 @@ func HrPDF(items []PDFItem, ink DemoInk, rules HrRules) []HrProblem {
 		}
 	}
 	main := pxMainSize(items)
+	if rules.Roman {
+		main = hrMainSize(items, fonts.math)
+	}
 	lines, orphans := pxLines(items, main)
 	if rules.Drop != nil {
 		lines = hrDrop(lines, rules.Drop)
