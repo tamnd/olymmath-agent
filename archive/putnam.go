@@ -12,6 +12,8 @@ type Doc struct {
 	URL  string
 	// Label is the competition label of the rows of the file when it is not the label of the lane.
 	Label string
+	// Number is the number of the problem of a file that holds one problem with no number in it, or "".
+	Number string
 }
 
 // Problem is one problem of a file.
@@ -28,6 +30,9 @@ type Lane struct {
 	// Label is the competition label of the rows.
 	Label string
 	Docs  func(from, to int) []Doc
+	// Index, when it is not "", is the page that lists the files of the archive, and List gives the files of the page from the year from to the year to. Docs is then nil.
+	Index string
+	List  func(index string, from, to int) []Doc
 	Parse func(tex string) []Problem
 }
 
@@ -36,6 +41,7 @@ var Lanes = map[string]Lane{
 	"kedlaya-putnam": {Label: "Putnam", Docs: Putnam, Parse: ParsePutnam},
 	"kalva":          {Docs: Kalva, Parse: ParseKalva},
 	"komal":          {Docs: Komal, Parse: ParseKomal},
+	"imosuisse":      {Index: ImosuisseIndex, List: ImosuisseDocs, Parse: ParseImosuisse},
 }
 
 // PutnamFirst is the first year of the Putnam archive.

@@ -114,7 +114,11 @@ func seedArchive(ctx context.Context, fc *fetch.Client, dir, source string, lane
 	err = seed.WriteFile(dir, source, func(w io.Writer) error {
 		enc := json.NewEncoder(w)
 		enc.SetEscapeHTML(false)
-		for _, d := range lane.Docs(0, time.Now().Year()) {
+		docs, err := laneDocs(ctx, fc, source, lane)
+		if err != nil {
+			return err
+		}
+		for _, d := range docs {
 			res, err := fc.Get(ctx, source, d.URL, fetch.Options{})
 			if err != nil {
 				fmt.Fprintf(log, "%s: %s: %v\n", source, d.URL, err)
@@ -139,7 +143,11 @@ func seedArchive(ctx context.Context, fc *fetch.Client, dir, source string, lane
 				if d.Label != "" {
 					label = d.Label
 				}
-				row := seed.Row{Source: source, File: path.Base(d.URL), Row: i, Labels: []string{label}, Year: d.Year, Number: p.Number, Lang: "en", Statement: p.Text, Ref: d.URL}
+				number := p.Number
+				if number == "" {
+					number = d.Number
+				}
+				row := seed.Row{Source: source, File: path.Base(d.URL), Row: i, Labels: []string{label}, Year: d.Year, Number: number, Lang: "en", Statement: p.Text, Ref: d.URL}
 				if err := enc.Encode(row); err != nil {
 					return err
 				}
@@ -149,6 +157,27 @@ func seedArchive(ctx context.Context, fc *fetch.Client, dir, source string, lane
 		return nil
 	})
 	return kept, skipped, err
+}
+
+// laneDocs gives the files of an archive: from the index page of the lane when it has one, or else from its Docs.
+func laneDocs(ctx context.Context, fc *fetch.Client, source string, lane archive.Lane) ([]archive.Doc, error) {
+	if lane.Index == "" {
+		return lane.Docs(0, time.Now().Year()), nil
+	}
+	res, err := fc.Get(ctx, source, lane.Index, fetch.Options{})
+	if err != nil {
+		return nil, err
+	}
+	rc, err := fc.Store.Get(ctx, res.Capture.Hash)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rc.Close() }()
+	b, err := io.ReadAll(rc)
+	if err != nil {
+		return nil, err
+	}
+	return lane.List(string(b), 0, time.Now().Year()), nil
 }
 
 func runCoverage(env Env, args []string) int {
