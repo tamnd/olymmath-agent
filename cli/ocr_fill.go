@@ -484,7 +484,7 @@ func (f *filler) write(e *content.Edition, r fillRec, s canon.Scan) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, b, 0o644) // #nosec G306 -- content files are public.
+	return os.WriteFile(path, b, 0o644) // #nosec G306 G703 -- content files are public.
 }
 
 // writeReview appends the problems that keep their link only to the file of -review.
