@@ -47,6 +47,17 @@ func TestLabelsLong(t *testing.T) {
 	}
 }
 
+func TestLabelsHeading(t *testing.T) {
+	pages := []Page{
+		{N: 2, Text: "**Aufgabe 020811:**\nMan beweise, dass $a^2 \\ge 0$ für jede reelle Zahl $a$ gilt."},
+		{N: 3, Text: "# Aufgabe 020814:\n\nMan bestimme alle Zahlen $n$ mit $n^2 = n$.\n\n## 2. Stufe\n\nKein Teil der Aufgabe."},
+	}
+	got := Labels(pages)
+	if len(got) != 2 || got[1].Label != "020814" || got[1].Page != 3 || got[1].Text != "Man bestimme alle Zahlen $n$ mit $n^2 = n$." {
+		t.Fatalf("labels %+v", got)
+	}
+}
+
 func TestLabelsWord(t *testing.T) {
 	pages := []Page{{N: 1, Text: "Problem 1. Find all primes $p$ such that $p+2$ is prime.\nProblem 2. Find the sum of the digits of $2^{10}$."}}
 	got := Labels(pages)

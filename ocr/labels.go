@@ -58,11 +58,21 @@ func Labels(pages []Page) []Labeled {
 	for _, p := range pages {
 		for _, line := range strings.Split(p.Text, "\n") {
 			t := strings.TrimSpace(line)
+			lre := re
+			// A label can come as a heading, as # Aufgabe 020816:, when the model sets some labels of a paper so. A heading with a bare number, as # 1. razred, stays a heading.
+			if h := strings.TrimSpace(strings.TrimLeft(t, "#")); h != t {
+				switch w := strings.Trim(h, "*"); {
+				case re != labelBareRE && re.MatchString(h):
+					t = h
+				case labelWordRE.MatchString(w):
+					t, lre = w, labelWordRE
+				}
+			}
 			if strings.HasPrefix(t, "#") || endRE.MatchString(t) {
 				end()
 				continue
 			}
-			if m := re.FindStringSubmatchIndex(t); m != nil {
+			if m := lre.FindStringSubmatchIndex(t); m != nil {
 				end()
 				cur = &Labeled{Label: t[m[2]:m[3]], Page: p.N}
 				body = []string{t[m[1]:]}
