@@ -24,7 +24,7 @@ type omaIndex struct {
 // omaLevels gives the paper of the layout of the May Olympiad for the label of a file that holds one level. A file with another label holds both levels.
 var omaLevels = map[string]string{"primer nivel": "level1", "segundo nivel": "level2"}
 
-// OMAPapers gives the papers of the May Olympiad (may-olympiad) in the archive index of the OMA. Most years have one file with both levels, the first level on the first page and the second on the next, so the paper is "" and om ocr reads each level with -paper and -pages. A year with a file for each level gives each file its paper. The OMA papers and the Ñandú have no layout in the register, so the index gives only the May Olympiad.
+// OMAPapers gives the papers of the May Olympiad (may-olympiad) in the archive index of the OMA. Most years have one file with both levels, the first level on the first page and the second on the next, so the paper is "" and om ocr reads each level with -paper and -pages. A year with a file for each level gives each file its paper. OMARoundPapers gives the papers of the OMA and of the Ñandú.
 func OMAPapers(page string) []National {
 	var idx omaIndex
 	if err := json.Unmarshal([]byte(page), &idx); err != nil {
