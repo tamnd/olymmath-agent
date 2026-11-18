@@ -64,7 +64,7 @@ const (
 var fenceRE = regexp.MustCompile("(?s)^\\s*```[a-zA-Z]*\\s*\\n(.*?)\\n?```\\s*$")
 
 // refusals are phrases that start an answer that is not the text of a page.
-var refusals = []string{"i can't", "i cannot", "i'm unable", "i am unable", "i'm sorry", "i am sorry", "as an ai", "unfortunately, i", "here is the", "here's the", "the image shows", "the image contains"}
+var refusals = []string{"i can't", "i cannot", "i couldn't", "i could not", "i don't see", "i do not see", "i'm unable", "i am unable", "i'm sorry", "i am sorry", "as an ai", "unfortunately, i", "here is the", "here's the", "the image shows", "the image contains"}
 
 // frontRE is a block of front matter at the start of an answer: lines of key: value between two lines of ---, with keys in lower case such as primary_language or running_head. Some OCR models write such a block above the page, and it is not a part of the page.
 var frontRE = regexp.MustCompile(`^---[ \t]*\n(?:[a-z][a-z0-9_]*:[^\n]*\n)+---[ \t]*(?:\n|$)`)
