@@ -250,6 +250,9 @@ var (
 	hrMSBM = regexp.MustCompile(`^(?:[A-Z]{6}\+)?MSBM\d`)
 	// hrAngles are the angle signs of MSAM: \angle, \measuredangle and \sphericalangle, which the HMO sets for an angle, and its relations \leqq, \geqq, \leqslant and \geqslant, which the Slovak papers set.
 	hrAngles = strings.NewReplacer("\\", "∠", "]", "∡", "^", "∢", "5", "≦", "=", "≧", "6", "⩽", ">", "⩾")
+	// hrPLSymbols is the font of the math symbols of the PL fonts of the Polish TeX users, whose slanted relations the papers made with pdfTeX 0.14 give as the Latin-1 letters at their places in the font: the soft hyphen for \geqslant and the not sign for \leqslant.
+	hrPLSymbols   = regexp.MustCompile(`^(?:[A-Z]{6}\+)?PLMathSymbols\d`)
+	hrPLRelations = strings.NewReplacer("\u00ad", "⩾", "¬", "⩽")
 )
 
 // hrLegacy gives the glyphs of a run of the font family that come out as the ASCII letters at their places in the font: the prime and the parallel sign of CMSY, the angles of MSAM and the double-struck capitals of MSBM, as N for ℕ. A run that has the Unicode names of its glyphs has none of these letters.
@@ -259,6 +262,8 @@ func hrLegacy(family, s string) string {
 		return demoOMS.Replace(s)
 	case hrMSAM.MatchString(family):
 		return hrAngles.Replace(s)
+	case hrPLSymbols.MatchString(family):
+		return hrPLRelations.Replace(s)
 	case hrMSBM.MatchString(family):
 		return strings.Map(func(r rune) rune {
 			switch {
