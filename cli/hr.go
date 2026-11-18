@@ -231,6 +231,8 @@ type hrRead struct {
 	prob  official.HrProblem
 	flags []string
 	conf  float64
+	// extraction names the reading of the text, when it is not HrPDF.
+	extraction string
 }
 
 // hrPlace gives the positions of the problems of a paper, or "" for a problem with no place, and the name of the statement of each. The parts of a book of the HMO are its days, a to d in their order, and the selection tests for the IMO and the MEMO team, which are hr-tst; a problem of a part is counted from 1.
@@ -348,6 +350,9 @@ type paperHarvest struct {
 	place                       func(hrPaper, []official.HrProblem) (ats, names []string)
 	// fix, if any, mends the text of each problem that HrPDF read.
 	fix func(*official.HrProblem)
+	// read, if any, reads the problems of a paper in place of HrPDF, as from a page of HTML, and extraction names that reading in the statements; rules is then not used.
+	read       func(ctx context.Context, fc *fetch.Client, p hrPaper, opt fetch.Options) ([]official.HrProblem, error)
+	extraction string
 }
 
 func (h *paperHarvest) run(env Env, args []string) int {
@@ -402,7 +407,12 @@ func (h *paperHarvest) run(env Env, args []string) int {
 	var reads []*hrRead
 	editions := map[string][]string{}
 	for _, p := range papers {
-		probs, err := hrRun(ctx, fc, h.source, p, h.rules(p), opt)
+		var probs []official.HrProblem
+		if h.read != nil {
+			probs, err = h.read(ctx, fc, p, opt)
+		} else {
+			probs, err = hrRun(ctx, fc, h.source, p, h.rules(p), opt)
+		}
 		if err != nil {
 			fmt.Fprintf(env.Stderr, "om %s: %s: %v\n", h.cmd, p.url, err)
 			code = ExitFailure
@@ -442,7 +452,7 @@ func (h *paperHarvest) run(env Env, args []string) int {
 			if pr.Text == "" {
 				flags = append(flags, "empty")
 			}
-			r := &hrRead{at: ats[i], paper: p, name: names[i], prob: pr, flags: flags, conf: ocr.Confidence(flags)}
+			r := &hrRead{at: ats[i], paper: p, name: names[i], prob: pr, flags: flags, conf: ocr.Confidence(flags), extraction: h.extraction}
 			if pr.Text == "" {
 				r.conf = 0
 			}
@@ -627,7 +637,11 @@ func hrWrite(root string, corpus *content.Corpus, src *content.SourceRecord, lan
 	text := ms[0]
 	at := text.at
 	comp := corpus.Competition(at[:strings.Index(at, "/")])
-	s := canon.Scan{Page: text.prob.Page, Text: text.prob.Text, Extraction: "native/" + official.RuPDFTool + " (" + official.HrVersion + ")", Confidence: text.conf}
+	extraction := "native/" + official.RuPDFTool + " (" + official.HrVersion + ")"
+	if text.extraction != "" {
+		extraction = text.extraction
+	}
+	s := canon.Scan{Page: text.prob.Page, Text: text.prob.Text, Extraction: extraction, Confidence: text.conf}
 	if !allowed || text.conf < ocr.Threshold {
 		s = canon.Scan{Page: text.prob.Page}
 	}
