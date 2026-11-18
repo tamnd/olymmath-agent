@@ -62,7 +62,11 @@ func runMatol(env Env, args []string) int {
 		if *cached {
 			return nil, errMatolNotStored
 		}
-		return apexRead(ctx, fc, u, *maxAge)
+		res, err := fc.Get(ctx, matolSource, u, fetch.Options{MaxAge: *maxAge})
+		if err != nil {
+			return nil, err
+		}
+		return apexBlob(ctx, st, res.Capture.Hash)
 	}
 	why := map[string]int{}
 	failed, papers := 0, 0

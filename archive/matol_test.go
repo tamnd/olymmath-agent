@@ -66,6 +66,15 @@ func TestMatolPlace(t *testing.T) {
 		{"olympiads-1180", 30, "kz-junior/2023/d730"},
 		{"olympiads-1005", 8, "kz-smagulov/2020/a68"},
 		{"olympiads-1013", 5, "kz-smagulov/2022/t5"},
+		// The final stage numbers grade 11 as the national olympiad, and the grades 9 and 10 after the grade.
+		{"olympiads-1154", 3, "kz-mo/2025/p3"},
+		{"olympiads-1153", 1, "kz-mo/2025/p101"},
+		{"olympiads-1220", 8, "kz-zhautykov-city/2026/p68"},
+		// The Almaty olympiad: the heading gives the year up to 2023, and from the 18th olympiad the sitting is the year before the name.
+		{"olympiads-1046", 4, "kz-almaty/2023/p4"},
+		{"olympiads-1250", 1, "kz-almaty/2026/p1"},
+		// A paper for the grades 5 and 6 takes the first.
+		{"olympiads-411", 20, "kz-al-farabi/2016/p520"},
 	} {
 		code, year, number, why := MatolPlace(matolFixture(t, c.page), c.n)
 		if why != "" {
@@ -78,8 +87,8 @@ func TestMatolPlace(t *testing.T) {
 	}
 	for page, want := range map[string]string{
 		"olympiads-1026": "the test round of the final stage of the junior olympiad",
-		// The final stage is not a root yet.
-		"olympiads-1153": "not under a node of the register",
+		"olympiads-416":  "a paper of physics",
+		"olympiads-1099": "the second sitting of 2023",
 	} {
 		if _, _, _, why := MatolPlace(matolFixture(t, page), 1); why != want {
 			t.Errorf("%s: %q, want %q", page, why, want)

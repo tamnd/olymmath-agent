@@ -51,6 +51,13 @@ func TestApexPlace(t *testing.T) {
 		"ukr_2007_189568": "ua-kyiv/2007/p72",
 		// The Kyiv district olympiad of 2006/07.
 		"ukr_2007_077948": "ua-umo-district/2006/p61",
+		// The selection of the Kyiv team of 2006/07, round II, and of 2022/23, the additional round V.
+		"ukr_2007_044962": "ua-kyiv-selection/2007/b83",
+		"ukr_2023_4bde96": "ua-kyiv-selection/2023/e91",
+		"ukr_2009_1b9dc0": "ua-tst/2009/b1",
+		"ukr_2016_94b6d2": "ua-intl-selection/2016/i3",
+		"ukr_2022_53ce3a": "ua-intl-selection/2021/p5",
+		"ukr_2014_a613d5": "ua-thematic/2014/a93",
 	} {
 		r, ok := recs[slug]
 		if !ok {
@@ -65,15 +72,15 @@ func TestApexPlace(t *testing.T) {
 			t.Errorf("%s: got %s, want %s", slug, got, want)
 		}
 	}
-	// A variant, a training problem and the Kyiv selection have no place.
-	for _, slug := range []string{"ukr_2009_113e24", "ukr_2007_17f7fe", "ukr_2007_044962"} {
+	// A variant and a training problem have no place.
+	for _, slug := range []string{"ukr_2009_113e24", "ukr_2007_17f7fe"} {
 		if code, _, number, why := ApexPlace(recs[slug]); why == "" {
 			t.Errorf("%s: placed at %s %s", slug, code, number)
 		}
 	}
 	for _, r := range recs {
 		code, _, number, why := ApexPlace(r)
-		if why == "" && (code == "" || strings.Trim(number[:1], "pab") != "") {
+		if why == "" && (code == "" || strings.Trim(number[:1], "abcdegijnp") != "") {
 			t.Errorf("%s: placed at %s %s", r.Slug, code, number)
 		}
 	}
@@ -85,7 +92,7 @@ func TestApexPlaceOther(t *testing.T) {
 		why bool
 	}{
 		{ApexRecord{Competition: "KyivMathBattle", Level: "regional", School: "2018-2019", Ref: "8.1"}, true},
-		{ApexRecord{Competition: "KyivSelection", Level: "regional", School: "2008-2009", Ref: "8.1", SubEvent: "III тур"}, true},
+		{ApexRecord{Competition: "KyivSelection", Level: "regional", School: "2008-2009", Ref: "8.1", SubEvent: "III тур"}, false},
 		{ApexRecord{Competition: "KyivCityMO", Level: "regional", School: "2020-2021", Ref: "8.1", SubEvent: "II етап"}, true},
 		{ApexRecord{Competition: "KyivCityMO", Level: "regional", School: "2006-2007", Ref: "8.1"}, false},
 		{ApexRecord{Competition: "UkrMO", Level: "regional", School: "2023-2024", Ref: "7.1", SubEvent: "Основний тур відбору команди Києва", Round: "III етап — LXXIX Київська міська олімпіада юних математиків"}, true},

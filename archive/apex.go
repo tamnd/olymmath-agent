@@ -127,6 +127,9 @@ var (
 
 // ApexPlace gives the competition code, the edition year and the problem number of a record, as ua-umo-district, 2001 and p93, or the reason why the record has no place. The number is p, the grade and the number of the problem in the paper of the grade. The Kyiv city olympiad and some regional olympiads have two rounds, each numbered from 1, so problem N of grade G of the first round is aG followed by N and of the second round bG followed by N, as the register numbers two rounds with a and b. The final stage numbers its two days on, as 9.1 to 9.8, so its rounds need no letter.
 func ApexPlace(r ApexRecord) (code string, year int, number, why string) {
+	if code, year, number, why, ok := apexMore(r); ok {
+		return code, year, number, why
+	}
 	st, ok := apexStages[r.Competition+"/"+r.Level]
 	if !ok {
 		return "", 0, "", "no competition of the register for " + r.Competition + "/" + r.Level

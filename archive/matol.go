@@ -23,6 +23,10 @@ var MatolRoots = []MatolRoot{
 	{Node: "/nodes/12", Code: "kz-mo-regional"},
 	{Node: "/nodes/468", Code: "kz-junior"},
 	{Node: "/nodes/157", Code: "kz-smagulov"},
+	{Node: "/nodes/13", Code: "kz-mo"},
+	{Node: "/nodes/110", Code: "kz-almaty"},
+	{Node: "/nodes/111", Code: "kz-zhautykov-city"},
+	{Node: "/nodes/127", Code: "kz-al-farabi"},
 }
 
 // MatolCrumb is a link of the breadcrumb of a page.
@@ -48,6 +52,8 @@ type MatolPage struct {
 	// Crumbs are the links of the breadcrumb, from the top. The page itself is the leaf.
 	Crumbs []MatolCrumb
 	Leaf   string
+	// Title is the heading of the page, as Республиканская олимпиада по математике, 2025 год, 10 класс.
+	Title string
 	// Links are the paths of the nodes and papers that the table of a node lists.
 	Links []string
 	// Problems are the problems of a paper.
@@ -58,6 +64,7 @@ var (
 	matolCrumbsRE  = regexp.MustCompile(`(?s)<ol class="breadcrumb">(.*?)</ol>`)
 	matolCrumbRE   = regexp.MustCompile(`(?s)<a href="([^"]+)">(.*?)</a>`)
 	matolLeafRE    = regexp.MustCompile(`(?s)<li class="active">(.*?)</li>`)
+	matolTitleRE   = regexp.MustCompile(`(?s)<h2>(.*?)</h2>`)
 	matolTableRE   = regexp.MustCompile(`(?s)<table class="table table-striped">(.*?)</table>`)
 	matolLinkRE    = regexp.MustCompile(`href="(/(?:nodes|olympiads)/[0-9]+)"`)
 	matolProblemRE = regexp.MustCompile(`(?s)<b>\s*Задача\s*№\s*([0-9]+)\.?\s*</b>(.*?)<br/>\s*<a href="/comments/([0-9]+)/show"`)
@@ -78,6 +85,9 @@ func ParseMatol(b []byte) MatolPage {
 		if l := matolLeafRE.FindStringSubmatch(m[1]); l != nil {
 			p.Leaf = matolPlain(l[1])
 		}
+	}
+	if m := matolTitleRE.FindStringSubmatch(s); m != nil {
+		p.Title = matolPlain(m[1])
 	}
 	if m := matolTableRE.FindStringSubmatch(s); m != nil {
 		seen := map[string]bool{}
@@ -173,6 +183,8 @@ var (
 	matolYearRE   = regexp.MustCompile(`[0-9]{4}`)
 	matolGradeRE  = regexp.MustCompile(`([0-9]+)\s*класс`)
 	matolTourRE   = regexp.MustCompile(`([0-9]+)\s*(?:тур|день)`)
+	// matolGradesRE takes the first grade of a paper for one grade or two, as 8 of 8-9 классы.
+	matolGradesRE = regexp.MustCompile(`([0-9]+)(?:\s*-\s*[0-9]+)?\s*класс`)
 )
 
 // MatolPlace gives the competition code, the edition year and the position of problem n of a paper page, or the reason why it has no place. The edition is the calendar year of the paper (spec 01f): the district stage is written in the autumn, so it is the first year of the school year, and the other stages and olympiads are written in the spring, so they are its last year.
@@ -180,7 +192,10 @@ var (
 // The position is the grade and the number, after a letter for the round:
 //   - the district and regional stages: p, as p93 for problem 3 of grade 9;
 //   - the junior olympiad: d, r and f for its district, regional and final stage, as r72; the test round of the final stage of 2021 has no position;
-//   - the Smagulov olympiad: a, b and c for its three rounds, as b64, and t for the team round of the grades 6 and 7 together, as t5.
+//   - the Smagulov olympiad: a, b and c for its three rounds, as b64, and t for the team round of the grades 6 and 7 together, as t5;
+//   - the final stage: p and the number for grade 11, as p3, and p and the grade and number for grades 9 and 10, as p104;
+//   - the Almaty olympiad of the physics and mathematics schools: p and the number, as p2;
+//   - the Zhautykov city olympiad and the Al-Farabi olympiad: p, the grade and the number, as p75; a paper for two grades takes the first, as p81 for the grades 8 and 9. The papers of physics have no position.
 func MatolPlace(p MatolPage, n int) (code string, year int, number, why string) {
 	root, mid, ok := MatolRootOf(p)
 	if !ok {
@@ -244,6 +259,52 @@ func MatolPlace(p MatolPage, n int) (code string, year int, number, why string) 
 			return "", 0, "", "no grade and round"
 		}
 		return root.Code, year, letter + grade + num, ""
+	case "kz-mo":
+		// The final stage gives the papers of grade 11 as the national olympiad, which the register numbers p1 to p8.
+		switch grade {
+		case "11":
+			return root.Code, year, "p" + num, ""
+		case "9", "10":
+			return root.Code, year, "p" + grade + num, ""
+		}
+		return "", 0, "", "no grade"
+	case "kz-almaty":
+		return matolAlmaty(p, label, num)
+	case "kz-zhautykov-city", "kz-al-farabi":
+		if strings.Contains(leaf, "физик") {
+			return "", 0, "", "a paper of physics"
+		}
+		m := matolGradesRE.FindStringSubmatch(leaf)
+		if m == nil {
+			return "", 0, "", "no grade"
+		}
+		return root.Code, year, "p" + m[1] + num, ""
 	}
 	return "", 0, "", "no rule for " + root.Code
 }
+
+// matolAlmaty places problem num of a paper of the Almaty olympiad of the physics and mathematics schools. The edition is the calendar year of the sitting. The heading of the papers of 2008 to 2023 gives it, as Алматы, 2023 год. The headings of the 17th to the 20th olympiads give no year, and the site names them for the next year, as 20-я олимпиада (2027): the first comments on their problems were written in December 2023, December 2024, December 2025 and on 3 November 2026, so the sitting is the year before the name. The 17th olympiad was the second sitting of 2023, after the 16th, whose heading gives 2023 and whose first comments are of January 2023, so it has no position.
+func matolAlmaty(p MatolPage, label, num string) (code string, year int, number, why string) {
+	if m := matolHeadYearRE.FindStringSubmatch(p.Title); m != nil {
+		year, _ = strconv.Atoi(m[1])
+		return "kz-almaty", year, "p" + num, ""
+	}
+	m := matolOrdinalRE.FindStringSubmatch(label)
+	if m == nil {
+		return "", 0, "", "no year"
+	}
+	ord, _ := strconv.Atoi(m[1])
+	named, _ := strconv.Atoi(m[2])
+	switch {
+	case ord == 17:
+		return "", 0, "", "the second sitting of 2023"
+	case ord < 17:
+		return "", 0, "", "no year in the heading"
+	}
+	return "kz-almaty", named - 1, "p" + num, ""
+}
+
+var (
+	matolHeadYearRE = regexp.MustCompile(`([0-9]{4})\s*год`)
+	matolOrdinalRE  = regexp.MustCompile(`^([0-9]+)-я олимпиада \(([0-9]{4})\)`)
+)
