@@ -1,8 +1,13 @@
 package ocr
 
 import (
+	"context"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
+
+	"github.com/tamnd/olymmath-agent/lane"
 )
 
 func TestLabels(t *testing.T) {
@@ -61,5 +66,30 @@ func TestPositionDigit(t *testing.T) {
 	}
 	if got := (Labeled{Label: "011246A"}).Digit(); got != 6 {
 		t.Errorf("the digit of 011246A is %d", got)
+	}
+}
+
+func TestRefusalNotCached(t *testing.T) {
+	f := filepath.Join(t.TempDir(), "p1.png")
+	if err := os.WriteFile(f, []byte("page 1"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	ask := lane.AskerFunc(func(context.Context, lane.Question) (lane.Answer, error) {
+		calls++
+		return lane.Answer{Text: "I couldn't transcribe the page because the image file isn't there.", Lane: "claude", Version: "2.1"}, nil
+	})
+	r := &Reader{Asker: ask, Cache: &Cache{Dir: t.TempDir()}}
+	for range 2 {
+		pages, err := r.ReadImages(context.Background(), []string{f})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Contains(pages[0].Flags, FlagRefusal) || pages[0].Cached {
+			t.Errorf("a refusal: %+v", pages[0])
+		}
+	}
+	if calls != 2 {
+		t.Errorf("a refusal came from the cache: %d calls", calls)
 	}
 }

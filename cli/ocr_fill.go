@@ -101,6 +101,12 @@ func runOCRFill(env Env, args []string) int {
 		fmt.Fprintf(env.Stderr, "om ocr-fill: %v\n", err)
 		return ExitFailure
 	}
+	// The lanes run in a directory of their own, so they get the images by an absolute path.
+	o.work, err = filepath.Abs(o.work)
+	if err != nil {
+		fmt.Fprintf(env.Stderr, "om ocr-fill: %v\n", err)
+		return ExitFailure
+	}
 	if err := os.MkdirAll(o.work, 0o750); err != nil {
 		fmt.Fprintf(env.Stderr, "om ocr-fill: %v\n", err)
 		return ExitFailure

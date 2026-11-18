@@ -229,8 +229,11 @@ func (r *Reader) ask(ctx context.Context, img, prompt, version string) (Page, er
 			p.Key = KeyFor(version+" "+a.Lane+"/"+a.Model, b)
 		}
 		e = Entry{Text: a.Text, Lane: a.Lane, Model: a.Model, Version: a.Version, Prompt: version, At: now()}
-		if err := r.Cache.Put(p.Key, e); err != nil {
-			return Page{}, err
+		// A refusal is not the page: the cache keeps it out, so a later run asks again.
+		if _, flags := Clean(e.Text); !slices.Contains(flags, FlagRefusal) {
+			if err := r.Cache.Put(p.Key, e); err != nil {
+				return Page{}, err
+			}
 		}
 	}
 	p.Lane, p.Model, p.Version = e.Lane, e.Model, e.Version
