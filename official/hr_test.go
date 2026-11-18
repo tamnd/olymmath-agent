@@ -199,6 +199,7 @@ func TestHrLegacy(t *testing.T) {
 		{"USIRKN+MSAM10", "^", "∢"},
 		{"TZYURE+MSBM10", "N", "ℕ"},
 		{"TZYURE+MSBM10", "B", "𝔹"},
+		{"QWERTY+PLMathSymbols10", "a\u00adb¬c", "a⩾b⩽c"},
 		{"YJCNKO+CMMI12", "k", "k"},
 	} {
 		if got := hrLegacy(c.family, c.in); got != c.want {
