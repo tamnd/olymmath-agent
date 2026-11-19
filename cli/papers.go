@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc|purple-comet|oma|imosuisse|lhsmath|usamts|bamo|mathhour-uw)", runPapers})
+	register(command{"papers", "record the official papers of each edition (om papers imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc|purple-comet|oma|imosuisse|lhsmath|usamts|bamo|mathhour-uw|chiuchang)", runPapers})
 }
 
 func runPapers(env Env, args []string) int {
@@ -31,8 +31,8 @@ func runPapers(env Env, args []string) int {
 	if err != nil {
 		return ExitUsage
 	}
-	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc", "purple-comet", "oma", "imosuisse", "lhsmath", "usamts", "bamo", "mathhour-uw"}, pos[0]) {
-		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc|purple-comet|oma|imosuisse|lhsmath|usamts|bamo|mathhour-uw")
+	if len(pos) != 1 || !slices.Contains([]string{"imo-official", "usa-tst-archive", "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc", "purple-comet", "oma", "imosuisse", "lhsmath", "usamts", "bamo", "mathhour-uw", "chiuchang"}, pos[0]) {
+		fmt.Fprintln(env.Stderr, "usage: om papers [-from YEAR] [-to YEAR] imo-official|usa-tst-archive|om-sem|bundeswettbewerb|ukmt|hbcse|imojp|amt|vtrmc-official|imc-official|pamo-official|tuymaada-official|georgmohr|spm-opm|mo-cz|elmo-official|dms-rs|aimo-awb|oktatas-oktv|ssmr-onm|dmfa-massa|pmo-ph|stanford-smt|maths-olympiques|pumac-archive|berkeley-mt|nzmoc|purple-comet|oma|imosuisse|lhsmath|usamts|bamo|mathhour-uw|chiuchang")
 		return ExitUsage
 	}
 	corpus, findings := content.Load(*root)
@@ -55,7 +55,7 @@ func runPapers(env Env, args []string) int {
 	switch pos[0] {
 	case "usa-tst-archive":
 		return tstPapers(ctx, env, fc, corpus, *root, *from, *to)
-	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc", "purple-comet", "oma", "imosuisse", "lhsmath", "usamts", "bamo", "mathhour-uw":
+	case "om-sem", "bundeswettbewerb", "ukmt", "hbcse", "imojp", "amt", "vtrmc-official", "imc-official", "pamo-official", "tuymaada-official", "georgmohr", "spm-opm", "mo-cz", "elmo-official", "dms-rs", "aimo-awb", "oktatas-oktv", "ssmr-onm", "dmfa-massa", "pmo-ph", "stanford-smt", "maths-olympiques", "pumac-archive", "berkeley-mt", "nzmoc", "purple-comet", "oma", "imosuisse", "lhsmath", "usamts", "bamo", "mathhour-uw", "chiuchang":
 		return nationalPapers(ctx, env, fc, corpus, *root, pos[0], *from, *to)
 	}
 	comp := corpus.Competition("imo")
@@ -171,6 +171,7 @@ var nationals = map[string]struct {
 	"usamts":            {official.USAMTSListings, content.OfficialPaper{Lang: "English", Code: "en"}, official.USAMTSPapers},
 	"bamo":              {[]string{official.BAMOListing}, content.OfficialPaper{Lang: "English", Code: "en"}, official.BAMOPapers},
 	"mathhour-uw":       {official.MathHourListings, content.OfficialPaper{Lang: "English", Code: "en"}, official.MathHourPapers},
+	"chiuchang":         {official.ChiuchangListings, content.OfficialPaper{Lang: "English", Code: "en"}, official.ChiuchangPapers},
 	"oma":               {[]string{official.OMAListing}, content.OfficialPaper{Lang: "Spanish", Code: "es"}, official.OMAAllPapers},
 	"imosuisse":         {[]string{official.ImosuisseListing}, content.OfficialPaper{Lang: "German", Code: "de"}, official.ImosuissePapers},
 }
